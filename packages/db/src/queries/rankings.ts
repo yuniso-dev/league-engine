@@ -1,4 +1,4 @@
-import { db } from '../client';
+import { getDb } from '../client';
 import { users } from '../schema';
 import { asc, desc, eq, and, ilike, or } from 'drizzle-orm';
 import { toPublicPlayer, type PublicPlayer } from '../dto';
@@ -11,7 +11,7 @@ const baseWhere = () =>
   );
 
 export async function getRankings(): Promise<PublicPlayer[]> {
-  const rows = await db
+  const rows = await getDb()
     .select()
     .from(users)
     .where(baseWhere())
@@ -23,7 +23,7 @@ export async function getRankings(): Promise<PublicPlayer[]> {
 }
 
 export async function searchRankings(q: string): Promise<PublicPlayer[]> {
-  const rows = await db
+  const rows = await getDb()
     .select()
     .from(users)
     .where(

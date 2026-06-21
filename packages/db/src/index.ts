@@ -1,4 +1,4 @@
-export { db } from './client';
+export { getDb } from './client';
 export * from './schema';
 export { getRankings, searchRankings } from './queries/rankings';
 export { getTournaments } from './queries/tournaments';
