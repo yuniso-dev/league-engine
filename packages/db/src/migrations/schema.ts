@@ -86,12 +86,14 @@ export const users = pgTable("users", {
 	isBlacklisted: boolean("is_blacklisted").default(false).notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	publicId: text("public_id"),
 },
 (table) => {
 	return {
 		idxUsersActiveLadder: index("idx_users_active_ladder").using("btree", table.initialised.asc().nullsLast(), table.isInactive.asc().nullsLast()),
 		idxUsersElo: index("idx_users_elo").using("btree", table.elo.desc().nullsFirst()),
 		idxUsersRank: index("idx_users_rank").using("btree", table.rank.asc().nullsLast()),
+		usersPublicIdKey: unique("users_public_id_key").on(table.publicId),
 	}
 });
 
