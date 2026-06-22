@@ -42,6 +42,7 @@ export const users = pgTable('users', {
   peakElo:         numeric('peak_elo', { precision: 7, scale: 2 }),
   peakRank:        integer('peak_rank'),
 
+  publicId:        text('public_id').unique(),
   initialised:     boolean('initialised').notNull().default(false),
   initialisedAt:   timestamp('initialised_at', { withTimezone: true }),
   lastActiveAt:    timestamp('last_active_at', { withTimezone: true }),

@@ -23,8 +23,12 @@ try {
 
 /** @type {import('next').NextConfig} */
 const config = {
-  // Compile workspace packages as source — required since they export TS directly
   transpilePackages: ['@inazuma/db', '@inazuma/core'],
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'cdn.discordapp.com', pathname: '/avatars/**' },
+    ],
+  },
 };
 
 export default config;

@@ -8,6 +8,7 @@ type TournamentRow = InferSelectModel<typeof tournaments>;
 // NEVER expose: discordId, role, isBlacklisted, initialised, initialisedAt,
 //               lastActiveAt, createdAt, updatedAt, or any internal timestamps.
 export type PublicPlayer = {
+  publicId: string;
   username: string;
   displayName: string;
   avatarUrl: string | null;
@@ -30,6 +31,7 @@ export type PublicPlayer = {
 
 export function toPublicPlayer(row: UserRow): PublicPlayer {
   return {
+    publicId: row.publicId!,
     username: row.username,
     displayName: row.displayName,
     avatarUrl: row.avatarUrl,
