@@ -1,9 +1,10 @@
 'use client';
-import { memo } from 'react';
-import type { PublicPlayer } from '@inazuma/db';
+import { memo, useEffect, useState } from 'react';
+import type { PublicPlayer, RatingPoint } from '@inazuma/db';
 import { Bolt } from '@/components/ui/Bolt';
 import { Avatar } from '@/components/ui/Avatar';
 import { CountUp } from '@/components/ui/CountUp';
+import { RatingGraph } from '@/components/RatingGraph';
 import { Tilt } from '@/components/ui/Tilt';
 import { REALMS, T, FONT_D, FONT_B, FONT_M, rankColor, lighten, rgba, glass } from '@/lib/realm-colors';
 
@@ -23,6 +24,20 @@ function initials(name: string): string {
 export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, isLoggedIn = false, currentUser = null }: Props) {
   const accent = REALMS[2].accent;
   const aGlow  = lighten(accent, 0.35);
+
+  const [history, setHistory] = useState<RatingPoint[]>([]);
+  const publicId = player?.publicId ?? null;
+
+  useEffect(() => {
+    setHistory([]);
+    if (!publicId) return;
+    let alive = true;
+    fetch(`/api/history/${publicId}`)
+      .then(r => (r.ok ? r.json() : []))
+      .then((points: RatingPoint[]) => { if (alive) setHistory(points); })
+      .catch(() => { /* graph is optional chrome — profile renders without it */ });
+    return () => { alive = false; };
+  }, [publicId]);
 
   if (!player) {
     const header = (
@@ -226,6 +241,19 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
           </div>
         ))}
       </div>
+
+      {/* rating history */}
+      {history.length >= 2 && (
+        <div style={{ ...glass({ padding: 18 }), marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <Bolt size={13} color={accent} />
+            <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+              RATING HISTORY
+            </h3>
+          </div>
+          <RatingGraph points={history} />
+        </div>
+      )}
 
       {/* bio / scouting report */}
       {player.bio && (

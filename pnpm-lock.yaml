@@ -63,6 +63,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@inazuma/core':
+        specifier: workspace:*
+        version: link:../core
       drizzle-orm:
         specifier: ^0.33.0
         version: 0.33.0(@types/react@18.3.31)(postgres@3.4.9)(react@18.3.1)

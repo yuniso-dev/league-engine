@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
-import { getUserByPublicId } from '@inazuma/db';
+import { getUserByPublicId, getRatingHistoryByPublicId } from '@inazuma/db';
 import { Avatar } from '@/components/ui/Avatar';
+import { RatingGraph } from '@/components/RatingGraph';
 import { glass, T, FONT_D, FONT_B, FONT_M, rankColor } from '@/lib/realm-colors';
 
 export const dynamic = 'force-dynamic';
@@ -10,6 +11,7 @@ type Props = { params: { publicId: string } };
 export default async function PublicProfilePage({ params }: Props) {
   const player = await getUserByPublicId(params.publicId);
   if (!player) notFound();
+  const history = await getRatingHistoryByPublicId(params.publicId);
 
   const initials = player.displayName.slice(0, 2).toUpperCase();
   const showRank = player.rank !== null && !player.provisional;
@@ -92,6 +94,19 @@ export default async function PublicProfilePage({ params }: Props) {
             marginBottom: 20,
           }}>
             Provisional — {player.gamesPlayed}/5 placement games
+          </div>
+        )}
+
+        {/* Rating history */}
+        {history.length >= 2 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{
+              fontFamily: FONT_M, fontSize: 10, color: T.faint,
+              letterSpacing: 1, marginBottom: 8,
+            }}>
+              RATING HISTORY
+            </div>
+            <RatingGraph points={history} />
           </div>
         )}
 

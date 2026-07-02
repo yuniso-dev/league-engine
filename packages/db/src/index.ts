@@ -35,5 +35,12 @@ export type {
   AdminMatch,
   AdminTournamentDetail,
 } from './queries/admin';
+export { previewReveal, commitReveal, getRatingHistoryByPublicId } from './queries/reveal';
+export type {
+  RevealPreview,
+  RevealPlayerPreview,
+  RevealMatchPreview,
+  RatingPoint,
+} from './queries/reveal';
 export { toPublicPlayer, toPublicTournament } from './dto';
 export type { PublicPlayer, PublicTournament } from './dto';

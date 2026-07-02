@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import {
   MATCH_STAGES,
+  commitReveal,
   createMatch,
   createTeam,
   createTournament,
@@ -17,7 +18,7 @@ import {
 import { requireAdminAction } from '@/lib/admin';
 
 // All admin forms use useFormState so validation problems surface inline.
-export type AdminFormState = { error?: string; ok?: boolean };
+export type AdminFormState = { error?: string; ok?: boolean; message?: string };
 
 function message(e: unknown): string {
   return e instanceof Error ? e.message : 'Something went wrong.';
@@ -230,6 +231,27 @@ export async function deleteMatchAction(
     await deleteMatch(admin.discordId, matchId);
     revalidatePath(`/admin/tournaments/${tournamentId}`);
     return { ok: true };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function commitRevealAction(
+  _prev: AdminFormState,
+  _formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+
+    const { matches, players } = await commitReveal(admin.discordId);
+    if (matches === 0) return { error: 'Nothing to process — no pending ranked matches.' };
+
+    revalidatePath('/admin/reveal');
+    revalidatePath('/');
+    return {
+      ok: true,
+      message: `Reveal committed — ${matches} match${matches === 1 ? '' : 'es'}, ${players} player${players === 1 ? '' : 's'} updated.`,
+    };
   } catch (e) {
     return { error: message(e) };
   }
