@@ -21,23 +21,42 @@ export default async function AdminDashboard() {
             Create tournaments, build teams and enter results.
           </p>
         </div>
-        <Link
-          href="/admin/tournaments/new"
-          style={{
-            padding: '10px 18px',
-            background: ADMIN_ACCENT,
-            borderRadius: 10,
-            color: '#fff',
-            fontFamily: FONT_D,
-            fontSize: 14,
-            letterSpacing: 1.5,
-            textDecoration: 'none',
-            whiteSpace: 'nowrap',
-            boxShadow: `0 0 18px ${rgba(ADMIN_ACCENT, 0.35)}`,
-          }}
-        >
-          + NEW
-        </Link>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Link
+            href="/admin/reveal"
+            style={{
+              padding: '10px 18px',
+              background: 'none',
+              border: `1px solid ${rgba(ADMIN_ACCENT, 0.5)}`,
+              borderRadius: 10,
+              color: ADMIN_ACCENT,
+              fontFamily: FONT_D,
+              fontSize: 14,
+              letterSpacing: 1.5,
+              textDecoration: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            ⚡ REVEAL
+          </Link>
+          <Link
+            href="/admin/tournaments/new"
+            style={{
+              padding: '10px 18px',
+              background: ADMIN_ACCENT,
+              borderRadius: 10,
+              color: '#fff',
+              fontFamily: FONT_D,
+              fontSize: 14,
+              letterSpacing: 1.5,
+              textDecoration: 'none',
+              whiteSpace: 'nowrap',
+              boxShadow: `0 0 18px ${rgba(ADMIN_ACCENT, 0.35)}`,
+            }}
+          >
+            + NEW
+          </Link>
+        </div>
       </div>
 
       {tournaments.length === 0 ? (
