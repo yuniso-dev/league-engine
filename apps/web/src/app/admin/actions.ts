@@ -1,7 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import {
   MATCH_STAGES,
   commitReveal,
@@ -16,6 +16,7 @@ import {
   grantAward,
   revokeAward,
   updateConfig,
+  updatePlayerProfileByAdmin,
   updateTournament,
   updateTournamentStatus,
   type MatchStage,
@@ -53,6 +54,7 @@ export async function createTournamentAction(
       ranked: formData.get('ranked') === 'on',
       date: str(formData, 'date') || null,
     });
+    revalidateTag('tournaments');
   } catch (e) {
     return { error: message(e) };
   }
@@ -80,6 +82,7 @@ export async function updateTournamentAction(
       ranked: formData.get('ranked') === 'on',
       date: str(formData, 'date') || null,
     });
+    revalidateTag('tournaments');
   } catch (e) {
     return { error: message(e) };
   }
@@ -96,6 +99,7 @@ export async function deleteTournamentAction(
     if (!tournamentId) return { error: 'Missing tournament.' };
 
     await deleteTournament(admin.discordId, tournamentId);
+    revalidateTag('tournaments');
   } catch (e) {
     return { error: message(e) };
   }
@@ -125,6 +129,7 @@ export async function updateTournamentStatusAction(
 
     revalidatePath(`/admin/tournaments/${tournamentId}`);
     revalidatePath('/admin');
+    revalidateTag('tournaments');
     return { ok: true };
   } catch (e) {
     return { error: message(e) };
@@ -253,6 +258,7 @@ export async function commitRevealAction(
 
     revalidatePath('/admin/reveal');
     revalidatePath('/');
+    revalidateTag('rankings');
     return {
       ok: true,
       message: `Reveal committed — ${matches} match${matches === 1 ? '' : 'es'}, ${players} player${players === 1 ? '' : 's'} updated.`,
@@ -275,7 +281,19 @@ export async function createAwardAction(
     const icon = str(formData, 'icon').slice(0, 8) || null;
     const description = str(formData, 'description').slice(0, 200) || null;
 
-    await createAward(admin.discordId, { name, icon, description });
+    const imageUrlRaw = str(formData, 'imageUrl').slice(0, 500);
+    let imageUrl: string | null = null;
+    if (imageUrlRaw) {
+      try {
+        const u = new URL(imageUrlRaw);
+        if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error();
+        imageUrl = u.toString();
+      } catch {
+        return { error: 'Image URL must be a valid http(s) link.' };
+      }
+    }
+
+    await createAward(admin.discordId, { name, icon, imageUrl, description });
     revalidatePath('/admin/awards');
     return { ok: true };
   } catch (e) {
@@ -321,7 +339,11 @@ export async function grantAwardAction(
     }
 
     await grantAward(admin.discordId, { awardId, publicId, tournamentId, season });
-    revalidatePath(`/admin/awards/${awardId}`);
+    // Submitted either from the award's page or a player's admin page —
+    // refresh whichever surface the form lives on.
+    const playerPublicId = str(formData, 'playerPublicId');
+    if (playerPublicId) revalidatePath(`/admin/players/${playerPublicId}`);
+    else revalidatePath(`/admin/awards/${awardId}`);
     return { ok: true };
   } catch (e) {
     return { error: message(e) };
@@ -340,8 +362,52 @@ export async function revokeAwardAction(
     if (!userAwardId) return { error: 'Missing grant.' };
 
     await revokeAward(admin.discordId, userAwardId);
-    revalidatePath(`/admin/awards/${awardId}`);
+    const playerPublicId = str(formData, 'playerPublicId');
+    if (playerPublicId) revalidatePath(`/admin/players/${playerPublicId}`);
+    else revalidatePath(`/admin/awards/${awardId}`);
     return { ok: true };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function updatePlayerProfileAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+
+    const publicId = str(formData, 'publicId');
+    if (!publicId) return { error: 'Missing player.' };
+
+    const title = str(formData, 'title').slice(0, 40) || null;
+    const characterNote = str(formData, 'characterNote').slice(0, 600) || null;
+    const achievements = str(formData, 'achievements').slice(0, 1000) || null;
+
+    const accentRaw = str(formData, 'accentColor');
+    let accentColor: string | null = null;
+    if (accentRaw) {
+      if (!/^#[0-9a-f]{6}$/i.test(accentRaw)) {
+        return { error: 'Accent colour must be a hex code like #ff7a1a.' };
+      }
+      accentColor = accentRaw.toLowerCase();
+    }
+
+    await updatePlayerProfileByAdmin(admin.discordId, publicId, {
+      title,
+      characterNote,
+      achievements,
+      showCharacter: formData.get('showCharacter') === 'on',
+      showAchievements: formData.get('showAchievements') === 'on',
+      showAwards: formData.get('showAwards') === 'on',
+      accentColor,
+    });
+
+    revalidatePath(`/admin/players/${publicId}`);
+    revalidatePath(`/p/${publicId}`);
+    revalidateTag('rankings'); // title/accent flow into the public player payload
+    return { ok: true, message: 'Profile saved.' };
   } catch (e) {
     return { error: message(e) };
   }

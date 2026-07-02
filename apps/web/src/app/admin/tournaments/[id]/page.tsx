@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getAdminTournament, listPlayersForAdmin } from '@inazuma/db';
+import { getAdminTournament } from '@inazuma/db';
 import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, FONT_M, T, glass, rgba } from '@/lib/realm-colors';
 import { STAGE_LABELS, STATUS_COLORS } from '@/components/admin/ui';
@@ -23,10 +23,7 @@ const sectionTitle: React.CSSProperties = {
 export default async function AdminTournamentPage({ params }: { params: { id: string } }) {
   await requireAdmin();
 
-  const [detail, players] = await Promise.all([
-    getAdminTournament(params.id),
-    listPlayersForAdmin(),
-  ]);
+  const detail = await getAdminTournament(params.id);
   if (!detail) notFound();
 
   const { tournament, teams, matches } = detail;
@@ -151,7 +148,6 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
       )}
       <TeamForm
         tournamentId={tournament.id}
-        players={players}
         takenPublicIds={takenPublicIds}
       />
 

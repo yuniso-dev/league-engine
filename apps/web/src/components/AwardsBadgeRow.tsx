@@ -3,6 +3,35 @@ import { T, FONT_B, rgba } from '@/lib/realm-colors';
 
 type Props = { awards: PublicAward[] };
 
+// Plain <img> on purpose: award images come from arbitrary admin-chosen hosts,
+// which next/image would need a wildcard remotePatterns entry for — turning the
+// image optimizer into an open proxy for ~20px decorative icons.
+export function AwardBadgeIcon({
+  imageUrl,
+  icon,
+  size = 18,
+}: {
+  imageUrl: string | null;
+  icon: string | null;
+  size?: number;
+}) {
+  if (imageUrl) {
+    return (
+      <img
+        src={imageUrl}
+        width={size}
+        height={size}
+        alt=""
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        style={{ objectFit: 'cover', borderRadius: size / 4, display: 'block', flexShrink: 0 }}
+      />
+    );
+  }
+  if (icon) return <span>{icon}</span>;
+  return null;
+}
+
 export function AwardsBadgeRow({ awards }: Props) {
   if (awards.length === 0) return null;
 
@@ -25,7 +54,7 @@ export function AwardsBadgeRow({ awards }: Props) {
             color: T.text,
           }}
         >
-          {a.icon && <span>{a.icon}</span>}
+          <AwardBadgeIcon imageUrl={a.imageUrl} icon={a.icon} />
           {a.name}
         </span>
       ))}

@@ -25,6 +25,11 @@ export type PublicPlayer = {
   country: string | null;
   quote: string | null;
   bio: string | null;
+  title: string | null;
+  characterNote: string | null;   // null when the admin has hidden the section
+  achievements: string | null;    // null when the admin has hidden the section
+  showAwards: boolean;
+  accentColor: string | null;
   tier: 'free' | 'premium';
   eventsAttended: number;
 };
@@ -48,6 +53,11 @@ export function toPublicPlayer(row: UserRow): PublicPlayer {
     country: row.country,
     quote: row.quote,
     bio: row.bio,
+    title: row.title,
+    characterNote: row.showCharacter ? row.characterNote : null,
+    achievements: row.showAchievements ? row.achievements : null,
+    showAwards: row.showAwards,
+    accentColor: row.accentColor,
     tier: row.tier,
     eventsAttended: row.eventsAttended,
   };

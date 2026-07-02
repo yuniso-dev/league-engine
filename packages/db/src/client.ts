@@ -11,8 +11,10 @@ let _db: Db | undefined;
 export function getDb(): Db {
   if (!_db) {
     const queryClient = postgres(process.env.DATABASE_URL!, {
-      prepare: false, // required for PgBouncer transaction mode (port 6543)
-      max: 1,         // keep Vercel serverless from exhausting the pool
+      prepare: false,      // required for PgBouncer transaction mode (port 6543)
+      max: 1,              // keep Vercel serverless from exhausting the pool
+      idle_timeout: 20,    // release idle lambda connections back to Supabase quickly
+      connect_timeout: 10, // fail fast instead of hanging a request
     });
     _db = drizzle(queryClient, { schema });
   }

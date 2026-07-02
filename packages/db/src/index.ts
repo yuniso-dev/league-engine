@@ -60,6 +60,18 @@ export type {
   PublicTeamMember,
   PublicBracketMatch,
 } from './queries/frontier';
+export { getRecentMatchesForPlayer } from './queries/profile';
+export type { PublicRecentMatch } from './queries/profile';
+export {
+  listPlayersDirectory,
+  getAdminPlayer,
+  updatePlayerProfileByAdmin,
+} from './queries/adminPlayers';
+export type {
+  AdminPlayerListItem,
+  AdminPlayerAwardGrant,
+  AdminPlayerDetail,
+} from './queries/adminPlayers';
 export { previewReveal, commitReveal, getRatingHistoryByPublicId } from './queries/reveal';
 export type {
   RevealPreview,

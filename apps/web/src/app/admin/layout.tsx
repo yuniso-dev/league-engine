@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { FONT_B, FONT_D, T } from '@/lib/realm-colors';
+import { FONT_D, T } from '@/lib/realm-colors';
 import { ADMIN_ACCENT } from '@/components/admin/ui';
+import { BackPill } from '@/components/ui/BackPill';
 
 // Chrome only — the role gate runs in every /admin page (requireAdmin) and
 // every mutation (requireAdminAction), so client-side navigation can't skip it.
@@ -22,12 +23,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             INAZUMA <span style={{ color: ADMIN_ACCENT }}>ADMIN</span>
           </span>
         </Link>
-        <Link
-          href="/"
-          style={{ fontFamily: FONT_B, fontSize: 13, color: T.dim, textDecoration: 'none' }}
-        >
-          ← Back to site
-        </Link>
+        <BackPill href="/" label="BACK TO SITE" accent={ADMIN_ACCENT} />
       </header>
       <main style={{ maxWidth: 900, margin: '0 auto', padding: '28px 16px 64px' }}>
         {children}

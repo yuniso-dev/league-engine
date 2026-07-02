@@ -1,11 +1,12 @@
 'use client';
 import { memo, useEffect, useState } from 'react';
-import type { PublicAward, PublicPlayer, RatingPoint } from '@inazuma/db';
+import type { PublicAward, PublicPlayer, PublicRecentMatch, RatingPoint } from '@inazuma/db';
 import { Bolt } from '@/components/ui/Bolt';
 import { Avatar } from '@/components/ui/Avatar';
 import { CountUp } from '@/components/ui/CountUp';
 import { RatingGraph } from '@/components/RatingGraph';
 import { AwardsBadgeRow } from '@/components/AwardsBadgeRow';
+import { RecentMatchesCard } from '@/components/RecentMatchesCard';
 import { Tilt } from '@/components/ui/Tilt';
 import { REALMS, T, FONT_D, FONT_B, FONT_M, rankColor, lighten, rgba, glass } from '@/lib/realm-colors';
 
@@ -22,33 +23,31 @@ function initials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
+type ProfileExtras = {
+  history: RatingPoint[];
+  awards: PublicAward[];
+  matches: PublicRecentMatch[];
+};
+
+const NO_EXTRAS: ProfileExtras = { history: [], awards: [], matches: [] };
+
 export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, isLoggedIn = false, currentUser = null }: Props) {
-  const accent = REALMS[2].accent;
+  // Player accent subtly tints the page; falls back to the profile realm's orange.
+  const accent = player?.accentColor ?? REALMS[2].accent;
   const aGlow  = lighten(accent, 0.35);
 
-  const [history, setHistory] = useState<RatingPoint[]>([]);
-  const [awards, setAwards] = useState<PublicAward[]>([]);
+  const [extras, setExtras] = useState<ProfileExtras>(NO_EXTRAS);
+  const { history, awards, matches } = extras;
   const publicId = player?.publicId ?? null;
 
   useEffect(() => {
-    setHistory([]);
+    setExtras(NO_EXTRAS);
     if (!publicId) return;
     let alive = true;
-    fetch(`/api/history/${publicId}`)
-      .then(r => (r.ok ? r.json() : []))
-      .then((points: RatingPoint[]) => { if (alive) setHistory(points); })
-      .catch(() => { /* graph is optional chrome — profile renders without it */ });
-    return () => { alive = false; };
-  }, [publicId]);
-
-  useEffect(() => {
-    setAwards([]);
-    if (!publicId) return;
-    let alive = true;
-    fetch(`/api/awards/${publicId}`)
-      .then(r => (r.ok ? r.json() : []))
-      .then((list: PublicAward[]) => { if (alive) setAwards(list); })
-      .catch(() => { /* badges are optional chrome — profile renders without them */ });
+    fetch(`/api/profile/${publicId}`)
+      .then(r => (r.ok ? r.json() : NO_EXTRAS))
+      .then((data: ProfileExtras) => { if (alive) setExtras(data); })
+      .catch(() => { /* graph/badges/matches are optional chrome — profile renders without them */ });
     return () => { alive = false; };
   }, [publicId]);
 
@@ -183,7 +182,12 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
 
       {/* hero card */}
       <Tilt style={{ marginBottom: 12 }}>
-        <div style={glass({ padding: 24, position: 'relative', overflow: 'hidden' })}>
+        <div style={glass({
+          padding: 24,
+          position: 'relative',
+          overflow: 'hidden',
+          borderTop: `1px solid ${rgba(accent, 0.35)}`,
+        })}>
           <div style={{
             position: 'absolute', top: -50, right: -50,
             width: 180, height: 180,
@@ -199,6 +203,18 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
                 </span>
                 {player.country && <span style={{ fontSize: 22 }}>{player.country}</span>}
               </div>
+              {player.title && (
+                <div style={{
+                  fontFamily: FONT_M,
+                  fontSize: 11,
+                  letterSpacing: 2.5,
+                  textTransform: 'uppercase',
+                  color: aGlow,
+                  marginTop: 4,
+                }}>
+                  {player.title}
+                </div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 9, flexWrap: 'wrap' }}>
                 <span style={{ fontFamily: FONT_D, fontSize: 18, color: showRank ? rc : T.faint }}>
                   {rankLabel}
@@ -256,9 +272,29 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
       </div>
 
       {/* awards */}
-      {awards.length > 0 && (
+      {player.showAwards && awards.length > 0 && (
         <div style={{ ...glass({ padding: 18 }), marginBottom: 12 }}>
           <AwardsBadgeRow awards={awards} />
+        </div>
+      )}
+
+      {/* achievements — admin-curated, hidden server-side when toggled off */}
+      {player.achievements && (
+        <div style={{ ...glass({ padding: 18 }), marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <Bolt size={13} color={accent} />
+            <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+              ACHIEVEMENTS
+            </h3>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {player.achievements.split('\n').map(a => a.trim()).filter(Boolean).map((a, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 9 }}>
+                <Bolt size={9} color={aGlow} style={{ flexShrink: 0 }} />
+                <span style={{ color: T.text, fontFamily: FONT_B, fontSize: 14, lineHeight: 1.5 }}>{a}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -272,6 +308,24 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
             </h3>
           </div>
           <RatingGraph points={history} />
+        </div>
+      )}
+
+      {/* recent matches */}
+      <RecentMatchesCard matches={matches} accent={accent} />
+
+      {/* character — admin-curated, hidden server-side when toggled off */}
+      {player.characterNote && (
+        <div style={{ ...glass({ padding: 22, borderLeft: `3px solid ${accent}` }), marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
+            <Bolt size={13} color={accent} />
+            <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+              CHARACTER
+            </h3>
+          </div>
+          <p style={{ color: T.text, fontFamily: FONT_B, fontSize: 14.5, lineHeight: 1.75, margin: 0, opacity: 0.92 }}>
+            {player.characterNote}
+          </p>
         </div>
       )}
 

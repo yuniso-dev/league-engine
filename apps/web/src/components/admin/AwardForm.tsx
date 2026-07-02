@@ -60,6 +60,17 @@ export default function AwardForm() {
           <input name="description" maxLength={200} placeholder="Won a Frontier tournament" style={inputBase} />
         </div>
 
+        <div style={{ marginTop: 12 }}>
+          <label style={labelStyle}>Image URL (optional — shown instead of the icon)</label>
+          <input
+            name="imageUrl"
+            maxLength={500}
+            autoComplete="off"
+            placeholder="https://…/badge.png"
+            style={inputBase}
+          />
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 16 }}>
           <SubmitButton />
           {state.error && (

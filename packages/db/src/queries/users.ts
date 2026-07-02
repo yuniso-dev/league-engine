@@ -125,6 +125,7 @@ export async function updateSettings(
     country: string | null;
     quote?: string | null;
     bio?: string | null;
+    accentColor?: string | null;
   },
 ): Promise<void> {
   await getDb()
@@ -137,6 +138,7 @@ export async function updateSettings(
       country: data.country,
       ...(data.quote !== undefined && { quote: data.quote }),
       ...(data.bio !== undefined && { bio: data.bio }),
+      ...(data.accentColor !== undefined && { accentColor: data.accentColor }),
       updatedAt: new Date(),
     })
     .where(eq(users.discordId, discordId));
