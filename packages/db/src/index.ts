@@ -3,6 +3,7 @@ export * from './schema';
 export { getRankings, searchRankings } from './queries/rankings';
 export { getTournaments } from './queries/tournaments';
 export { getHealth } from './queries/health';
+export type { HealthResult } from './queries/health';
 export {
   upsertDiscordUser,
   getUserByDiscordId,
