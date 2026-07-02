@@ -12,6 +12,7 @@ const DEFAULT_CONFIG: ConfigRow = {
   currentSeason: 1,
   guildId: null,
   rankingsMessageId: null,
+  rankingsChannelId: null,
   eloBase: '1000',
   kPlacement: 60,
   kEstablished: 24,

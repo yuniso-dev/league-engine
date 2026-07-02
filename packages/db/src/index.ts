@@ -1,4 +1,12 @@
-export { getDb } from './client';
+export { getDb, closeDb } from './client';
+export {
+  listPlayersForNicknames,
+  syncGuildMember,
+  setUserInactive,
+  listTrackedUsers,
+  setRankingsRef,
+} from './queries/bot';
+export type { NicknamePlayer } from './queries/bot';
 export * from './schema';
 export { getRankings, searchRankings } from './queries/rankings';
 export { getTournaments } from './queries/tournaments';
