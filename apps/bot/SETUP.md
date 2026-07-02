@@ -66,6 +66,16 @@ The bot must run 24/7, which Vercel can't do. Railway (~$5/month hobby plan) dep
 4. Try **`/profile`** — yours, or pick another player.
 5. After your next **weekly reveal** on the site, nicknames and the rankings message update within ~5 minutes. To force it immediately, run **`/syncnicks`**.
 
+## Switching from another rank/nickname bot
+
+Two bots must never manage nicknames at the same time — they'll overwrite each other. If you're replacing an old rank bot (especially one that left glitched names like `#58 #69 name [ST/CB] [ST/CB]`), do this **in order**:
+
+1. **Disable the old bot's nickname feature, or remove the old bot.** Do this first so nothing fights our bot.
+2. Run **`/resetnicknames`** with `confirm: True` (admins only). This clears **everyone's** nickname back to their plain Discord name, wiping the old bot's leftover tags. On a big server it takes a few minutes and reports the counts when done. *(Note: it also clears nicknames people set themselves — it's a clean slate.)*
+3. Run **`/syncnicks`** to stamp your league players with the correct `#rank Name | ST/GK` format.
+
+Our bot rebuilds each nickname from scratch every time, so it can't produce the stacked/duplicated glitch the old bot did.
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -73,7 +83,7 @@ The bot must run 24/7, which Vercel can't do. Railway (~$5/month hobby plan) dep
 | Bot is offline | Check the Railway logs; usually a wrong `DISCORD_BOT_TOKEN`. |
 | Log says "Used disallowed intents" | Step 1.3 — turn **SERVER MEMBERS INTENT** on, then redeploy. |
 | Log says "No Guild ID configured" | Step 2 — paste your server ID into Admin → Settings. It picks it up within 60s. |
-| Slash commands don't appear | The bot registers them on startup *after* the Guild ID is set — check the logs for "registered 4 slash commands", and try re-opening Discord. |
+| Slash commands don't appear | The bot registers them on startup *after* the Guild ID is set — check the logs for "registered … slash commands", and try re-opening Discord. |
 | Nicknames don't change | Step 1.6 — drag the bot's role above your members' roles. The **server owner** can never be renamed (Discord rule). |
 | Rankings message stopped updating | It was probably deleted — run `/postleaderboard` again in the channel you want. |
 | "Something went wrong" from a command | Transient database hiccup — try again; if it persists, check `https://inazuma-fc.vercel.app/api/health`. |
