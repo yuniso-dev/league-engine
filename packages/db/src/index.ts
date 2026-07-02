@@ -35,6 +35,31 @@ export type {
   AdminMatch,
   AdminTournamentDetail,
 } from './queries/admin';
+export {
+  listAwardsForAdmin,
+  createAward,
+  getAdminAward,
+  deleteAward,
+  grantAward,
+  revokeAward,
+  listAwardsForPlayer,
+} from './queries/awards';
+export type {
+  AwardRow,
+  AdminAward,
+  AdminAwardGrant,
+  AdminAwardDetail,
+  PublicAward,
+} from './queries/awards';
+export { getConfig, updateConfig } from './queries/config';
+export type { ConfigRow } from './queries/config';
+export { getTournamentDetail } from './queries/frontier';
+export type {
+  PublicTournamentDetail,
+  PublicBracketTeam,
+  PublicTeamMember,
+  PublicBracketMatch,
+} from './queries/frontier';
 export { previewReveal, commitReveal, getRatingHistoryByPublicId } from './queries/reveal';
 export type {
   RevealPreview,

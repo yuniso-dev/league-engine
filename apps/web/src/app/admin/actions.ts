@@ -5,12 +5,17 @@ import { revalidatePath } from 'next/cache';
 import {
   MATCH_STAGES,
   commitReveal,
+  createAward,
   createMatch,
   createTeam,
   createTournament,
+  deleteAward,
   deleteMatch,
   deleteTeam,
   deleteTournament,
+  grantAward,
+  revokeAward,
+  updateConfig,
   updateTournament,
   updateTournamentStatus,
   type MatchStage,
@@ -252,6 +257,128 @@ export async function commitRevealAction(
       ok: true,
       message: `Reveal committed — ${matches} match${matches === 1 ? '' : 'es'}, ${players} player${players === 1 ? '' : 's'} updated.`,
     };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function createAwardAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+
+    const name = str(formData, 'name').slice(0, 60);
+    if (!name) return { error: 'Name is required.' };
+
+    const icon = str(formData, 'icon').slice(0, 8) || null;
+    const description = str(formData, 'description').slice(0, 200) || null;
+
+    await createAward(admin.discordId, { name, icon, description });
+    revalidatePath('/admin/awards');
+    return { ok: true };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function deleteAwardAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+
+    const awardId = str(formData, 'awardId');
+    if (!awardId) return { error: 'Missing award.' };
+
+    await deleteAward(admin.discordId, awardId);
+    revalidatePath('/admin/awards');
+    return { ok: true };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function grantAwardAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  const awardId = str(formData, 'awardId');
+  try {
+    const admin = await requireAdminAction();
+    if (!awardId) return { error: 'Missing award.' };
+
+    const publicId = str(formData, 'publicId');
+    if (!publicId) return { error: 'Pick a player.' };
+
+    const tournamentId = str(formData, 'tournamentId') || null;
+    const seasonRaw = str(formData, 'season');
+    const season = seasonRaw ? parseInt(seasonRaw, 10) : null;
+    if (season !== null && (!Number.isInteger(season) || season < 1)) {
+      return { error: 'Season must be a positive number.' };
+    }
+
+    await grantAward(admin.discordId, { awardId, publicId, tournamentId, season });
+    revalidatePath(`/admin/awards/${awardId}`);
+    return { ok: true };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function revokeAwardAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  const awardId = str(formData, 'awardId');
+  try {
+    const admin = await requireAdminAction();
+
+    const userAwardId = str(formData, 'userAwardId');
+    if (!userAwardId) return { error: 'Missing grant.' };
+
+    await revokeAward(admin.discordId, userAwardId);
+    revalidatePath(`/admin/awards/${awardId}`);
+    return { ok: true };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function updateConfigAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+
+    const num = (key: string) => parseFloat(str(formData, key));
+    const currentSeason = parseInt(str(formData, 'currentSeason'), 10);
+    const eloBase = num('eloBase');
+    const kPlacement = parseInt(str(formData, 'kPlacement'), 10);
+    const kEstablished = parseInt(str(formData, 'kEstablished'), 10);
+    const placementGames = parseInt(str(formData, 'placementGames'), 10);
+    const movMultiplierCap = num('movMultiplierCap');
+
+    if (!Number.isInteger(currentSeason) || currentSeason < 1) return { error: 'Season must be a positive number.' };
+    if (!Number.isFinite(eloBase) || eloBase <= 0) return { error: 'Elo base must be a positive number.' };
+    if (!Number.isInteger(kPlacement) || kPlacement <= 0) return { error: 'Placement K-factor must be a positive number.' };
+    if (!Number.isInteger(kEstablished) || kEstablished <= 0) return { error: 'Established K-factor must be a positive number.' };
+    if (!Number.isInteger(placementGames) || placementGames < 1) return { error: 'Placement games must be at least 1.' };
+    if (!Number.isFinite(movMultiplierCap) || movMultiplierCap < 1) return { error: 'Margin cap must be at least 1.' };
+
+    const guildId = str(formData, 'guildId') || null;
+    const rankingsMessageId = str(formData, 'rankingsMessageId') || null;
+
+    await updateConfig(admin.discordId, {
+      currentSeason, eloBase, kPlacement, kEstablished, placementGames, movMultiplierCap,
+      guildId, rankingsMessageId,
+    });
+
+    revalidatePath('/admin/settings');
+    return { ok: true, message: 'Settings saved.' };
   } catch (e) {
     return { error: message(e) };
   }

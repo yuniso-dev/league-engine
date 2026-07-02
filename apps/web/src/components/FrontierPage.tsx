@@ -1,5 +1,6 @@
 'use client';
 import { memo } from 'react';
+import Link from 'next/link';
 import type { PublicTournament } from '@inazuma/db';
 import { Bolt } from '@/components/ui/Bolt';
 import { REALMS, T, FONT_D, FONT_B, FONT_M, rgba, glass } from '@/lib/realm-colors';
@@ -34,16 +35,19 @@ export const FrontierPage = memo(function FrontierPage({ tournaments }: Props) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {tournaments.map((f, i) => (
-            <div
+            <Link
               key={f.id}
+              href={`/frontier/${f.id}`}
               className="rise"
               style={{
+                textDecoration: 'none',
                 animationDelay: `${i * 70}ms`,
                 ...glass({
                   padding: 20,
                   borderLeft: `3px solid ${f.status === 'live' ? REALMS[2].accent : accent}`,
                   position: 'relative',
                   overflow: 'hidden',
+                  display: 'block',
                 }),
               }}
             >
@@ -97,7 +101,7 @@ export const FrontierPage = memo(function FrontierPage({ tournaments }: Props) {
                   </div>
                 )}
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { FONT_B, T } from '@/lib/realm-colors';
-import type { MatchStage } from '@inazuma/db';
+
+export { STAGE_LABELS, STATUS_COLORS } from '@/lib/tournament-ui';
 
 export const ADMIN_ACCENT = '#3D8BFF';
 
@@ -27,18 +28,3 @@ export const inputBase: CSSProperties = {
   boxSizing: 'border-box',
 };
 
-export const STAGE_LABELS: Record<MatchStage, string> = {
-  group: 'Group',
-  round_of_16: 'Round of 16',
-  quarter: 'Quarter-final',
-  semi: 'Semi-final',
-  final: 'Final',
-  third_place: 'Third place',
-  friendly: 'Friendly',
-};
-
-export const STATUS_COLORS: Record<'upcoming' | 'live' | 'completed', string> = {
-  upcoming: '#8B5CF6',
-  live: '#3DDC97',
-  completed: '#94A3C4',
-};

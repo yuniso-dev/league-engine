@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation';
-import { getUserByPublicId, getRatingHistoryByPublicId } from '@inazuma/db';
+import { getUserByPublicId, getRatingHistoryByPublicId, listAwardsForPlayer } from '@inazuma/db';
 import { Avatar } from '@/components/ui/Avatar';
 import { RatingGraph } from '@/components/RatingGraph';
+import { AwardsBadgeRow } from '@/components/AwardsBadgeRow';
 import { glass, T, FONT_D, FONT_B, FONT_M, rankColor } from '@/lib/realm-colors';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +12,10 @@ type Props = { params: { publicId: string } };
 export default async function PublicProfilePage({ params }: Props) {
   const player = await getUserByPublicId(params.publicId);
   if (!player) notFound();
-  const history = await getRatingHistoryByPublicId(params.publicId);
+  const [history, playerAwards] = await Promise.all([
+    getRatingHistoryByPublicId(params.publicId),
+    listAwardsForPlayer(params.publicId),
+  ]);
 
   const initials = player.displayName.slice(0, 2).toUpperCase();
   const showRank = player.rank !== null && !player.provisional;
@@ -94,6 +98,12 @@ export default async function PublicProfilePage({ params }: Props) {
             marginBottom: 20,
           }}>
             Provisional — {player.gamesPlayed}/5 placement games
+          </div>
+        )}
+
+        {playerAwards.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <AwardsBadgeRow awards={playerAwards} />
           </div>
         )}
 
