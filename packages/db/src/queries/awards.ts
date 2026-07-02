@@ -13,6 +13,7 @@ export type AdminAward = {
   id: string;
   name: string;
   icon: string | null;
+  imageUrl: string | null;
   description: string | null;
   grantCount: number;
 };
@@ -37,6 +38,7 @@ export type PublicAward = {
   id: string;
   name: string;
   icon: string | null;
+  imageUrl: string | null;
   description: string | null;
   tournamentName: string | null;
   season: number | null;
@@ -59,6 +61,7 @@ export async function listAwardsForAdmin(): Promise<AdminAward[]> {
     id: a.id,
     name: a.name,
     icon: a.icon,
+    imageUrl: a.imageUrl,
     description: a.description,
     grantCount: counts.get(a.id) ?? 0,
   }));
@@ -66,11 +69,11 @@ export async function listAwardsForAdmin(): Promise<AdminAward[]> {
 
 export async function createAward(
   adminId: string,
-  data: { name: string; icon: string | null; description: string | null },
+  data: { name: string; icon: string | null; imageUrl: string | null; description: string | null },
 ): Promise<string> {
   const [row] = await getDb()
     .insert(awards)
-    .values({ name: data.name, icon: data.icon, description: data.description })
+    .values({ name: data.name, icon: data.icon, imageUrl: data.imageUrl, description: data.description })
     .returning({ id: awards.id });
 
   await logAdminAction(adminId, 'award.create', { awardId: row.id, name: data.name });
@@ -166,6 +169,7 @@ export async function listAwardsForPlayer(publicId: string): Promise<PublicAward
       id: userAwards.id,
       name: awards.name,
       icon: awards.icon,
+      imageUrl: awards.imageUrl,
       description: awards.description,
       tournamentName: tournaments.name,
       season: userAwards.season,
@@ -178,6 +182,7 @@ export async function listAwardsForPlayer(publicId: string): Promise<PublicAward
     .where(and(
       eq(users.publicId, publicId),
       eq(users.isBlacklisted, false),
+      eq(users.showAwards, true),
     ))
     .orderBy(desc(userAwards.awardedAt));
 
@@ -185,6 +190,7 @@ export async function listAwardsForPlayer(publicId: string): Promise<PublicAward
     id: r.id,
     name: r.name,
     icon: r.icon,
+    imageUrl: r.imageUrl,
     description: r.description,
     tournamentName: r.tournamentName,
     season: r.season,

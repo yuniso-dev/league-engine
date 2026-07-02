@@ -55,6 +55,14 @@ export const users = pgTable('users', {
   quote:           text('quote'),
   bio:             text('bio'),
 
+  title:            text('title'),
+  characterNote:    text('character_note'),
+  achievements:     text('achievements'),
+  showCharacter:    boolean('show_character').notNull().default(true),
+  showAchievements: boolean('show_achievements').notNull().default(true),
+  showAwards:       boolean('show_awards').notNull().default(true),
+  accentColor:      varchar('accent_color', { length: 7 }),
+
   role:            userRoleEnum('role').notNull().default('member'),
   tier:            accountTierEnum('tier').notNull().default('free'),
   isBlacklisted:   boolean('is_blacklisted').notNull().default(false),
@@ -148,6 +156,7 @@ export const awards = pgTable('awards', {
   id:          uuid('id').primaryKey().defaultRandom(),
   name:        text('name').notNull(),
   icon:        text('icon'),
+  imageUrl:    text('image_url'),
   description: text('description'),
 });
 

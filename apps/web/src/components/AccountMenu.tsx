@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { PublicPlayer } from '@inazuma/db';
 import { Avatar } from '@/components/ui/Avatar';
 import { FONT_B, FONT_D, T, glass } from '@/lib/realm-colors';
@@ -43,6 +44,7 @@ function MenuItem({ onClick, children, danger }: { onClick: () => void; children
 }
 
 export function AccountMenu({ currentUser, isLoggedIn, isAdmin }: Props) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -151,12 +153,12 @@ export function AccountMenu({ currentUser, isLoggedIn, isAdmin }: Props) {
             )}
 
             {isAdmin && (
-              <MenuItem onClick={() => { setOpen(false); window.location.href = '/admin'; }}>
+              <MenuItem onClick={() => { setOpen(false); router.push('/admin'); }}>
                 ⚡ Admin
               </MenuItem>
             )}
 
-            <MenuItem onClick={() => { setOpen(false); window.location.href = '/settings'; }}>
+            <MenuItem onClick={() => { setOpen(false); router.push('/settings'); }}>
               ⚙ Settings
             </MenuItem>
 

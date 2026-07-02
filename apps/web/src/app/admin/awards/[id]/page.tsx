@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getAdminAward, getCurrentSeason, listAdminTournaments, listPlayersForAdmin } from '@inazuma/db';
+import { getAdminAward, getCurrentSeason, listAdminTournaments } from '@inazuma/db';
 import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, T, glass } from '@/lib/realm-colors';
 import DeleteButton from '@/components/admin/DeleteButton';
 import AwardGrantForm from '@/components/admin/AwardGrantForm';
+import { AwardBadgeIcon } from '@/components/AwardsBadgeRow';
 import { deleteAwardAction, revokeAwardAction } from '@/app/admin/actions';
 
 export const dynamic = 'force-dynamic';
@@ -20,9 +21,8 @@ const sectionTitle: React.CSSProperties = {
 export default async function AdminAwardDetailPage({ params }: { params: { id: string } }) {
   await requireAdmin();
 
-  const [detail, players, tournaments, season] = await Promise.all([
+  const [detail, tournaments, season] = await Promise.all([
     getAdminAward(params.id),
-    listPlayersForAdmin(),
     listAdminTournaments(),
     getCurrentSeason(),
   ]);
@@ -38,8 +38,11 @@ export default async function AdminAwardDetailPage({ params }: { params: { id: s
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, marginTop: 10, flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontFamily: FONT_D, fontSize: 26, letterSpacing: 2, color: T.text, margin: 0 }}>
-            {award.icon && <span style={{ marginRight: 10 }}>{award.icon}</span>}
+          <h1 style={{
+            fontFamily: FONT_D, fontSize: 26, letterSpacing: 2, color: T.text, margin: 0,
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <AwardBadgeIcon imageUrl={award.imageUrl} icon={award.icon} size={28} />
             {award.name}
           </h1>
           {award.description && (
@@ -93,7 +96,6 @@ export default async function AdminAwardDetailPage({ params }: { params: { id: s
 
       <AwardGrantForm
         awardId={award.id}
-        players={players}
         tournaments={tournaments}
         defaultSeason={season}
       />

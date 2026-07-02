@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { auth } from '@/auth';
 import { updateSettings } from '@inazuma/db';
 
@@ -18,6 +18,12 @@ export async function saveSettings(formData: FormData) {
   const quote = ((formData.get('quote') as string) || '').trim().slice(0, 100) || null;
   const bio   = ((formData.get('bio')   as string) || '').trim().slice(0, 300) || null;
 
+  // Invalid hex is silently dropped (keeps the previous value); empty clears it.
+  const accentRaw = ((formData.get('accentColor') as string) || '').trim();
+  const accentColor = accentRaw === ''
+    ? null
+    : /^#[0-9a-f]{6}$/i.test(accentRaw) ? accentRaw.toLowerCase() : undefined;
+
   await updateSettings(session.user.discordId, {
     displayName,
     position1,
@@ -26,7 +32,9 @@ export async function saveSettings(formData: FormData) {
     country,
     quote,
     bio,
+    accentColor,
   });
 
   revalidatePath('/settings');
+  revalidateTag('rankings'); // name/country/quote/accent flow into the public player payload
 }

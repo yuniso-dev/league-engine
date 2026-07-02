@@ -22,57 +22,31 @@ export default async function AdminDashboard() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <Link
-            href="/admin/settings"
-            style={{
-              padding: '10px 18px',
-              background: 'none',
-              border: `1px solid ${rgba(ADMIN_ACCENT, 0.5)}`,
-              borderRadius: 10,
-              color: ADMIN_ACCENT,
-              fontFamily: FONT_D,
-              fontSize: 14,
-              letterSpacing: 1.5,
-              textDecoration: 'none',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            ⚙ SETTINGS
-          </Link>
-          <Link
-            href="/admin/awards"
-            style={{
-              padding: '10px 18px',
-              background: 'none',
-              border: `1px solid ${rgba(ADMIN_ACCENT, 0.5)}`,
-              borderRadius: 10,
-              color: ADMIN_ACCENT,
-              fontFamily: FONT_D,
-              fontSize: 14,
-              letterSpacing: 1.5,
-              textDecoration: 'none',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            🏅 AWARDS
-          </Link>
-          <Link
-            href="/admin/reveal"
-            style={{
-              padding: '10px 18px',
-              background: 'none',
-              border: `1px solid ${rgba(ADMIN_ACCENT, 0.5)}`,
-              borderRadius: 10,
-              color: ADMIN_ACCENT,
-              fontFamily: FONT_D,
-              fontSize: 14,
-              letterSpacing: 1.5,
-              textDecoration: 'none',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            ⚡ REVEAL
-          </Link>
+          {[
+            { href: '/admin/players', label: '👥 PLAYERS' },
+            { href: '/admin/awards', label: '🏅 AWARDS' },
+            { href: '/admin/settings', label: '⚙ SETTINGS' },
+            { href: '/admin/reveal', label: '⚡ REVEAL' },
+          ].map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              style={{
+                padding: '10px 18px',
+                background: 'none',
+                border: `1px solid ${rgba(ADMIN_ACCENT, 0.5)}`,
+                borderRadius: 10,
+                color: ADMIN_ACCENT,
+                fontFamily: FONT_D,
+                fontSize: 14,
+                letterSpacing: 1.5,
+                textDecoration: 'none',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {label}
+            </Link>
+          ))}
           <Link
             href="/admin/tournaments/new"
             style={{

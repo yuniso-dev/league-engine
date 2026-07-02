@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { FONT_D, FONT_B, glass, T } from '@/lib/realm-colors';
 import { POSITIONS } from '@/lib/positions';
+import { BackPill } from '@/components/ui/BackPill';
 import type { UserRow } from '@inazuma/db';
 
 type Props = {
@@ -86,6 +87,9 @@ function SubmitButton() {
 }
 
 export default function SettingsForm({ action, user }: Props) {
+  const [accent, setAccent] = useState(user.accentColor ?? '');
+  const accentValid = /^#[0-9a-f]{6}$/i.test(accent);
+
   return (
     <div style={{
       minHeight: '100dvh',
@@ -133,6 +137,42 @@ export default function SettingsForm({ action, user }: Props) {
               </div>
             </div>
 
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Country</label>
+                <input
+                  name="country"
+                  defaultValue={user.country ?? ''}
+                  maxLength={2}
+                  autoComplete="off"
+                  placeholder="GB"
+                  style={{ ...inputBase, textTransform: 'uppercase' }}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Accent Colour</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    name="accentColor"
+                    value={accent}
+                    onChange={e => setAccent(e.target.value)}
+                    maxLength={7}
+                    autoComplete="off"
+                    placeholder="#ff7a1a"
+                    style={inputBase}
+                  />
+                  <span style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 7,
+                    flexShrink: 0,
+                    background: accentValid ? accent : 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                  }} />
+                </div>
+              </div>
+            </div>
+
             <div>
               <label style={labelStyle}>Quote</label>
               <input
@@ -173,9 +213,7 @@ export default function SettingsForm({ action, user }: Props) {
         </div>
 
         <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <a href="/" style={{ fontFamily: FONT_B, color: T.dim, fontSize: 14, textDecoration: 'none', letterSpacing: '0.02em' }}>
-            ← Back to INAZUMA FC
-          </a>
+          <BackPill href="/" label="BACK TO INAZUMA FC" accent={ACCENT} />
         </div>
       </form>
     </div>

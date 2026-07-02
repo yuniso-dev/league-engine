@@ -1,24 +1,25 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
-import type { TournamentRow } from '@inazuma/db';
+import type { AdminAward, TournamentRow } from '@inazuma/db';
 import { FONT_B, FONT_D, T, glass } from '@/lib/realm-colors';
 import { ADMIN_ACCENT, inputBase, labelStyle } from '@/components/admin/ui';
 import { grantAwardAction, type AdminFormState } from '@/app/admin/actions';
-import PlayerPicker from '@/components/admin/PlayerPicker';
 
+// The inverse of AwardGrantForm: the player is fixed, the award is picked.
 type Props = {
-  awardId: string;
+  playerPublicId: string;
+  awards: AdminAward[];
   tournaments: TournamentRow[];
   defaultSeason: number;
 };
 
-function SubmitButton({ disabled }: { disabled: boolean }) {
+function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
-      disabled={pending || disabled}
+      disabled={pending}
       style={{
         padding: '11px 20px',
         background: ADMIN_ACCENT,
@@ -28,8 +29,8 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
         fontFamily: FONT_D,
         fontSize: 13,
         letterSpacing: 1.5,
-        cursor: pending || disabled ? 'not-allowed' : 'pointer',
-        opacity: pending || disabled ? 0.6 : 1,
+        cursor: pending ? 'not-allowed' : 'pointer',
+        opacity: pending ? 0.6 : 1,
       }}
     >
       {pending ? 'GRANTING…' : 'GRANT AWARD'}
@@ -37,41 +38,44 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
   );
 }
 
-export default function AwardGrantForm({ awardId, tournaments, defaultSeason }: Props) {
+export default function PlayerAwardGrantForm({ playerPublicId, awards, tournaments, defaultSeason }: Props) {
   const [state, action] = useFormState<AdminFormState, FormData>(grantAwardAction, {});
-  const [selected, setSelected] = useState<string | null>(null);
-  const [resetKey, setResetKey] = useState(0);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    if (state.ok) {
-      setSelected(null);
-      setResetKey(k => k + 1); // remounts the picker → clears its search box
-      formRef.current?.reset();
-    }
+    if (state.ok) formRef.current?.reset();
   }, [state]);
 
-  const selectedIds = useMemo(
-    () => new Set(selected ? [selected] : []),
-    [selected],
-  );
+  if (awards.length === 0) {
+    return (
+      <div style={glass({ padding: 20 })}>
+        <p style={{ fontFamily: FONT_B, color: T.faint, fontSize: 13, margin: 0 }}>
+          No awards defined yet — create one on the Awards page first.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <form ref={formRef} action={action}>
       <div style={glass({ padding: 20 })}>
         <div style={{ fontFamily: FONT_D, fontSize: 14, letterSpacing: 1.5, color: T.dim, marginBottom: 14 }}>
-          GRANT TO PLAYER
+          GRANT AN AWARD
         </div>
-        <input type="hidden" name="awardId" value={awardId} />
-        <input type="hidden" name="publicId" value={selected ?? ''} />
+        <input type="hidden" name="publicId" value={playerPublicId} />
+        <input type="hidden" name="playerPublicId" value={playerPublicId} />
 
-        <PlayerPicker
-          key={resetKey}
-          mode="single"
-          selectedIds={selectedIds}
-          onToggle={publicId => setSelected(prev => (prev === publicId ? null : publicId))}
-          searchLabel="Find player"
-        />
+        <div>
+          <label style={labelStyle}>Award</label>
+          <select name="awardId" required defaultValue="" style={{ ...inputBase, cursor: 'pointer' }}>
+            <option value="" disabled>Pick an award…</option>
+            {awards.map(a => (
+              <option key={a.id} value={a.id}>
+                {a.icon ? `${a.icon} ` : ''}{a.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 12, marginTop: 14 }}>
           <div>
@@ -90,7 +94,7 @@ export default function AwardGrantForm({ awardId, tournaments, defaultSeason }: 
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 16 }}>
-          <SubmitButton disabled={selected === null} />
+          <SubmitButton />
           {state.error && (
             <span style={{ fontFamily: FONT_B, color: T.loss, fontSize: 13 }}>{state.error}</span>
           )}

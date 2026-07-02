@@ -3,6 +3,7 @@ import { listAwardsForAdmin } from '@inazuma/db';
 import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, T, glass } from '@/lib/realm-colors';
 import AwardForm from '@/components/admin/AwardForm';
+import { AwardBadgeIcon } from '@/components/AwardsBadgeRow';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,8 +38,8 @@ export default async function AdminAwardsPage() {
           {awardsList.map(a => (
             <Link key={a.id} href={`/admin/awards/${a.id}`} style={{ textDecoration: 'none' }}>
               <div style={glass({ padding: 16 })}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {a.icon && <span style={{ fontSize: 20 }}>{a.icon}</span>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 20 }}>
+                  <AwardBadgeIcon imageUrl={a.imageUrl} icon={a.icon} size={24} />
                   <span style={{ fontFamily: FONT_D, fontSize: 15, letterSpacing: 1, color: T.text }}>
                     {a.name}
                   </span>

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { getTournamentDetail } from '@inazuma/db';
 import { glass, REALMS, T, FONT_D, FONT_B, FONT_M, rgba } from '@/lib/realm-colors';
 import { STAGE_LABELS, STATUS_COLORS } from '@/lib/tournament-ui';
+import { BackPill } from '@/components/ui/BackPill';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,9 +25,7 @@ export default async function FrontierDetailPage({ params }: Props) {
       padding: '24px 16px 48px',
     }}>
       <header style={{ width: '100%', maxWidth: 640, marginBottom: 24 }}>
-        <a href="/" style={{ fontFamily: FONT_B, color: T.dim, fontSize: 14, textDecoration: 'none', letterSpacing: '0.02em' }}>
-          ← INAZUMA FC
-        </a>
+        <BackPill href="/" label="INAZUMA FC" accent={accent} />
       </header>
 
       <div style={{ width: '100%', maxWidth: 640 }}>

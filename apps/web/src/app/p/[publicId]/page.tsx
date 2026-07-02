@@ -1,9 +1,16 @@
 import { notFound } from 'next/navigation';
-import { getUserByPublicId, getRatingHistoryByPublicId, listAwardsForPlayer } from '@inazuma/db';
+import {
+  getUserByPublicId,
+  getRatingHistoryByPublicId,
+  getRecentMatchesForPlayer,
+  listAwardsForPlayer,
+} from '@inazuma/db';
 import { Avatar } from '@/components/ui/Avatar';
+import { BackPill } from '@/components/ui/BackPill';
 import { RatingGraph } from '@/components/RatingGraph';
 import { AwardsBadgeRow } from '@/components/AwardsBadgeRow';
-import { glass, T, FONT_D, FONT_B, FONT_M, rankColor } from '@/lib/realm-colors';
+import { RecentMatchesCard } from '@/components/RecentMatchesCard';
+import { glass, T, FONT_D, FONT_B, FONT_M, rankColor, rgba, lighten } from '@/lib/realm-colors';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,11 +19,13 @@ type Props = { params: { publicId: string } };
 export default async function PublicProfilePage({ params }: Props) {
   const player = await getUserByPublicId(params.publicId);
   if (!player) notFound();
-  const [history, playerAwards] = await Promise.all([
+  const [history, playerAwards, recentMatches] = await Promise.all([
     getRatingHistoryByPublicId(params.publicId),
     listAwardsForPlayer(params.publicId),
+    getRecentMatchesForPlayer(params.publicId),
   ]);
 
+  const accent = player.accentColor ?? '#FF7A1A';
   const initials = player.displayName.slice(0, 2).toUpperCase();
   const showRank = player.rank !== null && !player.provisional;
   const rankLabel = showRank ? `#${player.rank}` : player.provisional ? `${player.gamesPlayed}/5` : '—';
@@ -25,6 +34,10 @@ export default async function PublicProfilePage({ params }: Props) {
   const positions = !player.hidePositions
     ? `${player.position1 ?? '??'} / ${player.position2 ?? '??'}`
     : null;
+
+  const achievements = player.achievements
+    ? player.achievements.split('\n').map(a => a.trim()).filter(Boolean)
+    : [];
 
   return (
     <div style={{
@@ -36,21 +49,36 @@ export default async function PublicProfilePage({ params }: Props) {
       padding: '24px 16px 48px',
     }}>
       <header style={{ width: '100%', maxWidth: 460, marginBottom: 24 }}>
-        <a href="/" style={{ fontFamily: FONT_B, color: T.dim, fontSize: 14, textDecoration: 'none', letterSpacing: '0.02em' }}>
-          ← INAZUMA FC
-        </a>
+        <BackPill href="/" label="INAZUMA FC" accent={accent} />
       </header>
 
-      <div style={{ ...glass({ padding: 32, borderRadius: 22 }), width: '100%', maxWidth: 460 }}>
+      <div style={{
+        ...glass({ padding: 32, borderRadius: 22 }),
+        width: '100%',
+        maxWidth: 460,
+        borderTop: `1px solid ${rgba(accent, 0.35)}`,
+      }}>
         {/* Header row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
-          <Avatar initials={initials} src={player.avatarUrl} size={64} ring="#FF7A1A" />
+          <Avatar initials={initials} src={player.avatarUrl} size={64} ring={accent} />
           <div>
             <div style={{ fontFamily: FONT_D, fontSize: 24, color: T.text, letterSpacing: 1 }}>
               {player.displayName}
             </div>
+            {player.title && (
+              <div style={{
+                fontFamily: FONT_M,
+                fontSize: 10,
+                letterSpacing: 2.5,
+                textTransform: 'uppercase',
+                color: lighten(accent, 0.3),
+                marginTop: 3,
+              }}>
+                {player.title}
+              </div>
+            )}
             {positions && (
-              <div style={{ fontFamily: FONT_M, fontSize: 13, color: '#FF7A1A', marginTop: 2 }}>
+              <div style={{ fontFamily: FONT_M, fontSize: 13, color: accent, marginTop: 2 }}>
                 {positions}
               </div>
             )}
@@ -88,22 +116,42 @@ export default async function PublicProfilePage({ params }: Props) {
 
         {player.provisional && (
           <div style={{
-            background: 'rgba(255,122,26,0.1)',
-            border: '1px solid rgba(255,122,26,0.25)',
+            background: rgba(accent, 0.1),
+            border: `1px solid ${rgba(accent, 0.25)}`,
             borderRadius: 10,
             padding: '10px 14px',
             fontFamily: FONT_B,
             fontSize: 13,
-            color: '#FF7A1A',
+            color: accent,
             marginBottom: 20,
           }}>
             Provisional — {player.gamesPlayed}/5 placement games
           </div>
         )}
 
-        {playerAwards.length > 0 && (
+        {player.showAwards && playerAwards.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             <AwardsBadgeRow awards={playerAwards} />
+          </div>
+        )}
+
+        {/* Achievements — admin-curated, hidden server-side when toggled off */}
+        {achievements.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{
+              fontFamily: FONT_M, fontSize: 10, color: T.faint,
+              letterSpacing: 1, marginBottom: 8,
+            }}>
+              ACHIEVEMENTS
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {achievements.map((a, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{ color: accent, fontSize: 11, flexShrink: 0 }}>⚡</span>
+                  <span style={{ fontFamily: FONT_B, fontSize: 13.5, color: T.text, lineHeight: 1.5 }}>{a}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -125,7 +173,7 @@ export default async function PublicProfilePage({ params }: Props) {
           <blockquote style={{
             margin: '0 0 16px',
             paddingLeft: 14,
-            borderLeft: '3px solid rgba(255,122,26,0.5)',
+            borderLeft: `3px solid ${rgba(accent, 0.5)}`,
             fontFamily: FONT_B,
             fontSize: 14,
             color: T.dim,
@@ -133,6 +181,28 @@ export default async function PublicProfilePage({ params }: Props) {
           }}>
             "{player.quote}"
           </blockquote>
+        )}
+
+        {/* Character — admin-curated, hidden server-side when toggled off */}
+        {player.characterNote && (
+          <div style={{ margin: '0 0 16px' }}>
+            <div style={{
+              fontFamily: FONT_M, fontSize: 10, color: T.faint,
+              letterSpacing: 1, marginBottom: 8,
+            }}>
+              CHARACTER
+            </div>
+            <p style={{
+              margin: 0,
+              fontFamily: FONT_B,
+              fontSize: 14,
+              color: T.dim,
+              lineHeight: 1.6,
+              whiteSpace: 'pre-wrap',
+            }}>
+              {player.characterNote}
+            </p>
+          </div>
         )}
 
         {player.bio && (
@@ -166,6 +236,13 @@ export default async function PublicProfilePage({ params }: Props) {
           </div>
         )}
       </div>
+
+      {/* Recent matches — its own card below the profile card */}
+      {recentMatches.length > 0 && (
+        <div style={{ width: '100%', maxWidth: 460, marginTop: 12 }}>
+          <RecentMatchesCard matches={recentMatches} accent={accent} />
+        </div>
+      )}
     </div>
   );
 }
