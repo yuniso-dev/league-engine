@@ -1,10 +1,11 @@
 'use client';
 import { memo, useEffect, useState } from 'react';
-import type { PublicPlayer, RatingPoint } from '@inazuma/db';
+import type { PublicAward, PublicPlayer, RatingPoint } from '@inazuma/db';
 import { Bolt } from '@/components/ui/Bolt';
 import { Avatar } from '@/components/ui/Avatar';
 import { CountUp } from '@/components/ui/CountUp';
 import { RatingGraph } from '@/components/RatingGraph';
+import { AwardsBadgeRow } from '@/components/AwardsBadgeRow';
 import { Tilt } from '@/components/ui/Tilt';
 import { REALMS, T, FONT_D, FONT_B, FONT_M, rankColor, lighten, rgba, glass } from '@/lib/realm-colors';
 
@@ -26,6 +27,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
   const aGlow  = lighten(accent, 0.35);
 
   const [history, setHistory] = useState<RatingPoint[]>([]);
+  const [awards, setAwards] = useState<PublicAward[]>([]);
   const publicId = player?.publicId ?? null;
 
   useEffect(() => {
@@ -36,6 +38,17 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
       .then(r => (r.ok ? r.json() : []))
       .then((points: RatingPoint[]) => { if (alive) setHistory(points); })
       .catch(() => { /* graph is optional chrome — profile renders without it */ });
+    return () => { alive = false; };
+  }, [publicId]);
+
+  useEffect(() => {
+    setAwards([]);
+    if (!publicId) return;
+    let alive = true;
+    fetch(`/api/awards/${publicId}`)
+      .then(r => (r.ok ? r.json() : []))
+      .then((list: PublicAward[]) => { if (alive) setAwards(list); })
+      .catch(() => { /* badges are optional chrome — profile renders without them */ });
     return () => { alive = false; };
   }, [publicId]);
 
@@ -241,6 +254,13 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
           </div>
         ))}
       </div>
+
+      {/* awards */}
+      {awards.length > 0 && (
+        <div style={{ ...glass({ padding: 18 }), marginBottom: 12 }}>
+          <AwardsBadgeRow awards={awards} />
+        </div>
+      )}
 
       {/* rating history */}
       {history.length >= 2 && (

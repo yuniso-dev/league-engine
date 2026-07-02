@@ -158,7 +158,7 @@ export default async function RevealPage() {
               Committing applies the ratings above, re-ranks the ladder, writes this week&apos;s
               rating history and locks these matches. This cannot be undone from the admin panel.
             </p>
-            <RevealConfirm />
+            <RevealConfirm matchCount={preview.matches.length} playerCount={preview.players.length} />
           </div>
         </>
       )}
