@@ -9,7 +9,7 @@ import {
 } from 'discord.js';
 import { getUserByDiscordId, listAwardsForPlayer } from '@inazuma/db';
 import { handleLeaderboard, handlePostLeaderboard } from './leaderboard.js';
-import { syncNicknames } from './nicknameSync.js';
+import { resetAllNicknames, syncNicknames } from './nicknameSync.js';
 
 const definitions = [
   new SlashCommandBuilder()
@@ -26,6 +26,14 @@ const definitions = [
   new SlashCommandBuilder()
     .setName('postleaderboard')
     .setDescription('Admin: post the auto-updating rankings message in this channel')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+  new SlashCommandBuilder()
+    .setName('resetnicknames')
+    .setDescription("Admin: clear EVERYONE's nickname back to their Discord name (one-off cleanup)")
+    .addBooleanOption(o =>
+      o.setName('confirm')
+        .setDescription('This clears every member’s nickname, including ones people set themselves')
+        .setRequired(true))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 ];
 
@@ -103,6 +111,31 @@ export async function dispatch(
         await interaction.editReply(
           `Nicknames synced — ${r.renamed} renamed, ${r.skipped} already correct or unmanageable, ${r.failed} failed.`,
         );
+        break;
+      }
+      case 'resetnicknames': {
+        if (!interaction.options.getBoolean('confirm')) {
+          await interaction.reply({
+            content: 'Cancelled. Re-run with **confirm: True** to clear every member’s nickname back to their Discord name.',
+            flags: MessageFlags.Ephemeral,
+          });
+          break;
+        }
+        await interaction.deferReply();
+        const guild = interaction.guild ?? await interaction.client.guilds.fetch(interaction.guildId);
+        await interaction.editReply(
+          'Clearing nicknames back to Discord display names — on a large server this can take several minutes. I’ll report back here when it’s done.',
+        );
+        const r = await resetAllNicknames(guild);
+        const summary =
+          `✅ Nickname reset complete — cleared **${r.cleared}**, left **${r.skipped}** untouched (I can’t rename the owner or members with a higher role), **${r.failed}** failed.\n` +
+          'Now run **/syncnicks** to re-apply league ranks to your players.';
+        try {
+          await interaction.editReply(summary);
+        } catch {
+          // Interaction token can expire on a long sweep — post a fresh message instead.
+          if (interaction.channel?.isSendable()) await interaction.channel.send(summary);
+        }
         break;
       }
     }

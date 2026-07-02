@@ -51,3 +51,41 @@ export async function syncNicknames(guild: Guild): Promise<NicknameSyncResult> {
   );
   return result;
 }
+
+const RESET_DELAY_MS = 150; // spacing for the bulk one-off; discord.js also queues 429s
+
+export type NicknameResetResult = { cleared: number; skipped: number; failed: number };
+
+/** One-off cleanup for migrating off another rank bot: clear the guild nickname
+ *  (→ each member's plain Discord display name) for every member the bot can
+ *  manage who currently has one set. Blanket reset — this also clears nicknames
+ *  people set themselves. Does NOT re-apply league ranks; run syncNicknames()
+ *  afterwards for that. Never throws for a single failure. */
+export async function resetAllNicknames(guild: Guild): Promise<NicknameResetResult> {
+  const members = await guild.members.fetch();
+
+  const result: NicknameResetResult = { cleared: 0, skipped: 0, failed: 0 };
+
+  for (const member of members.values()) {
+    if (member.user.bot) continue;
+    if (member.nickname === null) continue;         // already showing their display name
+    if (!member.manageable) { result.skipped++; continue; } // owner / higher role — can't touch
+
+    try {
+      await member.setNickname(null, 'INZ nickname reset');
+      result.cleared++;
+    } catch (e) {
+      result.failed++;
+      console.warn(
+        `[nicknameReset] could not clear ${member.user.username} —`,
+        e instanceof Error ? e.message : e,
+      );
+    }
+    await sleep(RESET_DELAY_MS);
+  }
+
+  console.log(
+    `[nicknameReset] cleared ${result.cleared}, skipped ${result.skipped}, failed ${result.failed}`,
+  );
+  return result;
+}
