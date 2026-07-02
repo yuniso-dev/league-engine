@@ -6,6 +6,7 @@ import { FONT_B, FONT_D, T, glass } from '@/lib/realm-colors';
 import { ADMIN_ACCENT, inputBase, labelStyle } from '@/components/admin/ui';
 import { grantAwardAction, type AdminFormState } from '@/app/admin/actions';
 import PlayerPicker from '@/components/admin/PlayerPicker';
+import GlassSelect from '@/components/ui/GlassSelect';
 
 type Props = {
   awardId: string;
@@ -76,12 +77,15 @@ export default function AwardGrantForm({ awardId, tournaments, defaultSeason }: 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 12, marginTop: 14 }}>
           <div>
             <label style={labelStyle}>Tournament (optional)</label>
-            <select name="tournamentId" defaultValue="" style={{ ...inputBase, cursor: 'pointer' }}>
-              <option value="">— None —</option>
-              {tournaments.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
+            <GlassSelect
+              name="tournamentId"
+              defaultValue=""
+              options={[
+                { value: '', label: '— None —' },
+                ...tournaments.map(t => ({ value: t.id, label: t.name })),
+              ]}
+              accent={ADMIN_ACCENT}
+            />
           </div>
           <div>
             <label style={labelStyle}>Season</label>

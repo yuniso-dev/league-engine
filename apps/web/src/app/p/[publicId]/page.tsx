@@ -11,6 +11,7 @@ import { RatingGraph } from '@/components/RatingGraph';
 import { AwardsBadgeRow } from '@/components/AwardsBadgeRow';
 import { RecentMatchesCard } from '@/components/RecentMatchesCard';
 import { glass, T, FONT_D, FONT_B, FONT_M, rankColor, rgba, lighten } from '@/lib/realm-colors';
+import { flagEmoji, countryName } from '@/lib/countries';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,9 +83,9 @@ export default async function PublicProfilePage({ params }: Props) {
                 {positions}
               </div>
             )}
-            {player.country && (
-              <div style={{ fontFamily: FONT_B, fontSize: 12, color: T.faint, marginTop: 2 }}>
-                {player.country}
+            {flagEmoji(player.country) && (
+              <div style={{ fontSize: 16, marginTop: 2 }} title={countryName(player.country) ?? undefined}>
+                {flagEmoji(player.country)}
               </div>
             )}
           </div>

@@ -4,6 +4,7 @@ import { useFormState, useFormStatus } from 'react-dom';
 import type { AdminAward, TournamentRow } from '@inazuma/db';
 import { FONT_B, FONT_D, T, glass } from '@/lib/realm-colors';
 import { ADMIN_ACCENT, inputBase, labelStyle } from '@/components/admin/ui';
+import GlassSelect from '@/components/ui/GlassSelect';
 import { grantAwardAction, type AdminFormState } from '@/app/admin/actions';
 
 // The inverse of AwardGrantForm: the player is fixed, the award is picked.
@@ -67,25 +68,31 @@ export default function PlayerAwardGrantForm({ playerPublicId, awards, tournamen
 
         <div>
           <label style={labelStyle}>Award</label>
-          <select name="awardId" required defaultValue="" style={{ ...inputBase, cursor: 'pointer' }}>
-            <option value="" disabled>Pick an award…</option>
-            {awards.map(a => (
-              <option key={a.id} value={a.id}>
-                {a.icon ? `${a.icon} ` : ''}{a.name}
-              </option>
-            ))}
-          </select>
+          <GlassSelect
+            name="awardId"
+            defaultValue=""
+            required
+            placeholder="Pick an award…"
+            options={awards.map(a => ({
+              value: a.id,
+              label: `${a.icon ? `${a.icon} ` : ''}${a.name}`,
+            }))}
+            accent={ADMIN_ACCENT}
+          />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 12, marginTop: 14 }}>
           <div>
             <label style={labelStyle}>Tournament (optional)</label>
-            <select name="tournamentId" defaultValue="" style={{ ...inputBase, cursor: 'pointer' }}>
-              <option value="">— None —</option>
-              {tournaments.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
+            <GlassSelect
+              name="tournamentId"
+              defaultValue=""
+              options={[
+                { value: '', label: '— None —' },
+                ...tournaments.map(t => ({ value: t.id, label: t.name })),
+              ]}
+              accent={ADMIN_ACCENT}
+            />
           </div>
           <div>
             <label style={labelStyle}>Season</label>

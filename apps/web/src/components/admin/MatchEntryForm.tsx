@@ -4,6 +4,7 @@ import { useFormState, useFormStatus } from 'react-dom';
 import type { AdminTeam, MatchStage } from '@inazuma/db';
 import { FONT_B, FONT_D, FONT_M, T, glass } from '@/lib/realm-colors';
 import { ADMIN_ACCENT, STAGE_LABELS, inputBase, labelStyle } from '@/components/admin/ui';
+import GlassSelect from '@/components/ui/GlassSelect';
 import { createMatchAction, type AdminFormState } from '@/app/admin/actions';
 
 type Props = {
@@ -60,20 +61,19 @@ function TeamPicker({
   return (
     <div>
       <label style={labelStyle}>{label}</label>
-      <select
+      <GlassSelect
         name={side === 'homePlayers' ? 'homeTeamId' : 'awayTeamId'}
         value={teamId}
-        onChange={e => onTeamChange(e.target.value)}
+        onChange={onTeamChange}
+        placeholder="— Pick team —"
         required
-        style={{ ...inputBase, cursor: 'pointer' }}
-      >
-        <option value="">— Pick team —</option>
-        {teams.map(t => (
-          <option key={t.id} value={t.id} disabled={t.id === excludeTeamId}>
-            {t.name}
-          </option>
-        ))}
-      </select>
+        options={[
+          { value: '', label: '— Pick team —' },
+          // The team picked on the other side isn't offered here.
+          ...teams.filter(t => t.id !== excludeTeamId).map(t => ({ value: t.id, label: t.name })),
+        ]}
+        accent={ADMIN_ACCENT}
+      />
 
       {team && (
         <div style={{
@@ -239,11 +239,15 @@ export default function MatchEntryForm({ tournamentId, teams, defaultRanked }: P
           </div>
           <div>
             <label style={labelStyle}>Stage</label>
-            <select name="stage" defaultValue="group" style={{ ...inputBase, cursor: 'pointer' }}>
-              {(Object.keys(STAGE_LABELS) as MatchStage[]).map(s => (
-                <option key={s} value={s}>{STAGE_LABELS[s]}</option>
-              ))}
-            </select>
+            <GlassSelect
+              name="stage"
+              defaultValue="group"
+              options={(Object.keys(STAGE_LABELS) as MatchStage[]).map(s => ({
+                value: s,
+                label: STAGE_LABELS[s],
+              }))}
+              accent={ADMIN_ACCENT}
+            />
           </div>
           <div>
             <label style={labelStyle}>Played at</label>

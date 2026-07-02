@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { FONT_B, FONT_D, T } from '@/lib/realm-colors';
-import { ADMIN_ACCENT, inputBase } from '@/components/admin/ui';
+import { ADMIN_ACCENT } from '@/components/admin/ui';
+import GlassSelect from '@/components/ui/GlassSelect';
 import { updateTournamentStatusAction, type AdminFormState } from '@/app/admin/actions';
 
 type Props = {
@@ -45,28 +46,33 @@ export default function StatusControls({ tournamentId, status, winnerTeamId, tea
     <form action={action} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
       <input type="hidden" name="tournamentId" value={tournamentId} />
 
-      <select
-        name="status"
-        value={selected}
-        onChange={e => setSelected(e.target.value as Props['status'])}
-        style={{ ...inputBase, width: 150, cursor: 'pointer' }}
-      >
-        <option value="upcoming">Upcoming</option>
-        <option value="live">Live</option>
-        <option value="completed">Completed</option>
-      </select>
+      <div style={{ width: 150 }}>
+        <GlassSelect
+          name="status"
+          value={selected}
+          onChange={v => setSelected(v as Props['status'])}
+          options={[
+            { value: 'upcoming', label: 'Upcoming' },
+            { value: 'live', label: 'Live' },
+            { value: 'completed', label: 'Completed' },
+          ]}
+          accent={ADMIN_ACCENT}
+        />
+      </div>
 
       {selected === 'completed' && teams.length > 0 && (
-        <select
-          name="winnerTeamId"
-          defaultValue={winnerTeamId ?? ''}
-          style={{ ...inputBase, width: 200, cursor: 'pointer' }}
-        >
-          <option value="">— No winner set —</option>
-          {teams.map(t => (
-            <option key={t.id} value={t.id}>🏆 {t.name}</option>
-          ))}
-        </select>
+        <div style={{ width: 200 }}>
+          <GlassSelect
+            name="winnerTeamId"
+            defaultValue={winnerTeamId ?? ''}
+            placeholder="— No winner set —"
+            options={[
+              { value: '', label: '— No winner set —' },
+              ...teams.map(t => ({ value: t.id, label: `🏆 ${t.name}` })),
+            ]}
+            accent={ADMIN_ACCENT}
+          />
+        </div>
       )}
 
       <SubmitButton />
