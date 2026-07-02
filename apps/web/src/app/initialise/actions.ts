@@ -6,7 +6,7 @@ import { initialiseUser } from '@inazuma/db';
 
 export async function initialise(formData: FormData) {
   const session = await auth();
-  if (!session?.user?.discordId) redirect('/api/auth/signin');
+  if (!session?.user?.discordId) redirect('/signin?next=%2Finitialise');
 
   const displayName = (formData.get('displayName') as string ?? '').trim().slice(0, 32);
   if (!displayName) return;

@@ -3,8 +3,21 @@ import { useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { FONT_D, FONT_B, glass, T } from '@/lib/realm-colors';
 import { POSITIONS } from '@/lib/positions';
+import { COUNTRIES, flagEmoji } from '@/lib/countries';
 import { BackPill } from '@/components/ui/BackPill';
+import GlassSelect from '@/components/ui/GlassSelect';
+import HueWheel from '@/components/ui/HueWheel';
 import type { UserRow } from '@inazuma/db';
+
+const POSITION_OPTIONS = [
+  { value: '', label: '— None —' },
+  ...POSITIONS.map(p => ({ value: p, label: p })),
+];
+
+const COUNTRY_OPTIONS = [
+  { value: '', label: '— None —' },
+  ...COUNTRIES.map(c => ({ value: c.code, label: `${flagEmoji(c.code)} ${c.name}` })),
+];
 
 type Props = {
   action: (formData: FormData) => Promise<void>;
@@ -35,17 +48,6 @@ const inputBase: React.CSSProperties = {
   outline: 'none',
   boxSizing: 'border-box',
 };
-
-function posOptions(current: string | null) {
-  return (
-    <>
-      <option value="">— None —</option>
-      {POSITIONS.map(p => (
-        <option key={p} value={p} selected={p === current}>{p}</option>
-      ))}
-    </>
-  );
-}
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -87,9 +89,6 @@ function SubmitButton() {
 }
 
 export default function SettingsForm({ action, user }: Props) {
-  const [accent, setAccent] = useState(user.accentColor ?? '');
-  const accentValid = /^#[0-9a-f]{6}$/i.test(accent);
-
   return (
     <div style={{
       minHeight: '100dvh',
@@ -125,52 +124,38 @@ export default function SettingsForm({ action, user }: Props) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <label style={labelStyle}>Primary Position</label>
-                <select name="position1" style={{ ...inputBase, cursor: 'pointer' }}>
-                  {posOptions(user.position1)}
-                </select>
-              </div>
-              <div>
-                <label style={labelStyle}>Secondary Position</label>
-                <select name="position2" style={{ ...inputBase, cursor: 'pointer' }}>
-                  {posOptions(user.position2)}
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={labelStyle}>Country</label>
-                <input
-                  name="country"
-                  defaultValue={user.country ?? ''}
-                  maxLength={2}
-                  autoComplete="off"
-                  placeholder="GB"
-                  style={{ ...inputBase, textTransform: 'uppercase' }}
+                <GlassSelect
+                  name="position1"
+                  options={POSITION_OPTIONS}
+                  defaultValue={user.position1 ?? ''}
+                  accent={ACCENT}
                 />
               </div>
               <div>
-                <label style={labelStyle}>Accent Colour</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    name="accentColor"
-                    value={accent}
-                    onChange={e => setAccent(e.target.value)}
-                    maxLength={7}
-                    autoComplete="off"
-                    placeholder="#ff7a1a"
-                    style={inputBase}
-                  />
-                  <span style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: 7,
-                    flexShrink: 0,
-                    background: accentValid ? accent : 'rgba(255,255,255,0.08)',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                  }} />
-                </div>
+                <label style={labelStyle}>Secondary Position</label>
+                <GlassSelect
+                  name="position2"
+                  options={POSITION_OPTIONS}
+                  defaultValue={user.position2 ?? ''}
+                  accent={ACCENT}
+                />
               </div>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Country</label>
+              <GlassSelect
+                name="country"
+                options={COUNTRY_OPTIONS}
+                defaultValue={user.country ?? ''}
+                accent={ACCENT}
+                searchable
+              />
+            </div>
+
+            <div>
+              <label style={labelStyle}>Accent Colour</label>
+              <HueWheel name="accentColor" defaultValue={user.accentColor} />
             </div>
 
             <div>

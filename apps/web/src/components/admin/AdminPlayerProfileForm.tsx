@@ -1,10 +1,10 @@
 'use client';
-import { useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import type { AdminPlayerDetail } from '@inazuma/db';
 import { FONT_B, FONT_D, T, glass } from '@/lib/realm-colors';
 import { ADMIN_ACCENT, inputBase, labelStyle } from '@/components/admin/ui';
 import { updatePlayerProfileAction, type AdminFormState } from '@/app/admin/actions';
+import HueWheel from '@/components/ui/HueWheel';
 
 type Props = { player: AdminPlayerDetail['player'] };
 
@@ -59,8 +59,6 @@ function Toggle({ name, label, defaultChecked }: { name: string; label: string; 
 
 export default function AdminPlayerProfileForm({ player }: Props) {
   const [state, action] = useFormState<AdminFormState, FormData>(updatePlayerProfileAction, {});
-  const [accent, setAccent] = useState(player.accentColor ?? '');
-  const accentValid = /^#[0-9a-f]{6}$/i.test(accent);
 
   return (
     <form action={action}>
@@ -70,42 +68,23 @@ export default function AdminPlayerProfileForm({ player }: Props) {
         </div>
         <input type="hidden" name="publicId" value={player.publicId} />
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px', gap: 12 }}>
-          <div>
-            <label style={labelStyle}>Title</label>
-            <input
-              name="title"
-              maxLength={40}
-              defaultValue={player.title ?? ''}
-              autoComplete="off"
-              placeholder="THE WALL"
-              style={inputBase}
-            />
-            <p style={captionStyle}>Shown under the player&apos;s name on their profile.</p>
-          </div>
-          <div>
-            <label style={labelStyle}>Accent colour</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input
-                name="accentColor"
-                value={accent}
-                onChange={e => setAccent(e.target.value)}
-                maxLength={7}
-                autoComplete="off"
-                placeholder="#ff7a1a"
-                style={inputBase}
-              />
-              <span style={{
-                width: 26,
-                height: 26,
-                borderRadius: 7,
-                flexShrink: 0,
-                background: accentValid ? accent : 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.2)',
-              }} />
-            </div>
-            <p style={captionStyle}>Tints their profile card. Empty = default.</p>
-          </div>
+        <div>
+          <label style={labelStyle}>Title</label>
+          <input
+            name="title"
+            maxLength={40}
+            defaultValue={player.title ?? ''}
+            autoComplete="off"
+            placeholder="THE WALL"
+            style={inputBase}
+          />
+          <p style={captionStyle}>Shown under the player&apos;s name on their profile.</p>
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <label style={labelStyle}>Accent colour</label>
+          <HueWheel name="accentColor" defaultValue={player.accentColor} size={110} />
+          <p style={captionStyle}>Tints their profile card. &ldquo;Use default&rdquo; clears it.</p>
         </div>
 
         <div style={{ marginTop: 14 }}>

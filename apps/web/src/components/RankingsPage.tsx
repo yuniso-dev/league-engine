@@ -4,6 +4,7 @@ import type { PublicPlayer } from '@inazuma/db';
 import { Bolt } from '@/components/ui/Bolt';
 import { Avatar } from '@/components/ui/Avatar';
 import { REALMS, T, FONT_D, FONT_B, FONT_M, rankColor, rgba, glass } from '@/lib/realm-colors';
+import { flagEmoji, countryName } from '@/lib/countries';
 
 type Props = {
   players: PublicPlayer[];
@@ -110,6 +111,7 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen }: Prop
 
               <Avatar
                 initials={initials(p.displayName)}
+                src={p.avatarUrl}
                 size={42}
                 ring={showRank && p.rank! <= 3 ? rc : null}
               />
@@ -119,7 +121,11 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen }: Prop
                   <span style={{ color: T.text, fontFamily: FONT_B, fontWeight: 700, fontSize: 15 }}>
                     {p.displayName}
                   </span>
-                  {p.country && <span style={{ fontSize: 13 }}>{p.country}</span>}
+                  {flagEmoji(p.country) && (
+                    <span style={{ fontSize: 15 }} title={countryName(p.country) ?? undefined}>
+                      {flagEmoji(p.country)}
+                    </span>
+                  )}
                   {p.tier === 'premium' && <Bolt size={9} color={T.gold} />}
                   {p.provisional && (
                     <span style={{ color: T.faint, fontSize: 9, fontFamily: FONT_M, letterSpacing: 1 }}>

@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function InitialisePage() {
   const session = await auth();
-  if (!session?.user?.discordId) redirect('/api/auth/signin');
+  if (!session?.user?.discordId) redirect('/signin?next=%2Finitialise');
 
   const user = await getUserByDiscordId(session.user.discordId);
   if (user?.initialised) redirect('/settings');

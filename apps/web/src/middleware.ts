@@ -7,7 +7,10 @@ const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
   if (!req.auth) {
-    return Response.redirect(new URL('/api/auth/signin', req.url));
+    // /signin fires the Discord OAuth redirect directly — no provider-picker page.
+    const url = new URL('/signin', req.url);
+    url.searchParams.set('next', req.nextUrl.pathname);
+    return Response.redirect(url);
   }
 });
 

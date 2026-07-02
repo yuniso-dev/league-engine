@@ -13,7 +13,7 @@ function isStaff(user: UserRow | null): user is UserRow {
  */
 export async function requireAdmin(): Promise<UserRow> {
   const session = await auth();
-  if (!session?.user?.discordId) redirect('/api/auth/signin?callbackUrl=%2Fadmin');
+  if (!session?.user?.discordId) redirect('/signin?next=%2Fadmin');
   const user = await getCachedUserByDiscordId(session.user.discordId);
   if (!isStaff(user)) notFound();
   return user;
