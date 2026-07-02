@@ -1,7 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath } from 'next/cache';
 import {
   MATCH_STAGES,
   commitReveal,
@@ -54,7 +54,6 @@ export async function createTournamentAction(
       ranked: formData.get('ranked') === 'on',
       date: str(formData, 'date') || null,
     });
-    revalidateTag('tournaments');
   } catch (e) {
     return { error: message(e) };
   }
@@ -82,7 +81,6 @@ export async function updateTournamentAction(
       ranked: formData.get('ranked') === 'on',
       date: str(formData, 'date') || null,
     });
-    revalidateTag('tournaments');
   } catch (e) {
     return { error: message(e) };
   }
@@ -99,7 +97,6 @@ export async function deleteTournamentAction(
     if (!tournamentId) return { error: 'Missing tournament.' };
 
     await deleteTournament(admin.discordId, tournamentId);
-    revalidateTag('tournaments');
   } catch (e) {
     return { error: message(e) };
   }
@@ -129,7 +126,6 @@ export async function updateTournamentStatusAction(
 
     revalidatePath(`/admin/tournaments/${tournamentId}`);
     revalidatePath('/admin');
-    revalidateTag('tournaments');
     return { ok: true };
   } catch (e) {
     return { error: message(e) };
@@ -258,7 +254,6 @@ export async function commitRevealAction(
 
     revalidatePath('/admin/reveal');
     revalidatePath('/');
-    revalidateTag('rankings');
     return {
       ok: true,
       message: `Reveal committed — ${matches} match${matches === 1 ? '' : 'es'}, ${players} player${players === 1 ? '' : 's'} updated.`,
@@ -406,7 +401,6 @@ export async function updatePlayerProfileAction(
 
     revalidatePath(`/admin/players/${publicId}`);
     revalidatePath(`/p/${publicId}`);
-    revalidateTag('rankings'); // title/accent flow into the public player payload
     return { ok: true, message: 'Profile saved.' };
   } catch (e) {
     return { error: message(e) };

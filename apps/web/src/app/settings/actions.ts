@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath } from 'next/cache';
 import { auth } from '@/auth';
 import { updateSettings } from '@inazuma/db';
 
@@ -36,5 +36,4 @@ export async function saveSettings(formData: FormData) {
   });
 
   revalidatePath('/settings');
-  revalidateTag('rankings'); // name/country/quote/accent flow into the public player payload
 }
