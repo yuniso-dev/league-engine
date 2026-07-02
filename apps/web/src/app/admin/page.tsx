@@ -67,7 +67,6 @@ export default async function AdminDashboard() {
                   <div style={{ fontFamily: FONT_B, fontSize: 13, color: T.faint, marginTop: 2 }}>
                     Season {t.season}
                     {t.startDate && ` · ${t.startDate}`}
-                    {t.endDate && ` → ${t.endDate}`}
                   </div>
                 </div>
                 {!t.ranked && (

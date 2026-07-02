@@ -72,15 +72,11 @@ export async function listAdminTournaments(): Promise<TournamentRow[]> {
     .orderBy(desc(tournaments.season), desc(tournaments.createdAt));
 }
 
+// Frontiers are single-day events — one date field, stored in start_date.
+// end_date is kept in the schema but always written as null going forward.
 export async function createTournament(
   adminId: string,
-  data: {
-    name: string;
-    season: number;
-    ranked: boolean;
-    startDate: string | null;
-    endDate: string | null;
-  },
+  data: { name: string; season: number; ranked: boolean; date: string | null },
 ): Promise<string> {
   const [row] = await getDb()
     .insert(tournaments)
@@ -88,13 +84,62 @@ export async function createTournament(
       name: data.name,
       season: data.season,
       ranked: data.ranked,
-      startDate: data.startDate,
-      endDate: data.endDate,
+      startDate: data.date,
+      endDate: null,
     })
     .returning({ id: tournaments.id });
 
   await logAdminAction(adminId, 'tournament.create', { tournamentId: row.id, name: data.name });
   return row.id;
+}
+
+export async function getTournamentById(tournamentId: string): Promise<TournamentRow | null> {
+  const [row] = await getDb()
+    .select()
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function updateTournament(
+  adminId: string,
+  tournamentId: string,
+  data: { name: string; season: number; ranked: boolean; date: string | null },
+): Promise<void> {
+  await getDb()
+    .update(tournaments)
+    .set({
+      name: data.name,
+      season: data.season,
+      ranked: data.ranked,
+      startDate: data.date,
+      endDate: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(tournaments.id, tournamentId));
+
+  await logAdminAction(adminId, 'tournament.update', { tournamentId, name: data.name });
+}
+
+/** Cascades to teams/matches/participants at the DB level. Blocked once any match has been processed for Elo. */
+export async function deleteTournament(adminId: string, tournamentId: string): Promise<void> {
+  const [processedMatch] = await getDb()
+    .select({ id: matches.id })
+    .from(matches)
+    .where(and(eq(matches.tournamentId, tournamentId), eq(matches.processed, true)))
+    .limit(1);
+  if (processedMatch) throw new Error('Tournament has processed results — cannot delete.');
+
+  try {
+    await getDb().delete(tournaments).where(eq(tournaments.id, tournamentId));
+  } catch (e: unknown) {
+    const code = typeof e === 'object' && e !== null ? (e as { code?: string }).code : undefined;
+    if (code === '23503') throw new Error('Tournament has linked records that block deletion.');
+    throw e;
+  }
+
+  await logAdminAction(adminId, 'tournament.delete', { tournamentId });
 }
 
 export async function updateTournamentStatus(

@@ -8,7 +8,7 @@ import StatusControls from '@/components/admin/StatusControls';
 import TeamForm from '@/components/admin/TeamForm';
 import MatchEntryForm from '@/components/admin/MatchEntryForm';
 import DeleteButton from '@/components/admin/DeleteButton';
-import { deleteMatchAction, deleteTeamAction } from '@/app/admin/actions';
+import { deleteMatchAction, deleteTeamAction, deleteTournamentAction } from '@/app/admin/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,23 +51,43 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
             Season {tournament.season}
             {!tournament.ranked && ' · Friendly'}
             {tournament.startDate && ` · ${tournament.startDate}`}
-            {tournament.endDate && ` → ${tournament.endDate}`}
             {winnerName && ` · 🏆 ${winnerName}`}
           </p>
         </div>
-        <span style={{
-          fontFamily: FONT_M,
-          fontSize: 11,
-          letterSpacing: 1,
-          textTransform: 'uppercase',
-          color: STATUS_COLORS[tournament.status],
-          border: `1px solid ${rgba(STATUS_COLORS[tournament.status], 0.4)}`,
-          borderRadius: 6,
-          padding: '4px 10px',
-          marginTop: 6,
-        }}>
-          {tournament.status}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+          <span style={{
+            fontFamily: FONT_M,
+            fontSize: 11,
+            letterSpacing: 1,
+            textTransform: 'uppercase',
+            color: STATUS_COLORS[tournament.status],
+            border: `1px solid ${rgba(STATUS_COLORS[tournament.status], 0.4)}`,
+            borderRadius: 6,
+            padding: '4px 10px',
+          }}>
+            {tournament.status}
+          </span>
+          <Link
+            href={`/admin/tournaments/${tournament.id}/edit`}
+            style={{
+              fontFamily: FONT_B,
+              fontSize: 13,
+              color: T.dim,
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: 7,
+              padding: '6px 14px',
+              textDecoration: 'none',
+            }}
+          >
+            Edit
+          </Link>
+          <DeleteButton
+            action={deleteTournamentAction}
+            hidden={{ tournamentId: tournament.id }}
+            confirmText={`Delete tournament "${tournament.name}"? This also removes its teams and match results.`}
+            label="Delete"
+          />
+        </div>
       </div>
 
       <div style={{ marginTop: 18 }}>

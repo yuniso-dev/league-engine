@@ -8,5 +8,5 @@ export default async function NewTournamentPage() {
   await requireAdmin();
   const season = await getCurrentSeason();
 
-  return <TournamentForm defaultSeason={season} />;
+  return <TournamentForm mode="create" defaultSeason={season} />;
 }

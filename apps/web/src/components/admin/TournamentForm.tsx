@@ -3,9 +3,15 @@ import { useFormState, useFormStatus } from 'react-dom';
 import Link from 'next/link';
 import { FONT_B, FONT_D, T, glass } from '@/lib/realm-colors';
 import { ADMIN_ACCENT, inputBase, labelStyle } from '@/components/admin/ui';
-import { createTournamentAction, type AdminFormState } from '@/app/admin/actions';
+import { createTournamentAction, updateTournamentAction, type AdminFormState } from '@/app/admin/actions';
 
-function SubmitButton() {
+type TournamentValues = { id: string; name: string; season: number; ranked: boolean; date: string | null };
+
+type Props =
+  | { mode: 'create'; defaultSeason: number }
+  | { mode: 'edit'; tournament: TournamentValues };
+
+function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: string }) {
   const { pending } = useFormStatus();
   return (
     <button
@@ -27,26 +33,38 @@ function SubmitButton() {
         transition: 'opacity 0.2s',
       }}
     >
-      {pending ? 'CREATING…' : 'CREATE TOURNAMENT'}
+      {pending ? pendingLabel : label}
     </button>
   );
 }
 
-export default function TournamentForm({ defaultSeason }: { defaultSeason: number }) {
-  const [state, action] = useFormState<AdminFormState, FormData>(createTournamentAction, {});
+export default function TournamentForm(props: Props) {
+  const isEdit = props.mode === 'edit';
+  const action = isEdit ? updateTournamentAction : createTournamentAction;
+  const [state, formAction] = useFormState<AdminFormState, FormData>(action, {});
+
+  const values: Omit<TournamentValues, 'id'> = isEdit
+    ? props.tournament
+    : { name: '', season: props.defaultSeason, ranked: true, date: null };
+
+  const backHref = isEdit ? `/admin/tournaments/${props.tournament.id}` : '/admin';
 
   return (
-    <form action={action} style={{ maxWidth: 460, margin: '0 auto' }}>
+    <form action={formAction} style={{ maxWidth: 460, margin: '0 auto' }}>
       <div style={glass({ padding: 36, borderRadius: 22 })}>
         <h1 style={{
           fontFamily: FONT_D, fontSize: 24, color: ADMIN_ACCENT,
           margin: '0 0 4px', letterSpacing: 2,
         }}>
-          NEW TOURNAMENT
+          {isEdit ? 'EDIT TOURNAMENT' : 'NEW TOURNAMENT'}
         </h1>
         <p style={{ fontFamily: FONT_B, color: T.dim, fontSize: 14, margin: '0 0 28px' }}>
-          Teams and matches are added on the tournament page after creation.
+          {isEdit
+            ? 'Update the tournament details below.'
+            : 'Teams and matches are added on the tournament page after creation.'}
         </p>
+
+        {isEdit && <input type="hidden" name="tournamentId" value={props.tournament.id} />}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div>
@@ -57,6 +75,7 @@ export default function TournamentForm({ defaultSeason }: { defaultSeason: numbe
               required
               autoComplete="off"
               placeholder="Frontier #1"
+              defaultValue={values.name}
               style={inputBase}
             />
           </div>
@@ -68,7 +87,7 @@ export default function TournamentForm({ defaultSeason }: { defaultSeason: numbe
                 name="season"
                 type="number"
                 min={1}
-                defaultValue={defaultSeason}
+                defaultValue={values.season}
                 required
                 style={inputBase}
               />
@@ -78,7 +97,7 @@ export default function TournamentForm({ defaultSeason }: { defaultSeason: numbe
                 <input
                   type="checkbox"
                   name="ranked"
-                  defaultChecked
+                  defaultChecked={values.ranked}
                   style={{ width: 16, height: 16, accentColor: ADMIN_ACCENT }}
                 />
                 <span style={{ fontFamily: FONT_B, color: T.dim, fontSize: 14 }}>
@@ -88,15 +107,9 @@ export default function TournamentForm({ defaultSeason }: { defaultSeason: numbe
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={labelStyle}>Start date</label>
-              <input name="startDate" type="date" style={inputBase} />
-            </div>
-            <div>
-              <label style={labelStyle}>End date</label>
-              <input name="endDate" type="date" style={inputBase} />
-            </div>
+          <div>
+            <label style={labelStyle}>Date</label>
+            <input name="date" type="date" defaultValue={values.date ?? ''} style={inputBase} />
           </div>
         </div>
 
@@ -106,12 +119,15 @@ export default function TournamentForm({ defaultSeason }: { defaultSeason: numbe
           </p>
         )}
 
-        <SubmitButton />
+        <SubmitButton
+          label={isEdit ? 'SAVE CHANGES' : 'CREATE TOURNAMENT'}
+          pendingLabel={isEdit ? 'SAVING…' : 'CREATING…'}
+        />
       </div>
 
       <div style={{ textAlign: 'center', marginTop: 16 }}>
-        <Link href="/admin" style={{ fontFamily: FONT_B, color: T.dim, fontSize: 14, textDecoration: 'none' }}>
-          ← Back to tournaments
+        <Link href={backHref} style={{ fontFamily: FONT_B, color: T.dim, fontSize: 14, textDecoration: 'none' }}>
+          ← Back
         </Link>
       </div>
     </form>
