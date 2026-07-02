@@ -3,9 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch --env-file-if-exists=../../.env.local src/index.ts",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@inazuma/core": "workspace:*",
+    "@inazuma/db": "workspace:*",
+    "discord.js": "^14.16.0",
+    "tsx": "^4.19.0"
+  },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "typescript": "^5.5.0"
   }
 }

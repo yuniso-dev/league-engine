@@ -1,3 +1,136 @@
-// Discord bot — Phase 5
-// Needs an always-on host (Railway / Fly.io / VPS) — cannot run on Vercel.
-export {};
+// INAZUMA FC Discord bot — Phase 5.
+// Long-running gateway client: member sync, rank nicknames after each weekly
+// reveal, /leaderboard + auto-updating rankings message, /profile.
+// Needs an always-on host (see SETUP.md) — cannot run on Vercel.
+import { Client, Events, GatewayIntentBits, type Guild } from 'discord.js';
+import { closeDb, getConfig } from '@inazuma/db';
+import { registerCommands, dispatch } from './commands.js';
+import { onMemberAdd, onMemberRemove, syncAllMembers } from './memberSync.js';
+import { syncNicknames } from './nicknameSync.js';
+import { updateRankingsMessage } from './leaderboard.js';
+
+// ── env ───────────────────────────────────────────────────────────────────────
+const token = process.env.DISCORD_BOT_TOKEN;
+if (!token) {
+  console.error('DISCORD_BOT_TOKEN is not set — create a bot in the Discord Developer Portal (see apps/bot/SETUP.md) and set this variable on your host.');
+  process.exit(1);
+}
+if (!process.env.DATABASE_URL) {
+  console.error('DATABASE_URL is not set — use the same Supabase pooler URL (port 6543) as the website.');
+  process.exit(1);
+}
+const SITE_URL = process.env.SITE_URL ?? 'https://inazuma-fc.vercel.app';
+
+const REVEAL_POLL_MS = 5 * 60_000;   // check for a committed reveal
+const MEMBER_SYNC_MS = 6 * 3_600_000; // periodic full member re-sync
+const GUILD_RETRY_MS = 60_000;        // re-check config.guildId when unset
+
+// ── client ────────────────────────────────────────────────────────────────────
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+});
+
+let activeGuildId: string | null = null;
+let lastRevealSeen: number | null = null;
+const timers: NodeJS.Timeout[] = [];
+
+client.on(Events.Error, e => console.error('[discord] client error —', e));
+process.on('unhandledRejection', e => console.error('[bot] unhandled rejection —', e));
+process.on('uncaughtException', e => {
+  console.error('[bot] uncaught exception — exiting so the host restarts us', e);
+  process.exit(1);
+});
+
+/** Interval bodies must never kill the timer or the process on a transient error. */
+function every(ms: number, label: string, fn: () => Promise<void>): void {
+  timers.push(setInterval(() => {
+    fn().catch(e => console.error(`[bot] ${label} failed —`, e));
+  }, ms));
+}
+
+async function fullPass(guild: Guild): Promise<void> {
+  await syncAllMembers(guild);
+  await syncNicknames(guild);
+  await updateRankingsMessage(client, SITE_URL);
+}
+
+/** Waits for config.guildId to be set (in the site's Admin → Settings) and the
+ *  bot to actually be in that server — retrying instead of crash-looping, so
+ *  the owner can fix configuration without a redeploy. */
+async function resolveGuild(ready: Client<true>): Promise<Guild> {
+  for (;;) {
+    try {
+      const cfg = await getConfig();
+      if (cfg.guildId) {
+        const guild = await ready.guilds.fetch(cfg.guildId).catch(() => null);
+        if (guild) {
+          lastRevealSeen = cfg.lastRevealAt?.getTime() ?? null;
+          return guild;
+        }
+        console.warn(`[bot] I'm not in the server with ID ${cfg.guildId} — invite me there (SETUP.md step 2) or fix the Guild ID in Admin → Settings. Retrying in 60s.`);
+      } else {
+        console.warn('[bot] No Guild ID configured yet — paste your server ID into the site\'s Admin → Settings. Retrying in 60s.');
+      }
+    } catch (e) {
+      console.error('[bot] could not read config —', e);
+    }
+    await new Promise(r => setTimeout(r, GUILD_RETRY_MS));
+  }
+}
+
+client.once(Events.ClientReady, async ready => {
+  console.log(`[bot] logged in as ${ready.user.tag}`);
+
+  const guild = await resolveGuild(ready);
+  activeGuildId = guild.id;
+  console.log(`[bot] serving guild: ${guild.name}`);
+
+  await registerCommands(ready, guild.id);
+
+  // Startup pass — idempotent, self-heals anything missed while offline.
+  await fullPass(guild).catch(e => console.error('[bot] startup pass failed —', e));
+
+  // React to weekly reveals: config.lastRevealAt changes when the admin commits.
+  every(REVEAL_POLL_MS, 'reveal poll', async () => {
+    const cfg = await getConfig();
+    const stamp = cfg.lastRevealAt?.getTime() ?? null;
+    if (stamp !== null && stamp !== lastRevealSeen) {
+      lastRevealSeen = stamp;
+      console.log('[bot] new reveal detected — syncing nicknames + rankings message');
+      await syncNicknames(guild);
+      await updateRankingsMessage(client, SITE_URL);
+    }
+  });
+
+  every(MEMBER_SYNC_MS, 'member re-sync', async () => {
+    await syncAllMembers(guild);
+  });
+});
+
+client.on(Events.GuildMemberAdd, member => {
+  if (member.guild.id !== activeGuildId) return;
+  onMemberAdd(member).catch(e => console.error('[bot] member add sync failed —', e));
+});
+
+client.on(Events.GuildMemberRemove, member => {
+  if (member.guild.id !== activeGuildId) return;
+  onMemberRemove(member).catch(e => console.error('[bot] member remove sync failed —', e));
+});
+
+client.on(Events.InteractionCreate, interaction => {
+  if (interaction.guildId !== activeGuildId) return;
+  void dispatch(interaction, { siteUrl: SITE_URL });
+});
+
+// ── graceful shutdown ─────────────────────────────────────────────────────────
+async function shutdown(signal: string): Promise<void> {
+  console.log(`[bot] ${signal} — shutting down`);
+  for (const t of timers) clearInterval(t);
+  await client.destroy();
+  await closeDb().catch(() => {});
+  process.exit(0);
+}
+process.on('SIGINT', () => void shutdown('SIGINT'));
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+
+void client.login(token);

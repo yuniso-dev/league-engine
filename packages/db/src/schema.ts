@@ -174,6 +174,7 @@ export const config = pgTable('config', {
   currentSeason:      integer('current_season').notNull().default(1),
   guildId:            text('guild_id'),
   rankingsMessageId:  text('rankings_message_id'),
+  rankingsChannelId:  text('rankings_channel_id'),
   eloBase:            numeric('elo_base', { precision: 7, scale: 2 }).notNull().default('1000'),
   kPlacement:         integer('k_placement').notNull().default(60),
   kEstablished:       integer('k_established').notNull().default(24),
