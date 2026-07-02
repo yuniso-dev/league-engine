@@ -1,17 +1,16 @@
-import { toPublicPlayer } from '@inazuma/db';
+import { getRankings, getTournaments, toPublicPlayer } from '@inazuma/db';
 import type { PublicPlayer } from '@inazuma/db';
 import { auth } from '@/auth';
-import { getCachedRankings, getCachedTournaments } from '@/lib/data';
 import { getCachedUserByDiscordId } from '@/lib/user';
 import StormShell from '@/components/StormShell';
 
-// Dynamic for auth(); the heavy reads are tag-cached in lib/data.
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function HomePage() {
   const [rankings, tournaments, session] = await Promise.all([
-    getCachedRankings(),
-    getCachedTournaments(),
+    getRankings(),
+    getTournaments(),
     auth(),
   ]);
 

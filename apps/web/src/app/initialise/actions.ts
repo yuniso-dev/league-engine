@@ -1,7 +1,6 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { revalidateTag } from 'next/cache';
 import { auth } from '@/auth';
 import { initialiseUser } from '@inazuma/db';
 
@@ -24,6 +23,5 @@ export async function initialise(formData: FormData) {
     hidePositions,
     country,
   });
-  revalidateTag('rankings'); // new player enters the public ladder
   redirect(`/p/${publicId}`);
 }
