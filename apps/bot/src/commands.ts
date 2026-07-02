@@ -88,7 +88,7 @@ async function handleProfile(
 
 export async function dispatch(
   interaction: Interaction,
-  ctx: { siteUrl: string },
+  ctx: { siteUrl: string; readOnly: boolean },
 ): Promise<void> {
   if (!interaction.isChatInputCommand()) return;
   if (!interaction.inGuild()) return;
@@ -102,7 +102,7 @@ export async function dispatch(
         await handleProfile(interaction, ctx.siteUrl);
         break;
       case 'postleaderboard':
-        await handlePostLeaderboard(interaction, ctx.siteUrl);
+        await handlePostLeaderboard(interaction, ctx.siteUrl, ctx.readOnly);
         break;
       case 'syncnicks': {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
