@@ -21,6 +21,12 @@ if (!process.env.DATABASE_URL) {
 }
 const SITE_URL = process.env.SITE_URL ?? 'https://inazuma-fc.vercel.app';
 
+// Safe test mode: read production data but write NOTHING to the shared database
+// or the real server. Set BOT_READ_ONLY=true (+ BOT_GUILD_ID=<test server id>)
+// on a test host to dry-run in a throwaway server without touching live data.
+const READ_ONLY = /^(1|true)$/i.test(process.env.BOT_READ_ONLY ?? '');
+const GUILD_OVERRIDE = process.env.BOT_GUILD_ID || null;
+
 const REVEAL_POLL_MS = 5 * 60_000;   // check for a committed reveal
 const MEMBER_SYNC_MS = 6 * 3_600_000; // periodic full member re-sync
 const GUILD_RETRY_MS = 60_000;        // re-check config.guildId when unset
@@ -49,9 +55,9 @@ function every(ms: number, label: string, fn: () => Promise<void>): void {
 }
 
 async function fullPass(guild: Guild): Promise<void> {
-  await syncAllMembers(guild);
-  await syncNicknames(guild);
-  await updateRankingsMessage(client, SITE_URL);
+  if (!READ_ONLY) await syncAllMembers(guild); // member sync writes to the DB
+  await syncNicknames(guild);                  // only edits nicknames in this guild — no DB writes
+  if (!READ_ONLY) await updateRankingsMessage(client, SITE_URL);
 }
 
 /** Waits for config.guildId to be set (in the site's Admin → Settings) and the
@@ -61,13 +67,16 @@ async function resolveGuild(ready: Client<true>): Promise<Guild> {
   for (;;) {
     try {
       const cfg = await getConfig();
-      if (cfg.guildId) {
-        const guild = await ready.guilds.fetch(cfg.guildId).catch(() => null);
+      // BOT_GUILD_ID overrides the shared config.guildId (used for test runs, so
+      // testing never has to change the server's real Guild ID in Admin → Settings).
+      const guildId = GUILD_OVERRIDE ?? cfg.guildId;
+      if (guildId) {
+        const guild = await ready.guilds.fetch(guildId).catch(() => null);
         if (guild) {
           lastRevealSeen = cfg.lastRevealAt?.getTime() ?? null;
           return guild;
         }
-        console.warn(`[bot] I'm not in the server with ID ${cfg.guildId} — invite me there (SETUP.md step 2) or fix the Guild ID in Admin → Settings. Retrying in 60s.`);
+        console.warn(`[bot] I'm not in the server with ID ${guildId} — invite me there (SETUP.md step 2) or fix the Guild ID in Admin → Settings. Retrying in 60s.`);
       } else {
         console.warn('[bot] No Guild ID configured yet — paste your server ID into the site\'s Admin → Settings. Retrying in 60s.');
       }
@@ -80,6 +89,9 @@ async function resolveGuild(ready: Client<true>): Promise<Guild> {
 
 client.once(Events.ClientReady, async ready => {
   console.log(`[bot] logged in as ${ready.user.tag}`);
+  if (READ_ONLY) {
+    console.log('[bot] ⚠ TEST MODE (read-only) — the database will NOT be modified. Unset BOT_READ_ONLY for the real run.');
+  }
 
   const guild = await resolveGuild(ready);
   activeGuildId = guild.id;
@@ -98,28 +110,31 @@ client.once(Events.ClientReady, async ready => {
       lastRevealSeen = stamp;
       console.log('[bot] new reveal detected — syncing nicknames + rankings message');
       await syncNicknames(guild);
-      await updateRankingsMessage(client, SITE_URL);
+      if (!READ_ONLY) await updateRankingsMessage(client, SITE_URL);
     }
   });
 
-  every(MEMBER_SYNC_MS, 'member re-sync', async () => {
-    await syncAllMembers(guild);
-  });
+  // Periodic full member re-sync writes to the DB — skip it entirely in test mode.
+  if (!READ_ONLY) {
+    every(MEMBER_SYNC_MS, 'member re-sync', async () => {
+      await syncAllMembers(guild);
+    });
+  }
 });
 
 client.on(Events.GuildMemberAdd, member => {
-  if (member.guild.id !== activeGuildId) return;
+  if (READ_ONLY || member.guild.id !== activeGuildId) return;
   onMemberAdd(member).catch(e => console.error('[bot] member add sync failed —', e));
 });
 
 client.on(Events.GuildMemberRemove, member => {
-  if (member.guild.id !== activeGuildId) return;
+  if (READ_ONLY || member.guild.id !== activeGuildId) return;
   onMemberRemove(member).catch(e => console.error('[bot] member remove sync failed —', e));
 });
 
 client.on(Events.InteractionCreate, interaction => {
   if (interaction.guildId !== activeGuildId) return;
-  void dispatch(interaction, { siteUrl: SITE_URL });
+  void dispatch(interaction, { siteUrl: SITE_URL, readOnly: READ_ONLY });
 });
 
 // ── graceful shutdown ─────────────────────────────────────────────────────────

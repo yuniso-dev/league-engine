@@ -41,6 +41,7 @@ export async function handleLeaderboard(
 export async function handlePostLeaderboard(
   interaction: ChatInputCommandInteraction,
   siteUrl: string,
+  readOnly = false,
 ): Promise<void> {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
@@ -52,8 +53,14 @@ export async function handlePostLeaderboard(
 
   const players = await getRankings();
   const message = await channel.send({ embeds: [buildLeaderboardEmbed(players, siteUrl)] });
-  await setRankingsRef({ channelId: message.channelId, messageId: message.id });
 
+  if (readOnly) {
+    // Test mode: don't persist the rankings-message reference to the shared config.
+    await interaction.editReply('Posted (test mode) — not saved as the auto-updating message.');
+    return;
+  }
+
+  await setRankingsRef({ channelId: message.channelId, messageId: message.id });
   await interaction.editReply('Posted. This message will now update automatically after every reveal.');
 }
 

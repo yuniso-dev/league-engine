@@ -37,6 +37,24 @@ Setup takes about 15 minutes. You'll do three things: create the bot on Discord,
 
 The bot checks for this every 60 seconds, so you can do this before *or* after the bot is running — no restart needed.
 
+## Safe test run first (recommended)
+
+Before putting the bot in your real server, do a dry-run in a **throwaway test server** — with zero risk to your live data.
+
+Why this needs a special mode: the bot uses the *same database* as your website, and normally it hides any player who isn't in the server it's watching. In a test server that would be *all* your real players. **Test mode** fixes this — the bot reads your real data (so `/leaderboard` and `/profile` show real results) but writes **nothing** back to the database.
+
+1. Create a new Discord server (the **+** button → Create My Own) and invite the bot to it with the same link from step 1.5.
+2. Copy the **test** server's ID (right-click its icon → Copy Server ID).
+3. On your test host, set these **two extra** variables (alongside `DISCORD_BOT_TOKEN`, `DATABASE_URL`, `SITE_URL`):
+
+   | Variable | Value |
+   |---|---|
+   | `BOT_READ_ONLY` | `true` |
+   | `BOT_GUILD_ID` | your **test** server's ID |
+
+4. Start it. The logs will show `⚠ TEST MODE (read-only)`. Now try everything: `/leaderboard`, `/profile`, `/postleaderboard`, `/syncnicks`, `/resetnicknames`. Nickname changes happen only inside the test server; your website's rankings and players stay exactly as they were.
+5. When you're happy, **remove** `BOT_READ_ONLY` and `BOT_GUILD_ID` for the real deployment below.
+
 ## 3. Put the bot on a host (Railway — recommended)
 
 The bot must run 24/7, which Vercel can't do. Railway (~$5/month hobby plan) deploys straight from your GitHub repo:
