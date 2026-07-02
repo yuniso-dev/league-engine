@@ -9,6 +9,8 @@ import {
   createTournament,
   deleteMatch,
   deleteTeam,
+  deleteTournament,
+  updateTournament,
   updateTournamentStatus,
   type MatchStage,
 } from '@inazuma/db';
@@ -43,13 +45,55 @@ export async function createTournamentAction(
       name,
       season,
       ranked: formData.get('ranked') === 'on',
-      startDate: str(formData, 'startDate') || null,
-      endDate: str(formData, 'endDate') || null,
+      date: str(formData, 'date') || null,
     });
   } catch (e) {
     return { error: message(e) };
   }
   redirect(`/admin/tournaments/${id}`);
+}
+
+export async function updateTournamentAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  const tournamentId = str(formData, 'tournamentId');
+  try {
+    const admin = await requireAdminAction();
+    if (!tournamentId) return { error: 'Missing tournament.' };
+
+    const name = str(formData, 'name').slice(0, 80);
+    if (!name) return { error: 'Name is required.' };
+
+    const season = parseInt(str(formData, 'season'), 10);
+    if (!Number.isInteger(season) || season < 1) return { error: 'Season must be a positive number.' };
+
+    await updateTournament(admin.discordId, tournamentId, {
+      name,
+      season,
+      ranked: formData.get('ranked') === 'on',
+      date: str(formData, 'date') || null,
+    });
+  } catch (e) {
+    return { error: message(e) };
+  }
+  redirect(`/admin/tournaments/${tournamentId}`);
+}
+
+export async function deleteTournamentAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  const tournamentId = str(formData, 'tournamentId');
+  try {
+    const admin = await requireAdminAction();
+    if (!tournamentId) return { error: 'Missing tournament.' };
+
+    await deleteTournament(admin.discordId, tournamentId);
+  } catch (e) {
+    return { error: message(e) };
+  }
+  redirect('/admin');
 }
 
 export async function updateTournamentStatusAction(
