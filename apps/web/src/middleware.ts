@@ -11,4 +11,6 @@ export default auth((req) => {
   }
 });
 
-export const config = { matcher: ['/initialise', '/settings'] };
+// /admin gets the signed-in check here; the role check needs the DB, so it
+// lives in requireAdmin()/requireAdminAction() on the server side.
+export const config = { matcher: ['/initialise', '/settings', '/admin/:path*'] };
