@@ -14,11 +14,14 @@ export default async function HomePage() {
   ]);
 
   let isLoggedIn = false;
+  let isAdmin = false;
   let currentUser: PublicPlayer | null = null;
 
   if (session?.user?.discordId) {
     isLoggedIn = true;
     const user = await getUserByDiscordId(session.user.discordId);
+    // Only the viewer's own staff flag — never another user's role.
+    isAdmin = user?.role === 'owner' || user?.role === 'admin';
     if (user?.initialised) currentUser = toPublicPlayer(user);
   }
 
@@ -27,6 +30,7 @@ export default async function HomePage() {
       rankings={rankings}
       tournaments={tournaments}
       isLoggedIn={isLoggedIn}
+      isAdmin={isAdmin}
       currentUser={currentUser}
     />
   );

@@ -63,7 +63,7 @@ export type PublicTournament = {
   winnerName: string | null;
 };
 
-export function toPublicTournament(row: TournamentRow): PublicTournament {
+export function toPublicTournament(row: TournamentRow, winnerName: string | null = null): PublicTournament {
   return {
     id: row.id,
     name: row.name,
@@ -71,6 +71,6 @@ export function toPublicTournament(row: TournamentRow): PublicTournament {
     status: row.status,
     startDate: row.startDate,
     endDate: row.endDate,
-    winnerName: null, // resolved in Phase 3+ with a join to teams
+    winnerName,
   };
 }

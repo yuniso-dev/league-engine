@@ -15,6 +15,7 @@ type Props = {
   rankings: PublicPlayer[];
   tournaments: PublicTournament[];
   isLoggedIn: boolean;
+  isAdmin: boolean;
   currentUser: PublicPlayer | null;
 };
 
@@ -27,7 +28,7 @@ type DragState = {
   vel: number;
 };
 
-export default function StormShell({ rankings, tournaments, isLoggedIn, currentUser }: Props) {
+export default function StormShell({ rankings, tournaments, isLoggedIn, isAdmin, currentUser }: Props) {
   const [index,  setIndex]  = useState(1);  // 0=Frontier, 1=Rankings, 2=Profile
   const [viewed, setViewed] = useState<PublicPlayer | null>(currentUser);
 
@@ -152,7 +153,7 @@ export default function StormShell({ rankings, tournaments, isLoggedIn, currentU
             INAZUMA <span style={{ color: T.gold }}>FC</span>
           </span>
           <div style={{ position: 'absolute', right: 0 }}>
-            <AccountMenu currentUser={currentUser} isLoggedIn={isLoggedIn} />
+            <AccountMenu currentUser={currentUser} isLoggedIn={isLoggedIn} isAdmin={isAdmin} />
           </div>
         </div>
 

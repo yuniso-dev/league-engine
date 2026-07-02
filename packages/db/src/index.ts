@@ -11,5 +11,26 @@ export {
   updateSettings,
 } from './queries/users';
 export type { UserRow } from './queries/users';
+export {
+  MATCH_STAGES,
+  getCurrentSeason,
+  listAdminTournaments,
+  createTournament,
+  updateTournamentStatus,
+  listPlayersForAdmin,
+  getAdminTournament,
+  createTeam,
+  deleteTeam,
+  createMatch,
+  deleteMatch,
+} from './queries/admin';
+export type {
+  TournamentRow,
+  MatchStage,
+  AdminPlayerOption,
+  AdminTeam,
+  AdminMatch,
+  AdminTournamentDetail,
+} from './queries/admin';
 export { toPublicPlayer, toPublicTournament } from './dto';
 export type { PublicPlayer, PublicTournament } from './dto';

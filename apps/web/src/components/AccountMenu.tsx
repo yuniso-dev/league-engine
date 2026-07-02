@@ -8,6 +8,7 @@ import { doSignOut } from '@/app/auth-actions';
 type Props = {
   currentUser: PublicPlayer | null;
   isLoggedIn: boolean;
+  isAdmin: boolean;
 };
 
 const ACCENT = '#FF7A1A';
@@ -41,7 +42,7 @@ function MenuItem({ onClick, children, danger }: { onClick: () => void; children
   );
 }
 
-export function AccountMenu({ currentUser, isLoggedIn }: Props) {
+export function AccountMenu({ currentUser, isLoggedIn, isAdmin }: Props) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -147,6 +148,12 @@ export function AccountMenu({ currentUser, isLoggedIn }: Props) {
                   {currentUser.provisional ? 'Provisional' : `#${currentUser.rank} · ${Math.round(currentUser.elo)} ELO`}
                 </div>
               </div>
+            )}
+
+            {isAdmin && (
+              <MenuItem onClick={() => { setOpen(false); window.location.href = '/admin'; }}>
+                ⚡ Admin
+              </MenuItem>
             )}
 
             <MenuItem onClick={() => { setOpen(false); window.location.href = '/settings'; }}>
