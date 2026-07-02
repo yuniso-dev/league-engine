@@ -23,6 +23,5 @@ export async function initialise(formData: FormData) {
     hidePositions,
     country,
   });
-
   redirect(`/p/${publicId}`);
 }

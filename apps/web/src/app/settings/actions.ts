@@ -16,7 +16,7 @@ export async function saveSettings(formData: FormData) {
   const hidePositions = formData.get('hidePositions') === 'on';
   const country = ((formData.get('country') as string) || '').toUpperCase().slice(0, 2) || null;
   const quote = ((formData.get('quote') as string) || '').trim().slice(0, 100) || null;
-  const bio = ((formData.get('bio') as string) || '').trim().slice(0, 300) || null;
+  const bio   = ((formData.get('bio')   as string) || '').trim().slice(0, 300) || null;
 
   await updateSettings(session.user.discordId, {
     displayName,

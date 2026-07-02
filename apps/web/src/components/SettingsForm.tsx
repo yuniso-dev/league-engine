@@ -1,4 +1,6 @@
 'use client';
+import { useEffect, useRef, useState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { FONT_D, FONT_B, glass, T } from '@/lib/realm-colors';
 import { POSITIONS } from '@/lib/positions';
 import type { UserRow } from '@inazuma/db';
@@ -8,7 +10,9 @@ type Props = {
   user: UserRow;
 };
 
-const label: React.CSSProperties = {
+const ACCENT = '#FF7A1A';
+
+const labelStyle: React.CSSProperties = {
   display: 'block',
   fontFamily: FONT_B,
   fontSize: 12,
@@ -31,14 +35,55 @@ const inputBase: React.CSSProperties = {
   boxSizing: 'border-box',
 };
 
-const posOptions = (current: string | null) => (
-  <>
-    <option value="">— None —</option>
-    {POSITIONS.map(p => (
-      <option key={p} value={p} selected={p === current}>{p}</option>
-    ))}
-  </>
-);
+function posOptions(current: string | null) {
+  return (
+    <>
+      <option value="">— None —</option>
+      {POSITIONS.map(p => (
+        <option key={p} value={p} selected={p === current}>{p}</option>
+      ))}
+    </>
+  );
+}
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  const [saved, setSaved] = useState(false);
+  const wasPending = useRef(false);
+
+  useEffect(() => {
+    if (wasPending.current && !pending) {
+      setSaved(true);
+      const t = setTimeout(() => setSaved(false), 2500);
+      return () => clearTimeout(t);
+    }
+    wasPending.current = pending;
+  }, [pending]);
+
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      style={{
+        marginTop: 28,
+        width: '100%',
+        padding: '13px 0',
+        background: saved ? '#1a8a3a' : ACCENT,
+        border: 'none',
+        borderRadius: 12,
+        color: '#fff',
+        fontFamily: FONT_D,
+        fontSize: 16,
+        letterSpacing: 2,
+        cursor: pending ? 'not-allowed' : 'pointer',
+        opacity: pending ? 0.7 : 1,
+        transition: 'background 0.3s, opacity 0.2s',
+      }}
+    >
+      {pending ? 'SAVING…' : saved ? 'SAVED ✓' : 'SAVE CHANGES'}
+    </button>
+  );
+}
 
 export default function SettingsForm({ action, user }: Props) {
   return (
@@ -51,7 +96,7 @@ export default function SettingsForm({ action, user }: Props) {
       <form action={action} style={{ width: '100%', maxWidth: 460 }}>
         <div style={glass({ padding: 36, borderRadius: 22 })}>
           <h1 style={{
-            fontFamily: FONT_D, fontSize: 28, color: '#FF7A1A',
+            fontFamily: FONT_D, fontSize: 28, color: ACCENT,
             margin: '0 0 4px', letterSpacing: 2,
           }}>
             SETTINGS
@@ -62,7 +107,7 @@ export default function SettingsForm({ action, user }: Props) {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
-              <label style={label}>Display Name</label>
+              <label style={labelStyle}>Display Name</label>
               <input
                 name="displayName"
                 defaultValue={user.displayName}
@@ -75,13 +120,13 @@ export default function SettingsForm({ action, user }: Props) {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label style={label}>Primary Position</label>
+                <label style={labelStyle}>Primary Position</label>
                 <select name="position1" style={{ ...inputBase, cursor: 'pointer' }}>
                   {posOptions(user.position1)}
                 </select>
               </div>
               <div>
-                <label style={label}>Secondary Position</label>
+                <label style={labelStyle}>Secondary Position</label>
                 <select name="position2" style={{ ...inputBase, cursor: 'pointer' }}>
                   {posOptions(user.position2)}
                 </select>
@@ -89,19 +134,7 @@ export default function SettingsForm({ action, user }: Props) {
             </div>
 
             <div>
-              <label style={label}>Country (2-letter code)</label>
-              <input
-                name="country"
-                defaultValue={user.country ?? ''}
-                maxLength={2}
-                placeholder="e.g. GB"
-                style={{ ...inputBase, textTransform: 'uppercase' }}
-                onChange={e => { e.target.value = e.target.value.toUpperCase(); }}
-              />
-            </div>
-
-            <div>
-              <label style={label}>Quote</label>
+              <label style={labelStyle}>Quote</label>
               <input
                 name="quote"
                 defaultValue={user.quote ?? ''}
@@ -112,7 +145,7 @@ export default function SettingsForm({ action, user }: Props) {
             </div>
 
             <div>
-              <label style={label}>Bio</label>
+              <label style={labelStyle}>Bio</label>
               <textarea
                 name="bio"
                 defaultValue={user.bio ?? ''}
@@ -128,7 +161,7 @@ export default function SettingsForm({ action, user }: Props) {
                 type="checkbox"
                 name="hidePositions"
                 defaultChecked={user.hidePositions}
-                style={{ width: 16, height: 16, accentColor: '#FF7A1A' }}
+                style={{ width: 16, height: 16, accentColor: ACCENT }}
               />
               <span style={{ fontFamily: FONT_B, color: T.dim, fontSize: 14 }}>
                 Hide positions from my nickname
@@ -136,28 +169,11 @@ export default function SettingsForm({ action, user }: Props) {
             </label>
           </div>
 
-          <button
-            type="submit"
-            style={{
-              marginTop: 28,
-              width: '100%',
-              padding: '13px 0',
-              background: '#FF7A1A',
-              border: 'none',
-              borderRadius: 12,
-              color: '#fff',
-              fontFamily: FONT_D,
-              fontSize: 16,
-              letterSpacing: 2,
-              cursor: 'pointer',
-            }}
-          >
-            SAVE CHANGES
-          </button>
+          <SubmitButton />
         </div>
 
         <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <a href="/" style={{ fontFamily: FONT_B, color: T.faint, fontSize: 13, textDecoration: 'none' }}>
+          <a href="/" style={{ fontFamily: FONT_B, color: T.dim, fontSize: 14, textDecoration: 'none', letterSpacing: '0.02em' }}>
             ← Back to INAZUMA FC
           </a>
         </div>

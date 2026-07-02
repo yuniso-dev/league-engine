@@ -11,8 +11,14 @@ export default {
     }),
   ],
   callbacks: {
+    jwt({ token, account }) {
+      if (account?.providerAccountId) {
+        token.discordId = account.providerAccountId;
+      }
+      return token;
+    },
     session({ session, token }) {
-      if (token.sub) session.user.discordId = token.sub;
+      if (token.discordId) session.user.discordId = token.discordId as string;
       return session;
     },
   },

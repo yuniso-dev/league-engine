@@ -123,8 +123,8 @@ export async function updateSettings(
     position2: string | null;
     hidePositions: boolean;
     country: string | null;
-    quote: string | null;
-    bio: string | null;
+    quote?: string | null;
+    bio?: string | null;
   },
 ): Promise<void> {
   await getDb()
@@ -135,8 +135,8 @@ export async function updateSettings(
       position2: data.position2,
       hidePositions: data.hidePositions,
       country: data.country,
-      quote: data.quote,
-      bio: data.bio,
+      ...(data.quote !== undefined && { quote: data.quote }),
+      ...(data.bio !== undefined && { bio: data.bio }),
       updatedAt: new Date(),
     })
     .where(eq(users.discordId, discordId));

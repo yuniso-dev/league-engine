@@ -30,7 +30,7 @@ export default async function PublicProfilePage({ params }: Props) {
       padding: '24px 16px 48px',
     }}>
       <header style={{ width: '100%', maxWidth: 460, marginBottom: 24 }}>
-        <a href="/" style={{ fontFamily: FONT_B, color: T.faint, fontSize: 13, textDecoration: 'none' }}>
+        <a href="/" style={{ fontFamily: FONT_B, color: T.dim, fontSize: 14, textDecoration: 'none', letterSpacing: '0.02em' }}>
           ← INAZUMA FC
         </a>
       </header>
