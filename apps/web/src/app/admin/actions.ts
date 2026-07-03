@@ -19,6 +19,7 @@ import {
   generateKnockoutFromTable,
   generateNextRound,
   grantAward,
+  recomputeRanks,
   recordMatchResult,
   updateMatchStats,
   removeTeamMember,
@@ -415,6 +416,21 @@ export async function updatePlayerProfileAction(
     revalidatePath(`/admin/players/${publicId}`);
     revalidatePath(`/p/${publicId}`);
     return { ok: true, message: 'Profile saved.' };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function recalcRanksAction(
+  _prev: AdminFormState,
+  _formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    await requireAdminAction();
+    await recomputeRanks();
+    revalidatePath('/');
+    revalidatePath('/admin/players');
+    return { ok: true, message: 'Ranks recalculated — equal Elo shares the same rank.' };
   } catch (e) {
     return { error: message(e) };
   }

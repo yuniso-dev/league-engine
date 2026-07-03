@@ -2,6 +2,7 @@ import { getConfig } from '@inazuma/db';
 import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, T } from '@/lib/realm-colors';
 import SettingsForm from '@/components/admin/SettingsForm';
+import RecalcRanksButton from '@/components/admin/RecalcRanksButton';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -22,6 +23,7 @@ export default async function AdminSettingsPage() {
       </div>
 
       <SettingsForm config={config} />
+      <RecalcRanksButton />
     </>
   );
 }

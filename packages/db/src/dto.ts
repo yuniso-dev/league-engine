@@ -35,6 +35,9 @@ export type PublicPlayer = {
   /** Ladder extras — only populated by getRankings. */
   awardBadges?: { name: string; icon: string | null; imageUrl: string | null }[];
   wins?: number;
+  goals?: number;
+  assists?: number;
+  cleanSheets?: number;
 };
 
 export function toPublicPlayer(row: UserRow): PublicPlayer {

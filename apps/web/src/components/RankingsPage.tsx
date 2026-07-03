@@ -18,9 +18,11 @@ const MEDAL: Record<number, { from: string; to: string; glow: string }> = {
   3: { from: '#F0B27E', to: '#A05A2C', glow: 'rgba(224,145,90,0.5)' },
 };
 
-/** Top-3 get a glowing hexagon medal; everyone else a plain number. */
-function RankBadge({ rank, provisional }: { rank: number | null; provisional: boolean }) {
-  const show = !provisional && rank != null;
+/** Top-3 get a glowing hexagon medal; everyone else a plain number.
+ *  Ranks are tie-aware (equal Elo shares a rank), so several players can
+ *  legitimately wear the same medal. */
+function RankBadge({ rank }: { rank: number | null }) {
+  const show = rank != null;
   const medal = show ? MEDAL[rank!] : undefined;
 
   if (medal) {
@@ -56,6 +58,19 @@ function Num({ v, l, c }: { v: number | string; l: string; c?: string }) {
       <div style={{ color: T.faint, fontFamily: FONT_M, fontSize: 8 }}>{l}</div>
     </div>
   );
+}
+
+const DEFENDERS = ['CB', 'LB', 'RB'];
+const MIDFIELDERS = ['CDM', 'CM', 'CAM', 'LM', 'RM'];
+
+/** The stat that matters for the player's role: keepers → clean sheets,
+ *  defenders → games won, midfielders → goals/assists, attackers → goals. */
+function roleStat(p: PublicPlayer): { v: number | string; l: string } {
+  const pos = !p.hidePositions ? p.position1 : null;
+  if (pos === 'GK') return { v: p.cleanSheets ?? 0, l: 'CS' };
+  if (pos && DEFENDERS.includes(pos)) return { v: p.wins ?? 0, l: 'WON' };
+  if (pos && MIDFIELDERS.includes(pos)) return { v: `${p.goals ?? 0}/${p.assists ?? 0}`, l: 'G/A' };
+  return { v: p.goals ?? 0, l: 'GOALS' }; // ST / LW / RW / no position
 }
 
 function initials(name: string): string {
@@ -145,11 +160,12 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
 
         {list.map((p, i) => {
           const rc = rankColor(p.rank);
-          const showRank = !p.provisional && p.rank != null;
+          const showRank = p.rank != null;
           const winRate =
             p.wins != null && p.gamesPlayed > 0
               ? Math.round((p.wins / p.gamesPlayed) * 100)
               : null;
+          const rs = roleStat(p);
           return (
             <div
               key={p.publicId ?? p.displayName + i}
@@ -164,7 +180,7 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
                 }),
               }}
             >
-              <RankBadge rank={p.rank} provisional={p.provisional} />
+              <RankBadge rank={p.rank} />
 
               <Avatar
                 initials={initials(p.displayName)}
@@ -218,8 +234,9 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-                {winRate != null && <Num v={`${winRate}%`} l="W/R" c={winRate >= 50 ? T.win : T.dim} />}
+              <div style={{ display: 'flex', gap: 13, alignItems: 'center' }}>
+                <Num v={rs.v} l={rs.l} c={T.dim} />
+                <Num v={winRate != null ? `${winRate}%` : '—'} l="WR %" c={winRate != null && winRate >= 50 ? T.win : T.dim} />
                 <Num v={Math.round(p.elo)} l="ELO" />
                 <Num v={p.gamesPlayed} l="GP" />
               </div>

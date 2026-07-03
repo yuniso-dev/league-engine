@@ -23,8 +23,8 @@ export async function getRankings(): Promise<PublicPlayer[]> {
 
   const ids = rows.map(r => r.discordId);
 
-  // Award badges + win counts for the ladder rows, two round trips for the lot.
-  const [awardRows, winRows] = await Promise.all([
+  // Award badges + stat totals for the ladder rows, two round trips for the lot.
+  const [awardRows, statRows] = await Promise.all([
     db
       .select({
         userId: userAwards.userId,
@@ -40,6 +40,9 @@ export async function getRankings(): Promise<PublicPlayer[]> {
       .select({
         userId: matchParticipants.userId,
         wins: sql<number>`(count(*) filter (where ${matchParticipants.result} = 'win'))::int`,
+        goals: sql<number>`coalesce(sum(${matchParticipants.goals}), 0)::int`,
+        assists: sql<number>`coalesce(sum(${matchParticipants.assists}), 0)::int`,
+        cleanSheets: sql<number>`(count(*) filter (where ${matchParticipants.cleanSheet}))::int`,
       })
       .from(matchParticipants)
       .where(inArray(matchParticipants.userId, ids))
@@ -52,13 +55,40 @@ export async function getRankings(): Promise<PublicPlayer[]> {
     list.push({ name: a.name, icon: a.icon, imageUrl: a.imageUrl });
     badges.set(a.userId, list);
   }
-  const winsOf = new Map(winRows.map(w => [w.userId, w.wins]));
+  const statsOf = new Map(statRows.map(s => [s.userId, s]));
 
-  return rows.map(r => ({
-    ...toPublicPlayer(r),
-    awardBadges: badges.get(r.discordId) ?? [],
-    wins: winsOf.get(r.discordId) ?? 0,
-  }));
+  return rows.map(r => {
+    const s = statsOf.get(r.discordId);
+    return {
+      ...toPublicPlayer(r),
+      awardBadges: badges.get(r.discordId) ?? [],
+      wins: s?.wins ?? 0,
+      goals: s?.goals ?? 0,
+      assists: s?.assists ?? 0,
+      cleanSheets: s?.cleanSheets ?? 0,
+    };
+  });
+}
+
+/** Tie-aware ladder ranks for EVERY active player (provisional included):
+ *  equal Elo shares the same rank (standard competition ranking, e.g. 1,1,1,4)
+ *  — so a fresh league where everyone sits at the base Elo is all #1. */
+export async function recomputeRanks(): Promise<number> {
+  const rows = await getDb().execute(sql`
+    with ladder as (
+      select discord_id, rank() over (order by elo desc) as new_rank
+        from users
+       where initialised = true
+         and is_blacklisted = false
+         and is_inactive = false
+    )
+    update users u
+       set rank = l.new_rank
+      from ladder l
+     where u.discord_id = l.discord_id
+       and (u.rank is distinct from l.new_rank)
+  `);
+  return Array.isArray(rows) ? rows.length : 0;
 }
 
 export async function searchRankings(q: string): Promise<PublicPlayer[]> {
