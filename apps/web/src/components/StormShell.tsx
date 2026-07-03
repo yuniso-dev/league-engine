@@ -18,6 +18,7 @@ type Props = {
   voice: VoiceNowEntry[];
   season?: number;
   records?: StatLeaderboards;
+  recordsPreview?: boolean;
   dataOffline?: boolean;
   isLoggedIn: boolean;
   isAdmin: boolean;
@@ -33,7 +34,7 @@ type DragState = {
   vel: number;
 };
 
-export default function StormShell({ rankings, tournaments, voice, season, records, dataOffline, isLoggedIn, isAdmin, currentUser }: Props) {
+export default function StormShell({ rankings, tournaments, voice, season, records, recordsPreview, dataOffline, isLoggedIn, isAdmin, currentUser }: Props) {
   const [index,  setIndex]  = useState(1);  // 0=Frontier, 1=Rankings, 2=Profile
   const [viewed, setViewed] = useState<PublicPlayer | null>(currentUser);
 
@@ -281,7 +282,7 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
           }}
         >
           <div className="ina-scroll" style={{ width: '33.3333%', height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
-            <FrontierPage tournaments={tournaments} voice={voice} records={records} />
+            <FrontierPage tournaments={tournaments} voice={voice} records={records} recordsPreview={recordsPreview} />
           </div>
           <div className="ina-scroll" style={{ width: '33.3333%', height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
             <RankingsPage players={rankings} onOpen={openPlayer} season={season} />
@@ -297,8 +298,8 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
         </div>
       </div>
 
-      {/* nav dots */}
-      <div style={{ position: 'absolute', bottom: 18, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 8, zIndex: 10 }}>
+      {/* nav dots — lifted above the iOS home indicator */}
+      <div style={{ position: 'absolute', bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 8, zIndex: 10 }}>
         {REALMS.map((s, i) => (
           <button
             key={i}

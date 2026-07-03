@@ -49,6 +49,18 @@ body {
   }
 }
 
+/* Tactile press feedback for tappable cards/rows — makes mobile feel native. */
+.tap {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.13s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.13s ease;
+}
+.tap:active {
+  transform: scale(0.975);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tap:active { transform: none; }
+}
+
 /* ── Profile: one column on mobile, two on desktop ──
    .pcol is display:contents on mobile so every card is a direct flex item of
    .profile-grid and the `order` set on each card gives the phone reading order.

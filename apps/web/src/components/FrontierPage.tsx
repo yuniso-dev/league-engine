@@ -11,6 +11,7 @@ type Props = {
   tournaments: PublicTournament[];
   voice: VoiceNowEntry[];
   records?: StatLeaderboards;
+  recordsPreview?: boolean;
 };
 
 function RecordColumn({ title, emoji, leaders, unit }: {
@@ -51,7 +52,7 @@ function RecordColumn({ title, emoji, leaders, unit }: {
   );
 }
 
-export const FrontierPage = memo(function FrontierPage({ tournaments, voice, records }: Props) {
+export const FrontierPage = memo(function FrontierPage({ tournaments, voice, records, recordsPreview }: Props) {
   const accent = REALMS[0].accent;
   const recs = records ?? { topScorers: [], topAssisters: [], topCleanSheets: [] };
 
@@ -97,12 +98,25 @@ export const FrontierPage = memo(function FrontierPage({ tournaments, voice, rec
           <h3 style={{ fontFamily: FONT_D, color: T.gold, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
             ALL-TIME FRONTIER RECORDS
           </h3>
+          {recordsPreview && (
+            <span style={{
+              marginLeft: 'auto', fontFamily: FONT_M, fontSize: 9, letterSpacing: 1, color: T.faint,
+              border: `1px solid ${rgba(T.gold, 0.3)}`, borderRadius: 6, padding: '2px 7px',
+            }}>
+              EXAMPLE
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
           <RecordColumn title="TOP SCORERS" emoji="⚽" leaders={recs.topScorers} unit="G" />
           <RecordColumn title="TOP ASSISTS" emoji="🎯" leaders={recs.topAssisters} unit="A" />
           <RecordColumn title="CLEAN SHEETS" emoji="🧤" leaders={recs.topCleanSheets} unit="CS" />
         </div>
+        {recordsPreview && (
+          <p style={{ fontFamily: FONT_M, fontSize: 10, color: T.faint, margin: '13px 0 0', letterSpacing: 0.3, lineHeight: 1.6 }}>
+            Sample layout — these fill in automatically with real leaders once match stats are recorded.
+          </p>
+        )}
       </div>
 
       {tournaments.length === 0 ? (
@@ -165,7 +179,7 @@ export const FrontierPage = memo(function FrontierPage({ tournaments, voice, rec
                   <Link
                     key={f.id}
                     href={`/frontier/${f.id}`}
-                    className="rise"
+                    className="rise tap"
                     style={{
                       textDecoration: 'none',
                       animationDelay: `${i * 70}ms`,
