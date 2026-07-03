@@ -25,38 +25,51 @@ function DiscordGlyph({ size = 20 }: { size?: number }) {
   );
 }
 
-// Sign-in splash. On desktop it redirects straight to Discord's authorize page.
-// On mobile a programmatic redirect never hands off to the native app — only a
-// real tap on a link to discord.com does — so we fetch the authorize URL first
-// (redirect:false sets the state/PKCE cookies and returns the URL) and render it
-// as a tappable button. Tapping it lets iOS/Android open the Discord app.
+// Sign-in splash. Every path here ends at Discord's authorize screen:
+//
+// - The GUARANTEED route is /signin/go — a plain navigation the server answers
+//   with a 302 to Discord. No client JS involved, works on every browser.
+// - On phones the button shows IMMEDIATELY, pointing at that route. In the
+//   background we try to fetch the direct discord.com authorize URL
+//   (signIn redirect:false); if it arrives, the button upgrades to it so a
+//   tap can hand off to the native Discord app. If it never arrives, the
+//   button still works — nobody waits on JavaScript.
+// - On desktop we auto-continue with the fetched URL, fall back to /signin/go
+//   on any failure, and always show a manual link as an escape hatch.
 export default function AutoSignIn({ next }: { next: string }) {
-  const [authUrl, setAuthUrl] = useState<string | null>(null);
+  const goUrl = `/signin/go?next=${encodeURIComponent(next)}`;
+  const [mobile, setMobile] = useState<boolean | null>(null);
+  const [directUrl, setDirectUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    const m = isMobile();
+    setMobile(m);
+
     let cancelled = false;
-    const mobile = isMobile();
     (async () => {
       try {
         const res = (await signIn('discord', { redirect: false, callbackUrl: next })) as
           unknown as { url?: string; error?: string | null } | undefined;
         if (cancelled) return;
         if (res?.error || !res?.url) throw new Error(res?.error ?? 'no authorize url');
-        const url = res.url;
-        if (mobile) {
-          // Wait for the user's tap — don't auto-navigate, or we lose the app handoff.
-          setAuthUrl(url);
+        if (m) {
+          // Upgrade the button to the direct discord.com link — a real tap on
+          // it is what lets iOS/Android open the Discord app.
+          setDirectUrl(res.url);
         } else {
-          window.location.href = url;
+          window.location.href = res.url;
         }
       } catch {
         if (cancelled) return;
-        // Anything unexpected: fall back to NextAuth's normal redirect flow.
-        void signIn('discord', { callbackUrl: next });
+        // Desktop: fall through to the server-side path automatically.
+        // Mobile: nothing to do — the button already points there.
+        if (!m) window.location.assign(goUrl);
       }
     })();
     return () => { cancelled = true; };
-  }, [next]);
+  }, [next, goUrl]);
+
+  const showButton = mobile === true;
 
   return (
     <div style={{
@@ -73,10 +86,10 @@ export default function AutoSignIn({ next }: { next: string }) {
           INAZUMA <span style={{ color: ACCENT }}>FC</span>
         </div>
 
-        {authUrl ? (
+        {showButton ? (
           <>
             <a
-              href={authUrl}
+              href={directUrl ?? goUrl}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 10,
                 padding: '13px 26px', marginTop: 20,
@@ -90,13 +103,20 @@ export default function AutoSignIn({ next }: { next: string }) {
               CONTINUE WITH DISCORD
             </a>
             <p style={{ fontFamily: FONT_M, color: T.faint, fontSize: 11, margin: '14px 0 0', letterSpacing: 0.4 }}>
-              Opens the Discord app if it&apos;s installed.
+              {directUrl ? 'Opens the Discord app if it’s installed.' : 'Continues in your browser.'}
             </p>
           </>
         ) : (
-          <p style={{ fontFamily: FONT_B, color: T.dim, fontSize: 14, margin: '10px 0 0' }}>
-            Connecting to Discord…
-          </p>
+          <>
+            <p style={{ fontFamily: FONT_B, color: T.dim, fontSize: 14, margin: '10px 0 0' }}>
+              Connecting to Discord…
+            </p>
+            <p style={{ fontFamily: FONT_M, fontSize: 11, margin: '16px 0 0', letterSpacing: 0.4 }}>
+              <a href={goUrl} style={{ color: T.faint, textDecorationColor: rgba(ACCENT, 0.5) }}>
+                Not redirecting? Tap here.
+              </a>
+            </p>
+          </>
         )}
       </div>
     </div>
