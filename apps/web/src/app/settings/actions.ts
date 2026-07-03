@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/auth';
-import { updateOwnProfileFields, updateSettings } from '@inazuma/db';
+import { runResilient, updateOwnProfileFields, updateSettings } from '@inazuma/db';
 
 /** Inline (pen-icon) edits on a player's own profile — quote and accent only.
  *  Returns an error string, or null on success. */
@@ -25,7 +25,15 @@ export async function saveOwnFlair(data: {
     else return 'Invalid colour.';
   }
 
-  await updateOwnProfileFields(session.user.discordId, fields);
+  try {
+    // Timeout + rebuild-pool-and-retry-once: a save can't be stranded by a
+    // wedged connection pool (quote, accent and bio all come through here
+    // or saveSettings — same protection for both).
+    await runResilient(() => updateOwnProfileFields(session.user.discordId!, fields));
+  } catch (e) {
+    console.error('[saveOwnFlair] failed after retry:', e instanceof Error ? e.message : e);
+    return 'The database is not responding — nothing was saved. Try again in a few seconds.';
+  }
   revalidatePath('/');
   revalidatePath('/settings');
   return null;
@@ -51,16 +59,18 @@ export async function saveSettings(formData: FormData) {
     ? null
     : /^#[0-9a-f]{6}$/i.test(accentRaw) ? accentRaw.toLowerCase() : undefined;
 
-  await updateSettings(session.user.discordId, {
-    displayName,
-    position1,
-    position2,
-    hidePositions,
-    country,
-    quote,
-    bio,
-    accentColor,
-  });
+  await runResilient(() =>
+    updateSettings(session.user.discordId!, {
+      displayName,
+      position1,
+      position2,
+      hidePositions,
+      country,
+      quote,
+      bio,
+      accentColor,
+    }),
+  );
 
   revalidatePath('/settings');
 }

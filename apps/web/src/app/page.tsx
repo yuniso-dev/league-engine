@@ -4,6 +4,7 @@ import {
   getRankings,
   getTournaments,
   getVoiceNow,
+  resetDb,
   toPublicPlayer,
 } from '@inazuma/db';
 import type { PublicPlayer, PublicTournament, StatLeaderboards, VoiceNowEntry } from '@inazuma/db';
@@ -67,6 +68,12 @@ export default async function HomePage() {
   // True only when core data failed/timed out — lets the UI say "reconnecting"
   // rather than misleadingly showing an empty league.
   const dataOffline = !r.ok || !t.ok;
+
+  // Core queries timing out means this instance's pooled sockets are likely
+  // dead (thawed lambda, pooler dropped them while frozen). Rebuild the pool
+  // NOW so the banner's automatic 6s retry — and every other visitor hitting
+  // this same warm instance — gets fresh connections instead of the wedge.
+  if (dataOffline) resetDb();
 
   let isLoggedIn = false;
   let isAdmin = false;
