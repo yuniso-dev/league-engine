@@ -53,6 +53,7 @@ export type {
 } from './queries/admin';
 export {
   listAwardsForAdmin,
+  listAwardsWithHolders,
   createAward,
   updateAward,
   getAdminAward,
@@ -64,10 +65,13 @@ export {
 export type {
   AwardRow,
   AdminAward,
+  AdminAwardWithHolders,
   AdminAwardGrant,
   AdminAwardDetail,
   PublicAward,
 } from './queries/awards';
+export { getAdminStats } from './queries/adminStats';
+export type { AdminStats } from './queries/adminStats';
 export { getConfig, updateConfig } from './queries/config';
 export type { ConfigRow } from './queries/config';
 export { getTournamentDetail } from './queries/frontier';

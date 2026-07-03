@@ -67,6 +67,54 @@ export async function listAwardsForAdmin(): Promise<AdminAward[]> {
   }));
 }
 
+export type AdminAwardWithHolders = AdminAward & {
+  /** Every current holder, most recent grant first. */
+  holders: { publicId: string; displayName: string }[];
+};
+
+/** Awards hub: every award with its holders, in ONE round trip. */
+export async function listAwardsWithHolders(): Promise<AdminAwardWithHolders[]> {
+  const rows = await getDb()
+    .select({
+      id: awards.id,
+      name: awards.name,
+      icon: awards.icon,
+      imageUrl: awards.imageUrl,
+      description: awards.description,
+      grantId: userAwards.id,
+      publicId: users.publicId,
+      displayName: users.displayName,
+    })
+    .from(awards)
+    .leftJoin(userAwards, eq(userAwards.awardId, awards.id))
+    .leftJoin(users, eq(userAwards.userId, users.discordId))
+    .orderBy(desc(awards.id), desc(userAwards.awardedAt));
+
+  const byId = new Map<string, AdminAwardWithHolders>();
+  for (const r of rows) {
+    let entry = byId.get(r.id);
+    if (!entry) {
+      entry = {
+        id: r.id,
+        name: r.name,
+        icon: r.icon,
+        imageUrl: r.imageUrl,
+        description: r.description,
+        grantCount: 0,
+        holders: [],
+      };
+      byId.set(r.id, entry);
+    }
+    if (r.grantId) {
+      entry.grantCount += 1;
+      if (r.publicId && r.displayName) {
+        entry.holders.push({ publicId: r.publicId, displayName: r.displayName });
+      }
+    }
+  }
+  return [...byId.values()];
+}
+
 export async function createAward(
   adminId: string,
   data: { name: string; icon: string | null; imageUrl: string | null; description: string | null },

@@ -6,6 +6,7 @@ import { ADMIN_ACCENT } from '@/components/admin/ui';
 import RevealConfirm from '@/components/admin/RevealConfirm';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 const sectionTitle: React.CSSProperties = {
   fontFamily: FONT_D,
@@ -19,8 +20,8 @@ const deltaColor = (d: number): string => (d > 0 ? T.win : d < 0 ? T.loss : T.di
 const fmtDelta = (d: number): string => `${d > 0 ? '+' : ''}${d.toFixed(1)}`;
 
 export default async function RevealPage() {
-  await requireAdmin();
-  const preview = await previewReveal();
+  // Role gate + preview in one concurrent pass — no request waterfall.
+  const [, preview] = await Promise.all([requireAdmin(), previewReveal()]);
 
   return (
     <>

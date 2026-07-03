@@ -13,8 +13,11 @@ export function getDb(): Db {
   if (!_db) {
     _client = postgres(process.env.DATABASE_URL!, {
       prepare: false,        // required for PgBouncer transaction mode (port 6543)
-      // 1 for Vercel serverless; the long-running bot may set DB_POOL_MAX=3.
-      max: Number(process.env.DB_POOL_MAX ?? '1'),
+      // 4 so Promise.all page queries genuinely run in parallel instead of
+      // queueing on one connection. Safe through the Supabase pooler (port
+      // 6543): PgBouncer multiplexes client connections, and idle_timeout
+      // closes them quickly after a serverless burst. Override with DB_POOL_MAX.
+      max: Number(process.env.DB_POOL_MAX ?? '4'),
       idle_timeout: 20,      // close idle conns so a reused lambda never grabs a dead one
       max_lifetime: 60 * 30, // recycle a connection every 30 min
       connect_timeout: 10,   // fail fast if the DB is unreachable

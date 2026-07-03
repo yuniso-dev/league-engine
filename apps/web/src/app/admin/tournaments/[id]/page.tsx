@@ -13,6 +13,7 @@ import FixtureResultForm from '@/components/admin/FixtureResultForm';
 import { deleteMatchAction, deleteTeamAction, deleteTournamentAction } from '@/app/admin/actions';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 const sectionTitle: React.CSSProperties = {
   fontFamily: FONT_D,
@@ -23,9 +24,8 @@ const sectionTitle: React.CSSProperties = {
 };
 
 export default async function AdminTournamentPage({ params }: { params: { id: string } }) {
-  await requireAdmin();
-
-  const detail = await getAdminTournament(params.id);
+  // Role gate + tournament in one concurrent pass — no request waterfall.
+  const [, detail] = await Promise.all([requireAdmin(), getAdminTournament(params.id)]);
   if (!detail) notFound();
 
   const { tournament, teams, matches } = detail;
