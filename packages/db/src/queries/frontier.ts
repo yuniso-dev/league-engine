@@ -10,6 +10,7 @@ import {
   type LeagueTableRow,
   type StatLeaderboards,
 } from './stats';
+import { getSignupsForTournament, type PublicSignup } from './signups';
 
 // Public, read-only view of a tournament's teams and matches — for the
 // "click a Frontier, see its fixtures" page. Never exposes discordId.
@@ -48,6 +49,8 @@ export type PublicTournamentDetail = {
   /** Group-stage league table — null until group fixtures exist. */
   table: LeagueTableRow[] | null;
   stats: StatLeaderboards;
+  /** Signup roster with live in-voice status. */
+  signups: PublicSignup[];
 };
 
 // Display order differs from the enum's declaration order (which has
@@ -130,14 +133,16 @@ export async function getTournamentDetail(tournamentId: string): Promise<PublicT
   }
 
   const hasGroupStage = matchRows.some(m => m.stage === 'group');
-  const [table, stats] = await Promise.all([
+  const [table, stats, signups] = await Promise.all([
     hasGroupStage ? computeGroupTable(tournamentId) : Promise.resolve(null),
     getTournamentStats(tournamentId),
+    getSignupsForTournament(tournamentId),
   ]);
 
   return {
     table,
     stats,
+    signups,
     tournament: toPublicTournament(row.tournament, row.winnerName),
     teams: teamRows.map(t => ({
       id: t.id,

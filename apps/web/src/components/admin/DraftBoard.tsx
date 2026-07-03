@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import type { AdminTeam } from '@inazuma/db';
 import { FONT_B, FONT_D, FONT_M, T, glass, rgba } from '@/lib/realm-colors';
 import { ADMIN_ACCENT, inputBase } from '@/components/admin/ui';
@@ -14,8 +15,20 @@ import {
 // Rapid roster assignment for big drafts (44–66 players): pick a team once,
 // then every click on a pool player drops them straight onto it. Optimistic —
 // the click lands instantly, the server catches up in the background.
+// The pool knows who signed up (⚡) and who is in voice RIGHT NOW (green dot,
+// mirrored live by the Discord bot) — signups say "I want in", voice says
+// "I actually showed up". Draft from the overlap.
 
-type Props = { tournamentId: string; teams: AdminTeam[] };
+const LIVE = '#3DDC97';
+
+type Props = {
+  tournamentId: string;
+  teams: AdminTeam[];
+  signedUpIds: string[];
+  inVoiceIds: string[];
+};
+
+type PoolFilter = 'signedup' | 'voice' | 'all';
 
 function fd(entries: Record<string, string>): FormData {
   const f = new FormData();
@@ -23,12 +36,17 @@ function fd(entries: Record<string, string>): FormData {
   return f;
 }
 
-export default function DraftBoard({ tournamentId, teams }: Props) {
+export default function DraftBoard({ tournamentId, teams, signedUpIds, inVoiceIds }: Props) {
+  const router = useRouter();
   const { players, loading, error: loadError } = useAdminPlayers();
   const [query, setQuery] = useState('');
   const [activeTeamId, setActiveTeamId] = useState(teams[0]?.id ?? '');
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  const signedUp = useMemo(() => new Set(signedUpIds), [signedUpIds]);
+  const inVoice = useMemo(() => new Set(inVoiceIds), [inVoiceIds]);
+  const [filter, setFilter] = useState<PoolFilter>(signedUpIds.length > 0 ? 'signedup' : 'all');
 
   // publicId → teamId overrides applied on click, reconciled when the server
   // re-renders the page with fresh rosters.
@@ -80,12 +98,26 @@ export default function DraftBoard({ tournamentId, teams }: Props) {
 
   const pool = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return players.filter(p =>
-      assignmentOf(p.publicId) === null &&
-      (!q || p.displayName.toLowerCase().includes(q) || p.username.toLowerCase().includes(q)),
-    );
+    return players
+      .filter(p =>
+        assignmentOf(p.publicId) === null &&
+        (filter === 'all' ||
+          (filter === 'signedup' && signedUp.has(p.publicId)) ||
+          (filter === 'voice' && inVoice.has(p.publicId))) &&
+        (!q || p.displayName.toLowerCase().includes(q) || p.username.toLowerCase().includes(q)),
+      )
+      // In voice first, then signed-up, then the rest — the show-ups float to the top.
+      .sort((a, b) => {
+        const av = inVoice.has(a.publicId) ? 0 : 1;
+        const bv = inVoice.has(b.publicId) ? 0 : 1;
+        if (av !== bv) return av - bv;
+        const as = signedUp.has(a.publicId) ? 0 : 1;
+        const bs = signedUp.has(b.publicId) ? 0 : 1;
+        if (as !== bs) return as - bs;
+        return a.displayName.localeCompare(b.displayName);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [players, query, overrides, serverAssignment]);
+  }, [players, query, filter, overrides, serverAssignment, signedUp, inVoice]);
 
   const rosterOf = (teamId: string) => {
     const ids = new Set<string>();
@@ -122,9 +154,54 @@ export default function DraftBoard({ tournamentId, teams }: Props) {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 340px) 1fr', gap: 18, alignItems: 'start' }}>
         {/* ── Player pool ── */}
         <div style={glass({ padding: 16 })}>
-          <div style={{ fontFamily: FONT_D, fontSize: 13, letterSpacing: 1.5, color: T.dim, marginBottom: 10 }}>
-            PLAYER POOL <span style={{ color: T.faint }}>({loading ? '…' : pool.length})</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span style={{ fontFamily: FONT_D, fontSize: 13, letterSpacing: 1.5, color: T.dim, flex: 1 }}>
+              PLAYER POOL <span style={{ color: T.faint }}>({loading ? '…' : pool.length})</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => router.refresh()}
+              title="Re-check who's in voice"
+              style={{
+                background: 'none', border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 7, padding: '3px 9px', cursor: 'pointer',
+                fontFamily: FONT_M, fontSize: 10, color: T.dim, letterSpacing: 0.5,
+              }}
+            >
+              ↻ VC
+            </button>
           </div>
+
+          {/* pool filters: who signed up vs who actually showed up */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+            {([
+              { id: 'signedup' as const, label: `⚡ Signed up (${signedUpIds.length})` },
+              { id: 'voice' as const, label: `● In VC (${inVoiceIds.length})` },
+              { id: 'all' as const, label: 'Everyone' },
+            ]).map(f => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFilter(f.id)}
+                style={{
+                  padding: '5px 11px',
+                  borderRadius: 999,
+                  border: `1px solid ${filter === f.id ? rgba(ADMIN_ACCENT, 0.6) : 'rgba(255,255,255,0.12)'}`,
+                  background: filter === f.id ? rgba(ADMIN_ACCENT, 0.18) : 'none',
+                  color: f.id === 'voice'
+                    ? (filter === f.id ? LIVE : rgba(LIVE, 0.7))
+                    : filter === f.id ? '#fff' : T.dim,
+                  fontFamily: FONT_B,
+                  fontSize: 11.5,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
@@ -137,7 +214,13 @@ export default function DraftBoard({ tournamentId, teams }: Props) {
               <div style={{ fontFamily: FONT_B, color: T.faint, fontSize: 13, padding: 12 }}>Loading players…</div>
             ) : pool.length === 0 ? (
               <div style={{ fontFamily: FONT_B, color: T.faint, fontSize: 13, padding: 12 }}>
-                {query ? 'No players match.' : 'Everyone is on a team. 🎉'}
+                {query
+                  ? 'No players match.'
+                  : filter === 'signedup'
+                    ? 'No signed-up players left — everyone who signed up is on a team.'
+                    : filter === 'voice'
+                      ? 'Nobody undrafted is in voice right now. ↻ VC to re-check.'
+                      : 'Everyone is on a team. 🎉'}
               </div>
             ) : (
               pool.map(p => (
@@ -149,16 +232,30 @@ export default function DraftBoard({ tournamentId, teams }: Props) {
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8,
                     width: '100%', padding: '7px 10px',
-                    background: 'none', border: 'none',
+                    background: inVoice.has(p.publicId) ? rgba(LIVE, 0.05) : 'none',
+                    border: 'none',
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     color: T.text, fontFamily: FONT_B, fontSize: 14,
                     textAlign: 'left', cursor: 'pointer',
                   }}
                 >
                   <span style={{ color: ADMIN_ACCENT, fontSize: 12 }}>＋</span>
+                  {inVoice.has(p.publicId) && (
+                    <span
+                      title="In voice right now"
+                      style={{
+                        width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                        background: LIVE, boxShadow: `0 0 8px ${LIVE}`,
+                        animation: 'voicePulse 1.6s ease-in-out infinite',
+                      }}
+                    />
+                  )}
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {p.displayName}
                   </span>
+                  {signedUp.has(p.publicId) && (
+                    <span title="Signed up" style={{ fontSize: 11, color: T.gold }}>⚡</span>
+                  )}
                   {p.position1 && (
                     <span style={{ fontFamily: FONT_M, fontSize: 10, color: T.faint }}>
                       {p.position1}{p.position2 ? `/${p.position2}` : ''}
@@ -168,6 +265,7 @@ export default function DraftBoard({ tournamentId, teams }: Props) {
               ))
             )}
           </div>
+          <style>{'@keyframes voicePulse{0%,100%{opacity:0.55}50%{opacity:1}}'}</style>
         </div>
 
         {/* ── Teams ── */}
@@ -234,6 +332,15 @@ export default function DraftBoard({ tournamentId, teams }: Props) {
                         >
                           {isCaptain ? '©' : '☆'}
                         </button>
+                        {inVoice.has(pid) && (
+                          <span
+                            title="In voice right now"
+                            style={{
+                              width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                              background: LIVE, boxShadow: `0 0 7px ${LIVE}`,
+                            }}
+                          />
+                        )}
                         <span style={{
                           flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                           fontFamily: FONT_B, fontSize: 13, color: T.text,

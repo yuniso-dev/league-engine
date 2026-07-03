@@ -1,11 +1,13 @@
 import { notFound } from 'next/navigation';
-import { getTournamentDetail } from '@inazuma/db';
+import { getTournamentDetail, isSignedUp } from '@inazuma/db';
 import type { StatLeader } from '@inazuma/db';
+import { auth } from '@/auth';
 import { glass, REALMS, T, FONT_D, FONT_B, FONT_M, rgba } from '@/lib/realm-colors';
 import { STAGE_LABELS, STATUS_COLORS } from '@/lib/tournament-ui';
 import { BackPill } from '@/components/ui/BackPill';
 import { Avatar } from '@/components/ui/Avatar';
 import { LeagueTable } from '@/components/LeagueTable';
+import { SignupCard } from '@/components/SignupCard';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -54,11 +56,16 @@ function LeaderList({ title, emoji, leaders, unit, accent }: {
 }
 
 export default async function FrontierDetailPage({ params }: Props) {
-  const detail = await getTournamentDetail(params.id);
+  const [detail, session] = await Promise.all([getTournamentDetail(params.id), auth()]);
   if (!detail) notFound();
 
-  const { tournament, teams, matchesByStage, table, stats } = detail;
+  const { tournament, teams, matchesByStage, table, stats, signups } = detail;
   const accent = REALMS[0].accent;
+
+  const isLoggedIn = Boolean(session?.user?.discordId);
+  const signedUp = session?.user?.discordId
+    ? await isSignedUp(session.user.discordId, tournament.id)
+    : false;
 
   const groupStages = matchesByStage.filter(s => s.stage === 'group');
   const knockoutStages = matchesByStage.filter(s => s.stage !== 'group');
@@ -140,6 +147,15 @@ export default async function FrontierDetailPage({ params }: Props) {
             </span>
           </div>
         </div>
+
+        {/* signup roster — who's in, and who's actually in voice right now */}
+        <SignupCard
+          tournamentId={tournament.id}
+          status={tournament.status}
+          isLoggedIn={isLoggedIn}
+          signedUp={signedUp}
+          signups={signups}
+        />
 
         {/* two columns on PC: table + group fixtures left, knockout + leaders right */}
         <div className="fr-grid">

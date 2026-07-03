@@ -59,11 +59,29 @@ export const FrontierPage = memo(function FrontierPage({ tournaments, voice, rec
     <div style={{ padding: '28px 18px 96px', maxWidth: 680, margin: '0 auto' }}>
       {/* header */}
       <div style={{ marginBottom: 22 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <Bolt size={20} color={accent} />
           <h1 style={{ fontFamily: FONT_D, color: T.text, fontSize: 34, letterSpacing: '0.02em', margin: 0, lineHeight: 1 }}>
             THE FRONTIER
           </h1>
+          <Link
+            href="/hall-of-fame"
+            style={{
+              marginLeft: 'auto',
+              padding: '7px 14px',
+              borderRadius: 999,
+              border: `1px solid ${rgba(T.gold, 0.4)}`,
+              background: rgba(T.gold, 0.08),
+              color: T.gold,
+              textDecoration: 'none',
+              fontFamily: FONT_D,
+              fontSize: 12,
+              letterSpacing: 1.5,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            🏛️ HALL OF FAME
+          </Link>
         </div>
         <p style={{ color: T.dim, fontFamily: FONT_B, fontSize: 13, margin: '8px 0 0 32px' }}>
           Every server draft, archived in full.
@@ -202,8 +220,16 @@ export const FrontierPage = memo(function FrontierPage({ tournaments, voice, rec
                           </div>
                         </div>
                       ) : f.status === 'upcoming' ? (
-                        <div style={{ color: T.faint, fontFamily: FONT_M, fontSize: 12, flexShrink: 0 }}>
-                          UPCOMING
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ color: T.faint, fontFamily: FONT_M, fontSize: 12 }}>
+                            UPCOMING
+                          </div>
+                          <div style={{
+                            color: T.gold, fontFamily: FONT_M, fontSize: 11, marginTop: 3,
+                            border: `1px solid ${rgba(T.gold, 0.35)}`, borderRadius: 6, padding: '2px 8px',
+                          }}>
+                            ⚡ {f.signupCount ?? 0} SIGNED UP
+                          </div>
                         </div>
                       ) : (
                         <div style={{ color: REALMS[2].accent, fontFamily: FONT_M, fontSize: 12, flexShrink: 0 }}>

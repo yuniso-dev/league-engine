@@ -77,6 +77,8 @@ export type PublicTournament = {
   startDate: string | null;
   endDate: string | null;
   winnerName: string | null;
+  /** Populated by getTournaments — number of players signed up. */
+  signupCount?: number;
 };
 
 export function toPublicTournament(row: TournamentRow, winnerName: string | null = null): PublicTournament {

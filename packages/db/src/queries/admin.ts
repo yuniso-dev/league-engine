@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import type { InferSelectModel } from 'drizzle-orm';
 import { getDb } from '../client';
 import { computeGroupTable } from './stats';
+import { markAttendedIfSignedUp } from './signups';
 import {
   adminActions,
   matches,
@@ -435,11 +436,23 @@ export async function addTeamMember(
 ): Promise<void> {
   const resolved = await resolvePlayers([data.publicId]);
   const userId = resolved.get(data.publicId)!;
+  const db = getDb();
 
-  await getDb()
+  await db
     .insert(teamMembers)
     .values({ teamId: data.teamId, userId })
     .onConflictDoNothing();
+
+  // Being drafted onto a team = they showed up: mark their signup attended
+  // (feeds the events_attended profile counter).
+  const [team] = await db
+    .select({ tournamentId: teams.tournamentId })
+    .from(teams)
+    .where(eq(teams.id, data.teamId))
+    .limit(1);
+  if (team) {
+    await markAttendedIfSignedUp([team.tournamentId], userId);
+  }
 
   await logAdminAction(adminId, 'team.member.add', { teamId: data.teamId });
 }
