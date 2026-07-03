@@ -102,8 +102,9 @@ export default function AutoSignIn({ next }: { next: string }) {
               <DiscordGlyph />
               CONTINUE WITH DISCORD
             </a>
-            <p style={{ fontFamily: FONT_M, color: T.faint, fontSize: 11, margin: '14px 0 0', letterSpacing: 0.4 }}>
-              {directUrl ? 'Opens the Discord app if it’s installed.' : 'Continues in your browser.'}
+            <p style={{ fontFamily: FONT_M, color: T.faint, fontSize: 11, margin: '14px 0 0', letterSpacing: 0.4, lineHeight: 1.7 }}>
+              First time in this browser? Discord will ask you to log in once —
+              <br />after that it&apos;s a single tap. (Discord doesn&apos;t allow the app to authorize.)
             </p>
           </>
         ) : (
