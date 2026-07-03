@@ -225,7 +225,7 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
             <div style={{ marginBottom: 16 }}>
               <p style={{ fontFamily: FONT_B, color: T.faint, fontSize: 14, margin: '0 0 12px' }}>
                 The group stage is complete — draw the knockout from the standings
-                ({teams.length >= 4 ? 'top 4 → semi-finals' : 'top 2 → final'}).
+                ({teams.length >= 5 ? 'top 4 → semi-finals' : 'top 2 → straight final'}).
               </p>
               <BracketControls tournamentId={tournament.id} mode="knockout" teamCount={teams.length} />
             </div>
@@ -256,7 +256,7 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
             <LeagueTable
               rows={table}
               accent={ADMIN_ACCENT}
-              qualifyCount={hasKnockout || groupComplete ? (teams.length >= 4 ? 4 : 2) : 0}
+              qualifyCount={hasKnockout || groupComplete ? (teams.length >= 5 ? 4 : 2) : 0}
             />
           </div>
         </>

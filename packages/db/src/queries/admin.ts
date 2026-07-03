@@ -610,8 +610,9 @@ export async function generateGroupStage(adminId: string, tournamentId: string):
   return created;
 }
 
-/** Knockout drawn from the finished group table: top 4 → semis (1st v 4th,
- *  2nd v 3rd), or with fewer than 4 teams the top 2 → final. */
+/** Knockout drawn from the finished group table. With 5+ teams the top 4 go
+ *  to semis (1st v 4th, 2nd v 3rd); with 4 or fewer, the top 2 meet in a
+ *  straight final — a 4-team round robin already settles who deserves it. */
 export async function generateKnockoutFromTable(adminId: string, tournamentId: string): Promise<number> {
   const db = getDb();
 
@@ -640,7 +641,7 @@ export async function generateKnockoutFromTable(adminId: string, tournamentId: s
   const table = await computeGroupTable(tournamentId);
 
   let created = 0;
-  if (table.length >= 4) {
+  if (table.length >= 5) {
     // Semis seeded from the table; insert in bracket order so the final pairs
     // the two winners (generateNextRound relies on createdAt order).
     const [t1, t2, t3, t4] = table;

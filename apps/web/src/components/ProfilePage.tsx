@@ -41,15 +41,22 @@ const MILESTONES: {
   emoji: string;
   name: string;
   detail: string;
-  earned: (m: PlayerMilestones) => boolean;
+  earned: (m: PlayerMilestones, awardCount: number) => boolean;
 }[] = [
   { emoji: '🏟️', name: 'FRONTIER DEBUT', detail: 'Play in a Frontier', earned: m => m.tournamentsPlayed >= 1 },
+  { emoji: '⚡', name: 'FIRST BLOOD', detail: 'Win a Frontier match', earned: m => m.wins >= 1 },
   { emoji: '⚽', name: 'OFF THE MARK', detail: 'Score a Frontier goal', earned: m => m.goals >= 1 },
   { emoji: '🎯', name: 'PLAYMAKER', detail: 'Register an assist', earned: m => m.assists >= 1 },
   { emoji: '🧤', name: 'SHUTOUT', detail: 'Keep a clean sheet', earned: m => m.cleanSheets >= 1 },
   { emoji: '🥅', name: 'MARKSMAN', detail: 'Score 5 Frontier goals', earned: m => m.goals >= 5 },
+  { emoji: '🧠', name: 'ARCHITECT', detail: 'Provide 5 assists', earned: m => m.assists >= 5 },
+  { emoji: '🧱', name: 'THE WALL', detail: 'Keep 5 clean sheets', earned: m => m.cleanSheets >= 5 },
+  { emoji: '🔥', name: 'SHARPSHOOTER', detail: 'Score 10 Frontier goals', earned: m => m.goals >= 10 },
+  { emoji: '👟', name: 'DOUBLE DIGITS', detail: 'Play 10 matches', earned: m => m.matchesPlayed >= 10 },
+  { emoji: '👑', name: 'SERIAL WINNER', detail: 'Win 10 matches', earned: m => m.wins >= 10 },
   { emoji: '🌩️', name: 'VETERAN', detail: 'Play 5 Frontiers', earned: m => m.tournamentsPlayed >= 5 },
   { emoji: '🏆', name: 'CHAMPION', detail: 'Win a Frontier', earned: m => m.frontiersWon >= 1 },
+  { emoji: '🎖️', name: 'DECORATED', detail: 'Earn a league award', earned: (_m, awards) => awards >= 1 },
 ];
 
 export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, isLoggedIn = false, currentUser = null }: Props) {
@@ -168,7 +175,8 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
   }
 
   const rc       = rankColor(player.rank);
-  const showRank = !player.provisional && player.rank != null;
+  // Ranks are tie-aware and assigned to everyone — show one whenever it exists.
+  const showRank = player.rank != null;
 
   const rankLabel = showRank
     ? `#${player.rank}`
@@ -297,25 +305,37 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
             ))}
           </div>
 
-          {/* rating history */}
-          {history.length >= 2 && (
-            <div style={{ ...glass({ padding: 18 }), order: 4 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <Bolt size={13} color={accent} />
-                <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
-                  RATING HISTORY
-                </h3>
-              </div>
+          {/* rating history — blank chart state until the first reveal */}
+          <div style={{ ...glass({ padding: 18 }), order: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <Bolt size={13} color={accent} />
+              <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+                RATING HISTORY
+              </h3>
+            </div>
+            {history.length >= 2 ? (
               <RatingGraph points={history} />
-            </div>
-          )}
+            ) : (
+              <div style={{
+                height: 110,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderBottom: `1px dashed ${rgba(accent, 0.3)}`,
+              }}>
+                <span style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, letterSpacing: 0.5 }}>
+                  Rating history charts after the first reveal.
+                </span>
+              </div>
+            )}
+          </div>
 
-          {/* recent matches */}
-          {matches.length > 0 && (
-            <div style={{ order: 5 }}>
-              <RecentMatchesCard matches={matches} accent={accent} />
-            </div>
-          )}
+          {/* last 5 matches — empty state until they've played */}
+          <div style={{ order: 5 }}>
+            <RecentMatchesCard
+              matches={matches}
+              accent={accent}
+              emptyText="Play a Frontier to see results."
+            />
+          </div>
 
           {/* career milestones — auto-earned from match data */}
           {milestones && (
@@ -326,7 +346,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
                   MILESTONES
                 </h3>
                 <span style={{ fontFamily: FONT_M, fontSize: 10, color: T.faint }}>
-                  {MILESTONES.filter(ms => ms.earned(milestones)).length}/{MILESTONES.length}
+                  {MILESTONES.filter(ms => ms.earned(milestones, awards.length)).length}/{MILESTONES.length}
                 </span>
               </div>
               <div style={{
@@ -335,7 +355,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
                 gap: 8,
               }}>
                 {MILESTONES.map(ms => {
-                  const got = ms.earned(milestones);
+                  const got = ms.earned(milestones, awards.length);
                   return (
                     <div
                       key={ms.name}
@@ -369,8 +389,8 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
         </div>
 
         <div className="pcol">
-          {/* awards */}
-          {player.showAwards && awards.length > 0 && (
+          {/* awards — the cabinet is always on display, even empty */}
+          {player.showAwards && (
             <div style={{ ...glass({ padding: 18 }), order: 2 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                 <Bolt size={13} color={T.gold} />
@@ -378,19 +398,25 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
                   TROPHY CABINET
                 </h3>
               </div>
-              <AwardShowcase awards={awards} />
+              {awards.length > 0 ? (
+                <AwardShowcase awards={awards} />
+              ) : (
+                <p style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, margin: 0, letterSpacing: 0.5, lineHeight: 1.7 }}>
+                  Empty shelves. No silverware on record — unscouted territory.
+                </p>
+              )}
             </div>
           )}
 
-          {/* achievements — admin-curated, hidden server-side when toggled off */}
-          {player.achievements && (
-            <div style={{ ...glass({ padding: 18 }), order: 3 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <Bolt size={13} color={accent} />
-                <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
-                  ACHIEVEMENTS
-                </h3>
-              </div>
+          {/* achievements — admin-curated */}
+          <div style={{ ...glass({ padding: 18 }), order: 3 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <Bolt size={13} color={accent} />
+              <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+                ACHIEVEMENTS
+              </h3>
+            </div>
+            {player.achievements ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                 {player.achievements.split('\n').map(a => a.trim()).filter(Boolean).map((a, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 9 }}>
@@ -399,71 +425,61 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* the ominous empty state — nothing on file for this player yet */}
-          {!(player.showAwards && awards.length > 0) && !player.achievements && !player.characterNote && !player.bio && (
-            <div style={{
-              ...glass({ padding: 26 }),
-              order: 2,
-              border: '1px dashed rgba(255,255,255,0.14)',
-              background: 'rgba(0,0,0,0.25)',
-              textAlign: 'center',
-            }}>
-              <div style={{ fontSize: 26, opacity: 0.5 }}>⟠</div>
-              <div style={{
-                fontFamily: FONT_D, fontSize: 16, letterSpacing: 3,
-                color: T.dim, marginTop: 10,
-              }}>
-                UNSCOUTED
-              </div>
-              <p style={{
-                fontFamily: FONT_M, fontSize: 11, color: T.faint,
-                lineHeight: 1.8, margin: '10px 0 0', letterSpacing: 0.5,
-              }}>
-                No verified intel on this player.
-                <br />No trophies. No file. No warning.
-                <br />The scouts haven&apos;t caught up with them… yet.
+            ) : (
+              <p style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, margin: 0, letterSpacing: 0.5, lineHeight: 1.7 }}>
+                Nothing recorded by the staff yet.
               </p>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* report card — staff-written (the admin "Character" field) */}
-          {player.characterNote && (
-            <div style={{ ...glass({ padding: 22, borderLeft: `3px solid ${accent}` }), order: 7 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
-                <Bolt size={13} color={accent} />
-                <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
-                  REPORT CARD
-                </h3>
-              </div>
-              <p style={{ color: T.text, fontFamily: FONT_B, fontSize: 14.5, lineHeight: 1.75, margin: 0, opacity: 0.92 }}>
-                {player.characterNote}
-              </p>
-              <div style={{
-                fontFamily: FONT_M, fontSize: 10, letterSpacing: 1.5,
-                color: T.faint, textAlign: 'right', marginTop: 12,
-              }}>
-                — INAZUMA FC STAFF
-              </div>
+          <div style={{ ...glass({ padding: 22, borderLeft: `3px solid ${accent}` }), order: 7 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
+              <Bolt size={13} color={accent} />
+              <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+                REPORT CARD
+              </h3>
             </div>
-          )}
+            {player.characterNote ? (
+              <>
+                <p style={{ color: T.text, fontFamily: FONT_B, fontSize: 14.5, lineHeight: 1.75, margin: 0, opacity: 0.92 }}>
+                  {player.characterNote}
+                </p>
+                <div style={{
+                  fontFamily: FONT_M, fontSize: 10, letterSpacing: 1.5,
+                  color: T.faint, textAlign: 'right', marginTop: 12,
+                }}>
+                  — INAZUMA FC STAFF
+                </div>
+              </>
+            ) : (
+              <p style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, margin: 0, letterSpacing: 0.5, lineHeight: 1.8 }}>
+                UNSCOUTED — no staff report filed on this player.
+                <br />The scouts haven&apos;t caught up with them… yet.
+              </p>
+            )}
+          </div>
 
           {/* bio — the player's own words */}
-          {player.bio && (
-            <div style={{ ...glass({ padding: 22, borderLeft: `3px solid ${accent}` }), order: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
-                <Bolt size={13} color={accent} />
-                <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
-                  SCOUTING REPORT
-                </h3>
-              </div>
+          <div style={{ ...glass({ padding: 22, borderLeft: `3px solid ${accent}` }), order: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
+              <Bolt size={13} color={accent} />
+              <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+                SCOUTING REPORT
+              </h3>
+            </div>
+            {player.bio ? (
               <p style={{ color: T.text, fontFamily: FONT_B, fontSize: 14.5, lineHeight: 1.75, margin: 0, opacity: 0.92 }}>
                 {player.bio}
               </p>
-            </div>
-          )}
+            ) : (
+              <p style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, margin: 0, letterSpacing: 0.5, lineHeight: 1.7 }}>
+                {isOwn
+                  ? 'Nothing in your own words yet — add a bio in Settings.'
+                  : 'This player hasn’t written their own story yet.'}
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>

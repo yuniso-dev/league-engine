@@ -150,7 +150,7 @@ export default async function FrontierDetailPage({ params }: Props) {
                 <LeagueTable
                   rows={table}
                   accent={accent}
-                  qualifyCount={knockoutStages.length > 0 ? (table.length >= 4 ? 4 : 2) : 0}
+                  qualifyCount={knockoutStages.length > 0 ? (table.length >= 5 ? 4 : 2) : 0}
                 />
               </>
             )}

@@ -8,7 +8,7 @@ export {
 } from './queries/bot';
 export type { NicknamePlayer } from './queries/bot';
 export * from './schema';
-export { getRankings, searchRankings } from './queries/rankings';
+export { getRankings, searchRankings, recomputeRanks } from './queries/rankings';
 export { getTournaments } from './queries/tournaments';
 export { getHealth } from './queries/health';
 export type { HealthResult } from './queries/health';

@@ -16,12 +16,17 @@ type Props = {
 function RecordColumn({ title, emoji, leaders, unit }: {
   title: string; emoji: string; leaders: StatLeader[]; unit: string;
 }) {
-  if (leaders.length === 0) return null;
   return (
     <div style={{ flex: '1 1 150px', minWidth: 0 }}>
       <div style={{ fontFamily: FONT_M, fontSize: 10, letterSpacing: 1.5, color: T.faint, marginBottom: 8 }}>
         {emoji} {title}
       </div>
+      {leaders.length === 0 && (
+        <div style={{ fontFamily: FONT_M, fontSize: 10.5, color: T.faint, opacity: 0.7, lineHeight: 1.7, letterSpacing: 0.4 }}>
+          Unclaimed — the record books
+          <br />are waiting to be written.
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {leaders.map((l, i) => (
           <div key={l.publicId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -48,9 +53,7 @@ function RecordColumn({ title, emoji, leaders, unit }: {
 
 export const FrontierPage = memo(function FrontierPage({ tournaments, voice, records }: Props) {
   const accent = REALMS[0].accent;
-  const hasRecords =
-    records != null &&
-    (records.topScorers.length > 0 || records.topAssisters.length > 0 || records.topCleanSheets.length > 0);
+  const recs = records ?? { topScorers: [], topAssisters: [], topCleanSheets: [] };
 
   return (
     <div style={{ padding: '28px 18px 96px', maxWidth: 680, margin: '0 auto' }}>
@@ -69,22 +72,20 @@ export const FrontierPage = memo(function FrontierPage({ tournaments, voice, rec
 
       <VoiceNowCard voice={voice} />
 
-      {/* all-time records — appears once real match stats exist */}
-      {hasRecords && (
-        <div style={{ ...glass({ padding: 18 }), marginBottom: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-            <Bolt size={13} color={T.gold} />
-            <h3 style={{ fontFamily: FONT_D, color: T.gold, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
-              ALL-TIME FRONTIER RECORDS
-            </h3>
-          </div>
-          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-            <RecordColumn title="TOP SCORERS" emoji="⚽" leaders={records!.topScorers} unit="G" />
-            <RecordColumn title="TOP ASSISTS" emoji="🎯" leaders={records!.topAssisters} unit="A" />
-            <RecordColumn title="CLEAN SHEETS" emoji="🧤" leaders={records!.topCleanSheets} unit="CS" />
-          </div>
+      {/* all-time records — always on display; unclaimed columns say so */}
+      <div style={{ ...glass({ padding: 18 }), marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <Bolt size={13} color={T.gold} />
+          <h3 style={{ fontFamily: FONT_D, color: T.gold, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+            ALL-TIME FRONTIER RECORDS
+          </h3>
         </div>
-      )}
+        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+          <RecordColumn title="TOP SCORERS" emoji="⚽" leaders={recs.topScorers} unit="G" />
+          <RecordColumn title="TOP ASSISTS" emoji="🎯" leaders={recs.topAssisters} unit="A" />
+          <RecordColumn title="CLEAN SHEETS" emoji="🧤" leaders={recs.topCleanSheets} unit="CS" />
+        </div>
+      </div>
 
       {tournaments.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '64px 0', color: T.faint }}>

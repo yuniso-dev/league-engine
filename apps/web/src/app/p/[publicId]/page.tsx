@@ -28,7 +28,8 @@ export default async function PublicProfilePage({ params }: Props) {
 
   const accent = player.accentColor ?? '#FF7A1A';
   const initials = player.displayName.slice(0, 2).toUpperCase();
-  const showRank = player.rank !== null && !player.provisional;
+  // Ranks are tie-aware and assigned to everyone — show one whenever it exists.
+  const showRank = player.rank !== null;
   const rankLabel = showRank ? `#${player.rank}` : player.provisional ? `${player.gamesPlayed}/5` : '—';
   const rankCaption = showRank ? 'RANK' : player.provisional ? 'PLACEMENT' : 'RANK';
 

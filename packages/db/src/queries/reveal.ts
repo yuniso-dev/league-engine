@@ -295,12 +295,9 @@ export async function commitReveal(adminId: string): Promise<{ matches: number; 
         .where(eq(users.discordId, discordId));
     }
 
-    // Re-rank the ladder: established players only, best rating first.
-    await tx
-      .update(users)
-      .set({ rank: null })
-      .where(and(eq(users.provisional, true), isNotNull(users.rank)));
-
+    // Re-rank the ladder: every active player (provisional included), best
+    // rating first. Standard competition ranking — equal Elo shares the same
+    // rank (1,1,1,4), so an untouched league is all #1 until ratings move.
     const ladder = await tx
       .select({
         discordId: users.discordId,
@@ -314,13 +311,18 @@ export async function commitReveal(adminId: string): Promise<{ matches: number; 
         eq(users.initialised, true),
         eq(users.isBlacklisted, false),
         eq(users.isInactive, false),
-        eq(users.provisional, false),
       ))
       .orderBy(desc(users.elo), desc(users.gamesPlayed), asc(users.discordId));
 
+    const ranks: number[] = [];
+    for (let i = 0; i < ladder.length; i++) {
+      // Same Elo as the player above → same rank; otherwise position (1-based).
+      ranks.push(i > 0 && num(ladder[i].elo) === num(ladder[i - 1].elo) ? ranks[i - 1] : i + 1);
+    }
+
     for (let i = 0; i < ladder.length; i++) {
       const u = ladder[i];
-      const rank = i + 1;
+      const rank = ranks[i];
       const elo = num(u.elo);
       const peakElo = u.peakElo == null ? elo : Math.max(num(u.peakElo), elo);
       const peakRank = u.peakRank == null ? rank : Math.min(u.peakRank, rank);
@@ -330,9 +332,9 @@ export async function commitReveal(adminId: string): Promise<{ matches: number; 
         .where(eq(users.discordId, u.discordId));
     }
 
-    // One history row per ladder player per reveal, plus provisional players
-    // who featured this week — that keeps profile graphs continuous.
-    const newRank = new Map(ladder.map((u, i) => [u.discordId, i + 1]));
+    // One history row per ladder player per reveal — every active player has
+    // a rank now, so this covers provisional players who featured too.
+    const newRank = new Map(ladder.map((u, i) => [u.discordId, ranks[i]]));
     const historyRows = [
       ...ladder.map((u, i) => {
         const played = result.players.get(u.discordId);
@@ -340,11 +342,11 @@ export async function commitReveal(adminId: string): Promise<{ matches: number; 
         return {
           userId: u.discordId,
           elo: fx2(played ? played.newElo : num(u.elo)),
-          rank: i + 1,
+          rank: ranks[i],
           gamesPlayed: u.gamesPlayed,
           weekOf,
           eloChange: fx2(played ? played.newElo - played.oldElo : 0),
-          rankChange: prev == null ? null : prev - (i + 1),
+          rankChange: prev == null ? null : prev - ranks[i],
         };
       }),
       ...[...result.players.entries()]

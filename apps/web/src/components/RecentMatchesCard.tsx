@@ -2,7 +2,12 @@ import type { PublicRecentMatch } from '@inazuma/db';
 import { Bolt } from '@/components/ui/Bolt';
 import { T, FONT_B, FONT_D, FONT_M, glass, rgba } from '@/lib/realm-colors';
 
-type Props = { matches: PublicRecentMatch[]; accent: string };
+type Props = {
+  matches: PublicRecentMatch[];
+  accent: string;
+  /** Shown inside the card when there are no matches. Omit = render nothing. */
+  emptyText?: string;
+};
 
 const RESULT_STYLE = {
   win: { label: 'W', color: T.win },
@@ -10,8 +15,8 @@ const RESULT_STYLE = {
   draw: { label: 'D', color: T.dim },
 } as const;
 
-export function RecentMatchesCard({ matches, accent }: Props) {
-  if (matches.length === 0) return null;
+export function RecentMatchesCard({ matches, accent, emptyText }: Props) {
+  if (matches.length === 0 && !emptyText) return null;
 
   return (
     // No outer margin — callers space it (profile grid gap / share-page wrapper).
@@ -19,9 +24,15 @@ export function RecentMatchesCard({ matches, accent }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <Bolt size={13} color={accent} />
         <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
-          RECENT MATCHES
+          LAST 5 MATCHES
         </h3>
       </div>
+
+      {matches.length === 0 && (
+        <p style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, margin: 0, letterSpacing: 0.5, lineHeight: 1.7 }}>
+          {emptyText}
+        </p>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {matches.map(m => {
