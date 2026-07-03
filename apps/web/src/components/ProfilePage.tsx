@@ -8,7 +8,6 @@ import { RatingGraph } from '@/components/RatingGraph';
 import { AwardShowcase } from '@/components/AwardShowcase';
 import { RecentMatchesCard } from '@/components/RecentMatchesCard';
 import { AccentEditor, QuoteEditor } from '@/components/ProfileFlairEditor';
-import { Tilt } from '@/components/ui/Tilt';
 import { REALMS, T, FONT_D, FONT_B, FONT_M, rankColor, lighten, rgba, glass } from '@/lib/realm-colors';
 import { FlagIcon } from '@/components/ui/FlagIcon';
 import Link from 'next/link';
@@ -207,8 +206,9 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
         </p>
       </div>
 
-      {/* hero card */}
-      <Tilt style={{ marginBottom: 12 }}>
+      {/* hero card — plain wrapper: 3D tilt + backdrop blur produced a
+          misplaced grey smear on hover in Chromium, so the tilt is gone. */}
+      <div style={{ marginBottom: 12 }}>
         <div style={glass({
           padding: 24,
           position: 'relative',
@@ -285,7 +285,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
             </div>
           )}
         </div>
-      </Tilt>
+      </div>
 
       {/* Two columns on desktop (stats left, trophies + report right);
           the `order` values give the single-column phone reading order. */}
@@ -308,7 +308,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
           {/* rating history — blank chart state until the first reveal */}
           <div style={{ ...glass({ padding: 18 }), order: 4 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <Bolt size={13} color={accent} />
+              <span style={{ fontSize: 13 }}>📈</span>
               <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
                 RATING HISTORY
               </h3>
@@ -341,7 +341,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
           {milestones && (
             <div style={{ ...glass({ padding: 18 }), order: 6 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <Bolt size={13} color={accent} />
+                <span style={{ fontSize: 13 }}>🏅</span>
                 <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
                   MILESTONES
                 </h3>
@@ -393,13 +393,13 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
           {player.showAwards && (
             <div style={{ ...glass({ padding: 18 }), order: 2 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <Bolt size={13} color={T.gold} />
-                <h3 style={{ fontFamily: FONT_D, color: T.gold, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+                <span style={{ fontSize: 13 }}>🏆</span>
+                <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
                   TROPHY CABINET
                 </h3>
               </div>
               {awards.length > 0 ? (
-                <AwardShowcase awards={awards} />
+                <AwardShowcase awards={awards} accent={accent} />
               ) : (
                 <p style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, margin: 0, letterSpacing: 0.5, lineHeight: 1.7 }}>
                   Empty shelves. No silverware on record — unscouted territory.
@@ -411,7 +411,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
           {/* achievements — admin-curated */}
           <div style={{ ...glass({ padding: 18 }), order: 3 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <Bolt size={13} color={accent} />
+              <span style={{ fontSize: 13 }}>⭐</span>
               <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
                 ACHIEVEMENTS
               </h3>
@@ -420,7 +420,11 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                 {player.achievements.split('\n').map(a => a.trim()).filter(Boolean).map((a, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 9 }}>
-                    <Bolt size={9} color={aGlow} style={{ flexShrink: 0 }} />
+                    <span style={{
+                      width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                      background: aGlow, boxShadow: `0 0 6px ${rgba(accent, 0.6)}`,
+                      alignSelf: 'center',
+                    }} />
                     <span style={{ color: T.text, fontFamily: FONT_B, fontSize: 14, lineHeight: 1.5 }}>{a}</span>
                   </div>
                 ))}
@@ -435,7 +439,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
           {/* report card — staff-written (the admin "Character" field) */}
           <div style={{ ...glass({ padding: 22, borderLeft: `3px solid ${accent}` }), order: 7 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
-              <Bolt size={13} color={accent} />
+              <span style={{ fontSize: 13 }}>📋</span>
               <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
                 REPORT CARD
               </h3>
@@ -463,7 +467,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
           {/* bio — the player's own words */}
           <div style={{ ...glass({ padding: 22, borderLeft: `3px solid ${accent}` }), order: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
-              <Bolt size={13} color={accent} />
+              <span style={{ fontSize: 13 }}>🔍</span>
               <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
                 SCOUTING REPORT
               </h3>

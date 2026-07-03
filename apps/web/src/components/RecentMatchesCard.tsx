@@ -1,5 +1,4 @@
 import type { PublicRecentMatch } from '@inazuma/db';
-import { Bolt } from '@/components/ui/Bolt';
 import { T, FONT_B, FONT_D, FONT_M, glass, rgba } from '@/lib/realm-colors';
 
 type Props = {
@@ -22,7 +21,7 @@ export function RecentMatchesCard({ matches, accent, emptyText }: Props) {
     // No outer margin — callers space it (profile grid gap / share-page wrapper).
     <div style={glass({ padding: 18 })}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <Bolt size={13} color={accent} />
+        <span style={{ fontSize: 13 }}>⚔️</span>
         <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
           LAST 5 MATCHES
         </h3>

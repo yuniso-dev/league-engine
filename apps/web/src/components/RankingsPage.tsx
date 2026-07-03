@@ -51,26 +51,20 @@ function RankBadge({ rank }: { rank: number | null }) {
   );
 }
 
-function Num({ v, l, c }: { v: number | string; l: string; c?: string }) {
+function Num({ v, l, c, className }: { v: number | string; l: string; c?: string; className?: string }) {
   return (
-    <div style={{ textAlign: 'center', minWidth: 36 }}>
+    <div className={className} style={{ textAlign: 'center', minWidth: 36 }}>
       <div style={{ color: c ?? T.text, fontFamily: FONT_D, fontSize: 17 }}>{v}</div>
       <div style={{ color: T.faint, fontFamily: FONT_M, fontSize: 8 }}>{l}</div>
     </div>
   );
 }
 
-const DEFENDERS = ['CB', 'LB', 'RB'];
-const MIDFIELDERS = ['CDM', 'CM', 'CAM', 'LM', 'RM'];
-
-/** The stat that matters for the player's role: keepers → clean sheets,
- *  defenders → games won, midfielders → goals/assists, attackers → goals. */
+/** Everyone shows goals/assists — except keepers, whose stat is clean sheets. */
 function roleStat(p: PublicPlayer): { v: number | string; l: string } {
   const pos = !p.hidePositions ? p.position1 : null;
   if (pos === 'GK') return { v: p.cleanSheets ?? 0, l: 'CS' };
-  if (pos && DEFENDERS.includes(pos)) return { v: p.wins ?? 0, l: 'WON' };
-  if (pos && MIDFIELDERS.includes(pos)) return { v: `${p.goals ?? 0}/${p.assists ?? 0}`, l: 'G/A' };
-  return { v: p.goals ?? 0, l: 'GOALS' }; // ST / LW / RW / no position
+  return { v: `${p.goals ?? 0}/${p.assists ?? 0}`, l: 'G/A' };
 }
 
 function initials(name: string): string {
@@ -236,9 +230,10 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
 
               <div style={{ display: 'flex', gap: 13, alignItems: 'center' }}>
                 <Num v={rs.v} l={rs.l} c={T.dim} />
+                <Num v={p.wins ?? 0} l="GW" c={(p.wins ?? 0) > 0 ? T.win : T.dim} />
                 <Num v={winRate != null ? `${winRate}%` : '—'} l="WR %" c={winRate != null && winRate >= 50 ? T.win : T.dim} />
                 <Num v={Math.round(p.elo)} l="ELO" />
-                <Num v={p.gamesPlayed} l="GP" />
+                <Num v={p.gamesPlayed} l="GP" className="hide-sm" />
               </div>
             </div>
           );
