@@ -249,10 +249,6 @@ export default function MatchEntryForm({ tournamentId, teams, defaultRanked }: P
               accent={ADMIN_ACCENT}
             />
           </div>
-          <div>
-            <label style={labelStyle}>Played at</label>
-            <input name="playedAt" type="datetime-local" style={inputBase} />
-          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 18, flexWrap: 'wrap' }}>

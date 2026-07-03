@@ -150,7 +150,6 @@ export default function FixtureResultForm({ tournamentId, match, homeMembers, aw
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
             <SaveButton />
-            <input name="playedAt" type="datetime-local" style={{ ...inputBase, width: 210 }} />
             {state.error && (
               <span style={{ fontFamily: FONT_B, color: T.loss, fontSize: 12.5 }}>{state.error}</span>
             )}
