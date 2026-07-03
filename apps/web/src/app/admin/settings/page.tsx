@@ -4,10 +4,11 @@ import { FONT_B, FONT_D, T } from '@/lib/realm-colors';
 import SettingsForm from '@/components/admin/SettingsForm';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 export default async function AdminSettingsPage() {
-  await requireAdmin();
-  const config = await getConfig();
+  // Role gate + config in one concurrent pass — no request waterfall.
+  const [, config] = await Promise.all([requireAdmin(), getConfig()]);
 
   return (
     <>

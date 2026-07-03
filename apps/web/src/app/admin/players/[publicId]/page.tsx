@@ -9,6 +9,8 @@ import {
 import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, FONT_M, T, glass } from '@/lib/realm-colors';
 import { AwardBadgeIcon } from '@/components/AwardsBadgeRow';
+import { Avatar } from '@/components/ui/Avatar';
+import { flagEmoji } from '@/lib/countries';
 import AdminPlayerProfileForm from '@/components/admin/AdminPlayerProfileForm';
 import AdminPlayerIdentityForm from '@/components/admin/AdminPlayerIdentityForm';
 import PlayerAwardGrantForm from '@/components/admin/PlayerAwardGrantForm';
@@ -16,6 +18,7 @@ import DeleteButton from '@/components/admin/DeleteButton';
 import { revokeAwardAction } from '@/app/admin/actions';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 const sectionTitle: React.CSSProperties = {
   fontFamily: FONT_D,
@@ -25,10 +28,20 @@ const sectionTitle: React.CSSProperties = {
   margin: '32px 0 14px',
 };
 
-export default async function AdminPlayerPage({ params }: { params: { publicId: string } }) {
-  await requireAdmin();
+const chip: React.CSSProperties = {
+  fontFamily: FONT_M,
+  fontSize: 11,
+  color: T.dim,
+  border: '1px solid rgba(255,255,255,0.13)',
+  borderRadius: 6,
+  padding: '3px 9px',
+  whiteSpace: 'nowrap',
+};
 
-  const [detail, awards, tournaments, season] = await Promise.all([
+export default async function AdminPlayerPage({ params }: { params: { publicId: string } }) {
+  // Role gate + all page data in one concurrent pass — no request waterfall.
+  const [, detail, awards, tournaments, season] = await Promise.all([
+    requireAdmin(),
     getAdminPlayer(params.publicId),
     listAwardsForAdmin(),
     listAdminTournaments(),
@@ -45,17 +58,30 @@ export default async function AdminPlayerPage({ params }: { params: { publicId: 
       </Link>
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, marginTop: 10, flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ fontFamily: FONT_D, fontSize: 26, letterSpacing: 2, color: T.text, margin: 0 }}>
-            {player.displayName}
-          </h1>
-          <p style={{ fontFamily: FONT_B, fontSize: 14, color: T.faint, margin: '4px 0 0' }}>
-            @{player.username}
-            {' · '}
-            {player.provisional ? 'Unranked (placements)' : player.rank != null ? `Rank #${player.rank}` : 'Unranked'}
-            {' · '}
-            {Math.round(player.elo)} ELO · {player.gamesPlayed} games
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <Avatar
+            initials={player.displayName.slice(0, 2).toUpperCase()}
+            src={player.avatarUrl}
+            size={52}
+            ring={player.accentColor}
+          />
+          <div>
+            <h1 style={{ fontFamily: FONT_D, fontSize: 26, letterSpacing: 2, color: T.text, margin: 0 }}>
+              {player.country && <span style={{ marginRight: 8 }}>{flagEmoji(player.country)}</span>}
+              {player.displayName}
+            </h1>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+              <span style={chip}>@{player.username}</span>
+              <span style={chip}>
+                {player.provisional ? 'PLACEMENTS' : player.rank != null ? `RANK #${player.rank}` : 'UNRANKED'}
+              </span>
+              <span style={chip}>{Math.round(player.elo)} ELO</span>
+              <span style={chip}>{player.gamesPlayed} GAMES</span>
+              {player.position1 && (
+                <span style={chip}>{player.position1}{player.position2 ? `/${player.position2}` : ''}</span>
+              )}
+            </div>
+          </div>
         </div>
         <Link
           href={`/p/${player.publicId}`}

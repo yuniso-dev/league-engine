@@ -10,12 +10,16 @@ export type AdminPlayerListItem = {
   publicId: string;
   displayName: string;
   username: string;
+  avatarUrl: string | null;
   elo: number;
   rank: number | null;
   provisional: boolean;
   country: string | null;
+  position1: string | null;
+  position2: string | null;
   title: string | null;
   gamesPlayed: number;
+  isInactive: boolean;
 };
 
 export type AdminPlayerAwardGrant = {
@@ -73,12 +77,16 @@ export async function listPlayersDirectory(): Promise<AdminPlayerListItem[]> {
       publicId: users.publicId,
       displayName: users.displayName,
       username: users.username,
+      avatarUrl: users.avatarUrl,
       elo: users.elo,
       rank: users.rank,
       provisional: users.provisional,
       country: users.country,
+      position1: users.position1,
+      position2: users.position2,
       title: users.title,
       gamesPlayed: users.gamesPlayed,
+      isInactive: users.isInactive,
     })
     .from(users)
     .where(and(eq(users.initialised, true), eq(users.isBlacklisted, false)))
@@ -90,12 +98,16 @@ export async function listPlayersDirectory(): Promise<AdminPlayerListItem[]> {
       publicId: r.publicId,
       displayName: r.displayName,
       username: r.username,
+      avatarUrl: r.avatarUrl,
       elo: parseFloat(r.elo as string),
       rank: r.rank,
       provisional: r.provisional,
       country: r.country,
+      position1: r.position1,
+      position2: r.position2,
       title: r.title,
       gamesPlayed: r.gamesPlayed,
+      isInactive: r.isInactive,
     }));
 }
 

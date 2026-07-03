@@ -6,10 +6,11 @@ import { FONT_B, FONT_D, T } from '@/lib/realm-colors';
 import DraftBoard from '@/components/admin/DraftBoard';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 export default async function DraftPage({ params }: { params: { id: string } }) {
-  await requireAdmin();
-  const detail = await getAdminTournament(params.id);
+  // Role gate + tournament in one concurrent pass — no request waterfall.
+  const [, detail] = await Promise.all([requireAdmin(), getAdminTournament(params.id)]);
   if (!detail) notFound();
 
   return (

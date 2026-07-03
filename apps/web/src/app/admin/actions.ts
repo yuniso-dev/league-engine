@@ -342,11 +342,12 @@ export async function grantAwardAction(
     }
 
     await grantAward(admin.discordId, { awardId, publicId, tournamentId, season });
-    // Submitted either from the award's page or a player's admin page —
-    // refresh whichever surface the form lives on.
+    // Submitted from the awards hub, an award's page or a player's admin page —
+    // refresh every surface that shows holders.
     const playerPublicId = str(formData, 'playerPublicId');
     if (playerPublicId) revalidatePath(`/admin/players/${playerPublicId}`);
     else revalidatePath(`/admin/awards/${awardId}`);
+    revalidatePath('/admin/awards');
     return { ok: true };
   } catch (e) {
     return { error: message(e) };
@@ -368,6 +369,7 @@ export async function revokeAwardAction(
     const playerPublicId = str(formData, 'playerPublicId');
     if (playerPublicId) revalidatePath(`/admin/players/${playerPublicId}`);
     else revalidatePath(`/admin/awards/${awardId}`);
+    revalidatePath('/admin/awards');
     return { ok: true };
   } catch (e) {
     return { error: message(e) };

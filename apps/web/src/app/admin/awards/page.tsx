@@ -1,65 +1,38 @@
-import Link from 'next/link';
-import { listAwardsForAdmin } from '@inazuma/db';
+import { getCurrentSeason, listAdminTournaments, listAwardsWithHolders } from '@inazuma/db';
 import { requireAdmin } from '@/lib/admin';
-import { FONT_B, FONT_D, T, glass } from '@/lib/realm-colors';
+import { FONT_B, FONT_D, T } from '@/lib/realm-colors';
+import AwardsHub from '@/components/admin/AwardsHub';
 import AwardForm from '@/components/admin/AwardForm';
 import AwardPresets from '@/components/admin/AwardPresets';
-import { AwardBadgeIcon } from '@/components/AwardsBadgeRow';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 export default async function AdminAwardsPage() {
-  await requireAdmin();
-  const awardsList = await listAwardsForAdmin();
+  // Role gate + all page data in one concurrent pass — no request waterfall.
+  const [, awardsList, tournaments, season] = await Promise.all([
+    requireAdmin(),
+    listAwardsWithHolders(),
+    listAdminTournaments(),
+    getCurrentSeason(),
+  ]);
 
   return (
     <>
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontFamily: FONT_D, fontSize: 26, letterSpacing: 2, color: T.text, margin: 0 }}>
           AWARDS
+          <span style={{ color: T.faint, fontSize: 15, marginLeft: 12, letterSpacing: 1 }}>
+            {awardsList.length}
+          </span>
         </h1>
         <p style={{ fontFamily: FONT_B, fontSize: 14, color: T.dim, margin: '4px 0 0' }}>
-          Define awards and grant them to players.
+          Grant straight from a card, or open MANAGE to edit and revoke.
         </p>
       </div>
 
-      {awardsList.length === 0 ? (
-        <div style={glass({ padding: 36, textAlign: 'center', marginBottom: 20 })}>
-          <p style={{ fontFamily: FONT_B, color: T.dim, margin: 0 }}>
-            No awards yet — create the first one below.
-          </p>
-        </div>
-      ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-          gap: 12,
-          marginBottom: 20,
-        }}>
-          {awardsList.map(a => (
-            <Link key={a.id} href={`/admin/awards/${a.id}`} style={{ textDecoration: 'none' }}>
-              <div style={glass({ padding: 16 })}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 20 }}>
-                  <AwardBadgeIcon imageUrl={a.imageUrl} icon={a.icon} size={24} />
-                  <span style={{ fontFamily: FONT_D, fontSize: 15, letterSpacing: 1, color: T.text }}>
-                    {a.name}
-                  </span>
-                </div>
-                {a.description && (
-                  <div style={{ fontFamily: FONT_B, fontSize: 13, color: T.dim, marginTop: 8 }}>
-                    {a.description}
-                  </div>
-                )}
-                <div style={{ fontFamily: FONT_B, fontSize: 12, color: T.faint, marginTop: 8 }}>
-                  {a.grantCount} player{a.grantCount === 1 ? '' : 's'}
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      <AwardPresets />
+      <AwardsHub awards={awardsList} tournaments={tournaments} defaultSeason={season} />
+      <AwardPresets existingNames={awardsList.map(a => a.name)} />
       <AwardForm />
     </>
   );

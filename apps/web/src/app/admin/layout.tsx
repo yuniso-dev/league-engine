@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { FONT_D, T } from '@/lib/realm-colors';
 import { ADMIN_ACCENT } from '@/components/admin/ui';
 import { BackPill } from '@/components/ui/BackPill';
+import AdminNav from '@/components/admin/AdminNav';
 
 // Chrome only — the role gate runs in every /admin page (requireAdmin) and
 // every mutation (requireAdminAction), so client-side navigation can't skip it.
@@ -15,8 +16,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '18px 24px',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        padding: '18px 24px 12px',
       }}>
         <Link href="/admin" style={{ textDecoration: 'none' }}>
           <span style={{ fontFamily: FONT_D, fontSize: 20, letterSpacing: 2, color: T.text }}>
@@ -25,7 +25,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </Link>
         <BackPill href="/" label="BACK TO SITE" accent={ADMIN_ACCENT} />
       </header>
-      <main style={{ maxWidth: 900, margin: '0 auto', padding: '28px 16px 64px' }}>
+      <AdminNav />
+      <main style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px 64px' }}>
         {children}
       </main>
     </div>

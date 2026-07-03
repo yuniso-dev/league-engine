@@ -10,6 +10,7 @@ import { AwardBadgeIcon } from '@/components/AwardsBadgeRow';
 import { deleteAwardAction, revokeAwardAction } from '@/app/admin/actions';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 const sectionTitle: React.CSSProperties = {
   fontFamily: FONT_D,
@@ -20,9 +21,9 @@ const sectionTitle: React.CSSProperties = {
 };
 
 export default async function AdminAwardDetailPage({ params }: { params: { id: string } }) {
-  await requireAdmin();
-
-  const [detail, tournaments, season] = await Promise.all([
+  // Role gate + data in one concurrent pass — no request waterfall.
+  const [, detail, tournaments, season] = await Promise.all([
+    requireAdmin(),
     getAdminAward(params.id),
     listAdminTournaments(),
     getCurrentSeason(),
