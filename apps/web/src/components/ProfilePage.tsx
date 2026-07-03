@@ -167,7 +167,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
     : null;
 
   return (
-    <div style={{ padding: '28px 18px 96px', maxWidth: 600, margin: '0 auto' }}>
+    <div className="profile-wrap" style={{ padding: '28px 18px 96px', margin: '0 auto' }}>
       {/* header */}
       <div style={{ marginBottom: 22 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -265,98 +265,116 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
         </div>
       </Tilt>
 
-      {/* stats grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${stats.length},1fr)`, gap: 8, marginBottom: 12 }}>
-        {stats.map(s => (
-          <div key={s.l} style={glass({ padding: '16px 4px', textAlign: 'center' })}>
-            <div style={{ fontFamily: FONT_D, fontSize: 26, color: s.c, lineHeight: 1 }}>
-              {s.l === 'RANK' && !showRank ? '—' : <CountUp end={s.v} suffix={s.s} />}
-            </div>
-            <div style={{ color: T.dim, fontFamily: FONT_M, fontSize: 8, letterSpacing: '0.06em', marginTop: 4 }}>
-              {s.l}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* awards */}
-      {player.showAwards && awards.length > 0 && (
-        <div style={{ ...glass({ padding: 18 }), marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <Bolt size={13} color={T.gold} />
-            <h3 style={{ fontFamily: FONT_D, color: T.gold, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
-              TROPHY CABINET
-            </h3>
-          </div>
-          <AwardShowcase awards={awards} />
-        </div>
-      )}
-
-      {/* achievements — admin-curated, hidden server-side when toggled off */}
-      {player.achievements && (
-        <div style={{ ...glass({ padding: 18 }), marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <Bolt size={13} color={accent} />
-            <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
-              ACHIEVEMENTS
-            </h3>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {player.achievements.split('\n').map(a => a.trim()).filter(Boolean).map((a, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 9 }}>
-                <Bolt size={9} color={aGlow} style={{ flexShrink: 0 }} />
-                <span style={{ color: T.text, fontFamily: FONT_B, fontSize: 14, lineHeight: 1.5 }}>{a}</span>
+      {/* Two columns on desktop (stats left, trophies + report right);
+          the `order` values give the single-column phone reading order. */}
+      <div className="profile-grid">
+        <div className="pcol">
+          {/* stats grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${stats.length},1fr)`, gap: 8, order: 1 }}>
+            {stats.map(s => (
+              <div key={s.l} style={glass({ padding: '16px 4px', textAlign: 'center' })}>
+                <div style={{ fontFamily: FONT_D, fontSize: 26, color: s.c, lineHeight: 1 }}>
+                  {s.l === 'RANK' && !showRank ? '—' : <CountUp end={s.v} suffix={s.s} />}
+                </div>
+                <div style={{ color: T.dim, fontFamily: FONT_M, fontSize: 8, letterSpacing: '0.06em', marginTop: 4 }}>
+                  {s.l}
+                </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
 
-      {/* rating history */}
-      {history.length >= 2 && (
-        <div style={{ ...glass({ padding: 18 }), marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <Bolt size={13} color={accent} />
-            <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
-              RATING HISTORY
-            </h3>
-          </div>
-          <RatingGraph points={history} />
-        </div>
-      )}
+          {/* rating history */}
+          {history.length >= 2 && (
+            <div style={{ ...glass({ padding: 18 }), order: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <Bolt size={13} color={accent} />
+                <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+                  RATING HISTORY
+                </h3>
+              </div>
+              <RatingGraph points={history} />
+            </div>
+          )}
 
-      {/* recent matches */}
-      <RecentMatchesCard matches={matches} accent={accent} />
-
-      {/* character — admin-curated, hidden server-side when toggled off */}
-      {player.characterNote && (
-        <div style={{ ...glass({ padding: 22, borderLeft: `3px solid ${accent}` }), marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
-            <Bolt size={13} color={accent} />
-            <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
-              CHARACTER
-            </h3>
-          </div>
-          <p style={{ color: T.text, fontFamily: FONT_B, fontSize: 14.5, lineHeight: 1.75, margin: 0, opacity: 0.92 }}>
-            {player.characterNote}
-          </p>
+          {/* recent matches */}
+          {matches.length > 0 && (
+            <div style={{ order: 5 }}>
+              <RecentMatchesCard matches={matches} accent={accent} />
+            </div>
+          )}
         </div>
-      )}
 
-      {/* bio / scouting report */}
-      {player.bio && (
-        <div style={glass({ padding: 22, borderLeft: `3px solid ${accent}` })}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
-            <Bolt size={13} color={accent} />
-            <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
-              SCOUTING REPORT
-            </h3>
-          </div>
-          <p style={{ color: T.text, fontFamily: FONT_B, fontSize: 14.5, lineHeight: 1.75, margin: 0, opacity: 0.92 }}>
-            {player.bio}
-          </p>
+        <div className="pcol">
+          {/* awards */}
+          {player.showAwards && awards.length > 0 && (
+            <div style={{ ...glass({ padding: 18 }), order: 2 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <Bolt size={13} color={T.gold} />
+                <h3 style={{ fontFamily: FONT_D, color: T.gold, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+                  TROPHY CABINET
+                </h3>
+              </div>
+              <AwardShowcase awards={awards} />
+            </div>
+          )}
+
+          {/* achievements — admin-curated, hidden server-side when toggled off */}
+          {player.achievements && (
+            <div style={{ ...glass({ padding: 18 }), order: 3 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <Bolt size={13} color={accent} />
+                <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+                  ACHIEVEMENTS
+                </h3>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {player.achievements.split('\n').map(a => a.trim()).filter(Boolean).map((a, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 9 }}>
+                    <Bolt size={9} color={aGlow} style={{ flexShrink: 0 }} />
+                    <span style={{ color: T.text, fontFamily: FONT_B, fontSize: 14, lineHeight: 1.5 }}>{a}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* report card — staff-written (the admin "Character" field) */}
+          {player.characterNote && (
+            <div style={{ ...glass({ padding: 22, borderLeft: `3px solid ${accent}` }), order: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
+                <Bolt size={13} color={accent} />
+                <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+                  REPORT CARD
+                </h3>
+              </div>
+              <p style={{ color: T.text, fontFamily: FONT_B, fontSize: 14.5, lineHeight: 1.75, margin: 0, opacity: 0.92 }}>
+                {player.characterNote}
+              </p>
+              <div style={{
+                fontFamily: FONT_M, fontSize: 10, letterSpacing: 1.5,
+                color: T.faint, textAlign: 'right', marginTop: 12,
+              }}>
+                — INAZUMA FC STAFF
+              </div>
+            </div>
+          )}
+
+          {/* bio — the player's own words */}
+          {player.bio && (
+            <div style={{ ...glass({ padding: 22, borderLeft: `3px solid ${accent}` }), order: 7 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
+                <Bolt size={13} color={accent} />
+                <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+                  SCOUTING REPORT
+                </h3>
+              </div>
+              <p style={{ color: T.text, fontFamily: FONT_B, fontSize: 14.5, lineHeight: 1.75, margin: 0, opacity: 0.92 }}>
+                {player.bio}
+              </p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 });
