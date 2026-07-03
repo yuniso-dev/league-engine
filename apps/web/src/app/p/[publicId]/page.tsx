@@ -190,14 +190,14 @@ export default async function PublicProfilePage({ params }: Props) {
           </blockquote>
         )}
 
-        {/* Character — admin-curated, hidden server-side when toggled off */}
+        {/* Report card — admin-curated, hidden server-side when toggled off */}
         {player.characterNote && (
           <div style={{ margin: '0 0 16px' }}>
             <div style={{
               fontFamily: FONT_M, fontSize: 10, color: T.faint,
               letterSpacing: 1, marginBottom: 8,
             }}>
-              CHARACTER
+              REPORT CARD
             </div>
             <p style={{
               margin: 0,

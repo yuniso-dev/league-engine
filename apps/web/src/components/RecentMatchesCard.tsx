@@ -14,7 +14,8 @@ export function RecentMatchesCard({ matches, accent }: Props) {
   if (matches.length === 0) return null;
 
   return (
-    <div style={{ ...glass({ padding: 18 }), marginBottom: 12 }}>
+    // No outer margin — callers space it (profile grid gap / share-page wrapper).
+    <div style={glass({ padding: 18 })}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <Bolt size={13} color={accent} />
         <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>

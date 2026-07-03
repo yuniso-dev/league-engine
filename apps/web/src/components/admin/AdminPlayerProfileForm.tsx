@@ -88,7 +88,7 @@ export default function AdminPlayerProfileForm({ player }: Props) {
         </div>
 
         <div style={{ marginTop: 14 }}>
-          <label style={labelStyle}>Character</label>
+          <label style={labelStyle}>Report card — the staff write-up shown on their profile</label>
           <textarea
             name="characterNote"
             maxLength={600}
@@ -112,7 +112,7 @@ export default function AdminPlayerProfileForm({ player }: Props) {
         </div>
 
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginTop: 16 }}>
-          <Toggle name="showCharacter" label="Show character" defaultChecked={player.showCharacter} />
+          <Toggle name="showCharacter" label="Show report card" defaultChecked={player.showCharacter} />
           <Toggle name="showAchievements" label="Show achievements" defaultChecked={player.showAchievements} />
           <Toggle name="showAwards" label="Show awards" defaultChecked={player.showAwards} />
         </div>
