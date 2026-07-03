@@ -18,6 +18,8 @@ import {
   generateGroupStage,
   generateKnockoutFromTable,
   generateNextRound,
+  getTournamentById,
+  getTournamentDetail,
   grantAward,
   recomputeRanks,
   recordMatchResult,
@@ -34,6 +36,12 @@ import {
   type MatchStage,
 } from '@inazuma/db';
 import { requireAdminAction } from '@/lib/admin';
+import {
+  announceAward,
+  announceChampion,
+  announceKickoff,
+  announceSignupsOpen,
+} from '@/lib/announce';
 
 // All admin forms use useFormState so validation problems surface inline.
 export type AdminFormState = { error?: string; ok?: boolean; message?: string };
@@ -66,6 +74,8 @@ export async function createTournamentAction(
       ranked: formData.get('ranked') === 'on',
       date: str(formData, 'date') || null,
     });
+    // New Frontier opens as 'upcoming' with signups live — announce it.
+    await announceSignupsOpen({ id, name, season });
   } catch (e) {
     return { error: message(e) };
   }
@@ -136,8 +146,25 @@ export async function updateTournamentStatusAction(
       status === 'completed' ? winnerTeamId : null,
     );
 
+    // Announce the two moments that matter: kickoff and the champion.
+    if (status === 'live') {
+      const t = await getTournamentById(tournamentId);
+      if (t) await announceKickoff({ id: t.id, name: t.name, season: t.season });
+    } else if (status === 'completed' && winnerTeamId) {
+      const d = await getTournamentDetail(tournamentId);
+      if (d?.tournament.winnerName) {
+        await announceChampion({
+          id: tournamentId,
+          name: d.tournament.name,
+          season: d.tournament.season,
+          champion: d.tournament.winnerName,
+        });
+      }
+    }
+
     revalidatePath(`/admin/tournaments/${tournamentId}`);
     revalidatePath('/admin');
+    revalidatePath('/hall-of-fame');
     return { ok: true };
   } catch (e) {
     return { error: message(e) };
@@ -345,7 +372,14 @@ export async function grantAwardAction(
       return { error: 'Season must be a positive number.' };
     }
 
-    await grantAward(admin.discordId, { awardId, publicId, tournamentId, season });
+    const granted = await grantAward(admin.discordId, { awardId, publicId, tournamentId, season });
+    await announceAward({
+      awardName: granted.awardName,
+      icon: granted.awardIcon,
+      playerName: granted.playerName,
+      publicId,
+      season,
+    });
     // Submitted from the awards hub, an award's page or a player's admin page —
     // refresh every surface that shows holders.
     const playerPublicId = str(formData, 'playerPublicId');

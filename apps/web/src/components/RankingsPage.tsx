@@ -101,7 +101,7 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
           </h1>
         </div>
         <p style={{ color: T.dim, fontFamily: FONT_B, fontSize: 13, margin: '8px 0 0 32px' }}>
-          The Frontier ladder. Tap a player to open their profile.
+          The Season {season ?? 1} ladder. Tap a player to open their profile.
         </p>
       </div>
 

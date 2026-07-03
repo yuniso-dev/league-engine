@@ -8,7 +8,7 @@ import { ProfilePage } from './ProfilePage';
 import { AccountMenu } from './AccountMenu';
 import { Bolt } from './ui/Bolt';
 import {
-  REALMS, T, FONT_D, FONT_B,
+  REALMS, T, FONT_D, FONT_B, FONT_M,
   clamp, rgba, lighten, realmAt, glass,
 } from '@/lib/realm-colors';
 
@@ -214,11 +214,19 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
             </button>
           </div>
         )}
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 14 }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
           <Bolt size={18} color={T.gold} />
-          <span style={{ fontFamily: FONT_D, color: T.text, fontSize: 22, letterSpacing: 3 }}>
-            INAZUMA <span style={{ color: T.gold }}>FC</span>
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+            <span style={{ fontFamily: FONT_D, color: T.text, fontSize: 22, letterSpacing: 3 }}>
+              INAZUMA <span style={{ color: T.gold }}>FC</span>
+            </span>
+            <span style={{
+              fontFamily: FONT_M, fontSize: 8.5, letterSpacing: 3,
+              color: rgba(T.gold, 0.85), marginTop: 3,
+            }}>
+              SEASON {season ?? 1}
+            </span>
+          </div>
           <div style={{ position: 'absolute', right: 0 }}>
             <AccountMenu currentUser={currentUser} isLoggedIn={isLoggedIn} isAdmin={isAdmin} />
           </div>
