@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import type { PublicPlayer, PublicTournament, VoiceNowEntry } from '@inazuma/db';
+import type { PublicPlayer, PublicTournament, StatLeaderboards, VoiceNowEntry } from '@inazuma/db';
 import { FrontierPage } from './FrontierPage';
 import { RankingsPage } from './RankingsPage';
 import { ProfilePage } from './ProfilePage';
@@ -15,6 +15,8 @@ type Props = {
   rankings: PublicPlayer[];
   tournaments: PublicTournament[];
   voice: VoiceNowEntry[];
+  season?: number;
+  records?: StatLeaderboards;
   dataOffline?: boolean;
   isLoggedIn: boolean;
   isAdmin: boolean;
@@ -30,7 +32,7 @@ type DragState = {
   vel: number;
 };
 
-export default function StormShell({ rankings, tournaments, voice, dataOffline, isLoggedIn, isAdmin, currentUser }: Props) {
+export default function StormShell({ rankings, tournaments, voice, season, records, dataOffline, isLoggedIn, isAdmin, currentUser }: Props) {
   const [index,  setIndex]  = useState(1);  // 0=Frontier, 1=Rankings, 2=Profile
   const [viewed, setViewed] = useState<PublicPlayer | null>(currentUser);
 
@@ -254,10 +256,10 @@ export default function StormShell({ rankings, tournaments, voice, dataOffline, 
           }}
         >
           <div className="ina-scroll" style={{ width: '33.3333%', height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
-            <FrontierPage tournaments={tournaments} voice={voice} />
+            <FrontierPage tournaments={tournaments} voice={voice} records={records} />
           </div>
           <div className="ina-scroll" style={{ width: '33.3333%', height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
-            <RankingsPage players={rankings} onOpen={openPlayer} />
+            <RankingsPage players={rankings} onOpen={openPlayer} season={season} />
           </div>
           <div className="ina-scroll" style={{ width: '33.3333%', height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
             <ProfilePage

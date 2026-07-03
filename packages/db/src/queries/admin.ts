@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import type { InferSelectModel } from 'drizzle-orm';
 import { getDb } from '../client';
+import { computeGroupTable } from './stats';
 import {
   adminActions,
   matches,
@@ -558,6 +559,108 @@ export async function generateBracket(adminId: string, tournamentId: string): Pr
   }
 
   await logAdminAction(adminId, 'bracket.generate', { tournamentId, stage, matches: created });
+  return created;
+}
+
+/** Round-robin group stage: every team plays every other team once.
+ *  Creates fixtures with empty scores — results are entered per fixture later. */
+export async function generateGroupStage(adminId: string, tournamentId: string): Promise<number> {
+  const db = getDb();
+
+  const [tournament] = await db
+    .select()
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1);
+  if (!tournament) throw new Error('Unknown tournament.');
+
+  const [existing] = await db
+    .select({ id: matches.id })
+    .from(matches)
+    .where(eq(matches.tournamentId, tournamentId))
+    .limit(1);
+  if (existing) throw new Error('This tournament already has matches — delete them first to redraw.');
+
+  const teamRows = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.tournamentId, tournamentId))
+    .orderBy(asc(teams.createdAt));
+  if (teamRows.length < 3) {
+    throw new Error(`A group stage needs at least 3 teams — this tournament has ${teamRows.length}.`);
+  }
+
+  // Alternate pairing order so no team plays all its games back to back.
+  const ids = shuffle(teamRows.map(t => t.id));
+  let created = 0;
+  for (let gap = 1; gap < ids.length; gap++) {
+    for (let i = 0; i + gap < ids.length; i++) {
+      await db.insert(matches).values({
+        tournamentId,
+        homeTeamId: ids[i],
+        awayTeamId: ids[i + gap],
+        stage: 'group',
+        ranked: tournament.ranked,
+      });
+      created++;
+    }
+  }
+
+  await logAdminAction(adminId, 'group.generate', { tournamentId, matches: created });
+  return created;
+}
+
+/** Knockout drawn from the finished group table: top 4 → semis (1st v 4th,
+ *  2nd v 3rd), or with fewer than 4 teams the top 2 → final. */
+export async function generateKnockoutFromTable(adminId: string, tournamentId: string): Promise<number> {
+  const db = getDb();
+
+  const [tournament] = await db
+    .select()
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1);
+  if (!tournament) throw new Error('Unknown tournament.');
+
+  const all = await db
+    .select({ id: matches.id, stage: matches.stage, homeScore: matches.homeScore, awayScore: matches.awayScore })
+    .from(matches)
+    .where(eq(matches.tournamentId, tournamentId));
+
+  const group = all.filter(m => m.stage === 'group');
+  if (group.length === 0) throw new Error('No group fixtures yet — generate the group stage first.');
+  const unplayed = group.filter(m => m.homeScore === null || m.awayScore === null);
+  if (unplayed.length > 0) {
+    throw new Error(`${unplayed.length} group fixture${unplayed.length === 1 ? '' : 's'} still need a result.`);
+  }
+  if (all.some(m => m.stage !== 'group' && m.stage !== 'friendly')) {
+    throw new Error('The knockout has already been drawn.');
+  }
+
+  const table = await computeGroupTable(tournamentId);
+
+  let created = 0;
+  if (table.length >= 4) {
+    // Semis seeded from the table; insert in bracket order so the final pairs
+    // the two winners (generateNextRound relies on createdAt order).
+    const [t1, t2, t3, t4] = table;
+    await db.insert(matches).values({
+      tournamentId, homeTeamId: t1.teamId, awayTeamId: t4.teamId, stage: 'semi', ranked: tournament.ranked,
+    });
+    await db.insert(matches).values({
+      tournamentId, homeTeamId: t2.teamId, awayTeamId: t3.teamId, stage: 'semi', ranked: tournament.ranked,
+    });
+    created = 2;
+  } else {
+    const [t1, t2] = table;
+    if (!t1 || !t2) throw new Error('Not enough teams for a knockout.');
+    await db.insert(matches).values({
+      tournamentId, homeTeamId: t1.teamId, awayTeamId: t2.teamId, stage: 'final', ranked: tournament.ranked,
+    });
+    created = 1;
+  }
+
+  await logAdminAction(adminId, 'knockout.from_table', { tournamentId, matches: created });
   return created;
 }
 

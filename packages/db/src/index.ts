@@ -40,6 +40,8 @@ export {
   removeTeamMember,
   setTeamCaptain,
   generateBracket,
+  generateGroupStage,
+  generateKnockoutFromTable,
   generateNextRound,
   recordMatchResult,
 } from './queries/admin';
@@ -72,6 +74,22 @@ export type {
 } from './queries/awards';
 export { getAdminStats } from './queries/adminStats';
 export type { AdminStats } from './queries/adminStats';
+export {
+  getMatchStatsEntries,
+  updateMatchStats,
+  getTournamentStats,
+  getAllTimeStats,
+  getPlayerMilestones,
+  computeGroupTable,
+} from './queries/stats';
+export type {
+  MatchStatsEntry,
+  MatchStatsSheet,
+  StatLeader,
+  StatLeaderboards,
+  PlayerMilestones,
+  LeagueTableRow,
+} from './queries/stats';
 export { getConfig, updateConfig } from './queries/config';
 export type { ConfigRow } from './queries/config';
 export { getTournamentDetail } from './queries/frontier';

@@ -68,3 +68,22 @@ body {
   }
   .pcol { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 }
+
+/* Rankings ladder: phone column, wide table on PC (room for awards + stats). */
+.rank-wrap { max-width: 680px; }
+@media (min-width: 1024px) {
+  .rank-wrap { max-width: 950px; }
+}
+
+/* Frontier detail: stacked on phones; table+groups left, knockout+leaders right on PC. */
+.fr-grid { display: flex; flex-direction: column; gap: 0; }
+.fr-col { min-width: 0; }
+@media (min-width: 1024px) {
+  .fr-wrap { max-width: 1100px !important; }
+  .fr-grid {
+    display: grid;
+    grid-template-columns: 11fr 9fr;
+    gap: 20px;
+    align-items: start;
+  }
+}

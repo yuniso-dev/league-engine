@@ -1,6 +1,6 @@
 'use client';
 import { memo, useEffect, useState } from 'react';
-import type { PublicAward, PublicPlayer, PublicRecentMatch, RatingPoint } from '@inazuma/db';
+import type { PlayerMilestones, PublicAward, PublicPlayer, PublicRecentMatch, RatingPoint } from '@inazuma/db';
 import { Bolt } from '@/components/ui/Bolt';
 import { Avatar } from '@/components/ui/Avatar';
 import { CountUp } from '@/components/ui/CountUp';
@@ -10,7 +10,7 @@ import { RecentMatchesCard } from '@/components/RecentMatchesCard';
 import { AccentEditor, QuoteEditor } from '@/components/ProfileFlairEditor';
 import { Tilt } from '@/components/ui/Tilt';
 import { REALMS, T, FONT_D, FONT_B, FONT_M, rankColor, lighten, rgba, glass } from '@/lib/realm-colors';
-import { flagEmoji, countryName } from '@/lib/countries';
+import { FlagIcon } from '@/components/ui/FlagIcon';
 import Link from 'next/link';
 
 type Props = {
@@ -30,9 +30,27 @@ type ProfileExtras = {
   history: RatingPoint[];
   awards: PublicAward[];
   matches: PublicRecentMatch[];
+  milestones: PlayerMilestones | null;
 };
 
-const NO_EXTRAS: ProfileExtras = { history: [], awards: [], matches: [] };
+const NO_EXTRAS: ProfileExtras = { history: [], awards: [], matches: [], milestones: null };
+
+// Auto-earned career badges, computed from real match data — no admin input.
+// Locked ones render dimmed so every profile shows what it COULD become.
+const MILESTONES: {
+  emoji: string;
+  name: string;
+  detail: string;
+  earned: (m: PlayerMilestones) => boolean;
+}[] = [
+  { emoji: '🏟️', name: 'FRONTIER DEBUT', detail: 'Play in a Frontier', earned: m => m.tournamentsPlayed >= 1 },
+  { emoji: '⚽', name: 'OFF THE MARK', detail: 'Score a Frontier goal', earned: m => m.goals >= 1 },
+  { emoji: '🎯', name: 'PLAYMAKER', detail: 'Register an assist', earned: m => m.assists >= 1 },
+  { emoji: '🧤', name: 'SHUTOUT', detail: 'Keep a clean sheet', earned: m => m.cleanSheets >= 1 },
+  { emoji: '🥅', name: 'MARKSMAN', detail: 'Score 5 Frontier goals', earned: m => m.goals >= 5 },
+  { emoji: '🌩️', name: 'VETERAN', detail: 'Play 5 Frontiers', earned: m => m.tournamentsPlayed >= 5 },
+  { emoji: '🏆', name: 'CHAMPION', detail: 'Win a Frontier', earned: m => m.frontiersWon >= 1 },
+];
 
 export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, isLoggedIn = false, currentUser = null }: Props) {
   // Player accent subtly tints the page; falls back to the profile realm's orange.
@@ -40,7 +58,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
   const aGlow  = lighten(accent, 0.35);
 
   const [extras, setExtras] = useState<ProfileExtras>(NO_EXTRAS);
-  const { history, awards, matches } = extras;
+  const { history, awards, matches, milestones } = extras;
   const publicId = player?.publicId ?? null;
 
   useEffect(() => {
@@ -202,11 +220,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
                 <span style={{ fontFamily: FONT_D, color: T.text, fontSize: 32, letterSpacing: '0.02em' }}>
                   {player.displayName.toUpperCase()}
                 </span>
-                {flagEmoji(player.country) && (
-                  <span style={{ fontSize: 22 }} title={countryName(player.country) ?? undefined}>
-                    {flagEmoji(player.country)}
-                  </span>
-                )}
+                <FlagIcon code={player.country} size={26} />
                 {isOwn && <AccentEditor accentColor={player.accentColor} />}
               </div>
               {player.title && (
@@ -302,6 +316,56 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
               <RecentMatchesCard matches={matches} accent={accent} />
             </div>
           )}
+
+          {/* career milestones — auto-earned from match data */}
+          {milestones && (
+            <div style={{ ...glass({ padding: 18 }), order: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <Bolt size={13} color={accent} />
+                <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+                  MILESTONES
+                </h3>
+                <span style={{ fontFamily: FONT_M, fontSize: 10, color: T.faint }}>
+                  {MILESTONES.filter(ms => ms.earned(milestones)).length}/{MILESTONES.length}
+                </span>
+              </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(118px, 1fr))',
+                gap: 8,
+              }}>
+                {MILESTONES.map(ms => {
+                  const got = ms.earned(milestones);
+                  return (
+                    <div
+                      key={ms.name}
+                      title={ms.detail}
+                      style={{
+                        padding: '12px 8px',
+                        textAlign: 'center',
+                        borderRadius: 12,
+                        background: got ? rgba(accent, 0.1) : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${got ? rgba(accent, 0.4) : 'rgba(255,255,255,0.07)'}`,
+                        opacity: got ? 1 : 0.45,
+                        filter: got ? 'none' : 'grayscale(0.9)',
+                      }}
+                    >
+                      <div style={{ fontSize: 22, lineHeight: 1 }}>{got ? ms.emoji : '🔒'}</div>
+                      <div style={{
+                        fontFamily: FONT_D, fontSize: 10.5, letterSpacing: 1,
+                        color: got ? T.text : T.faint, marginTop: 7,
+                      }}>
+                        {ms.name}
+                      </div>
+                      <div style={{ fontFamily: FONT_B, fontSize: 9.5, color: T.faint, marginTop: 2, lineHeight: 1.35 }}>
+                        {ms.detail}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="pcol">
@@ -338,9 +402,36 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
             </div>
           )}
 
+          {/* the ominous empty state — nothing on file for this player yet */}
+          {!(player.showAwards && awards.length > 0) && !player.achievements && !player.characterNote && !player.bio && (
+            <div style={{
+              ...glass({ padding: 26 }),
+              order: 2,
+              border: '1px dashed rgba(255,255,255,0.14)',
+              background: 'rgba(0,0,0,0.25)',
+              textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 26, opacity: 0.5 }}>⟠</div>
+              <div style={{
+                fontFamily: FONT_D, fontSize: 16, letterSpacing: 3,
+                color: T.dim, marginTop: 10,
+              }}>
+                UNSCOUTED
+              </div>
+              <p style={{
+                fontFamily: FONT_M, fontSize: 11, color: T.faint,
+                lineHeight: 1.8, margin: '10px 0 0', letterSpacing: 0.5,
+              }}>
+                No verified intel on this player.
+                <br />No trophies. No file. No warning.
+                <br />The scouts haven&apos;t caught up with them… yet.
+              </p>
+            </div>
+          )}
+
           {/* report card — staff-written (the admin "Character" field) */}
           {player.characterNote && (
-            <div style={{ ...glass({ padding: 22, borderLeft: `3px solid ${accent}` }), order: 6 }}>
+            <div style={{ ...glass({ padding: 22, borderLeft: `3px solid ${accent}` }), order: 7 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
                 <Bolt size={13} color={accent} />
                 <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
@@ -361,7 +452,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
 
           {/* bio — the player's own words */}
           {player.bio && (
-            <div style={{ ...glass({ padding: 22, borderLeft: `3px solid ${accent}` }), order: 7 }}>
+            <div style={{ ...glass({ padding: 22, borderLeft: `3px solid ${accent}` }), order: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
                 <Bolt size={13} color={accent} />
                 <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>

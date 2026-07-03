@@ -32,6 +32,9 @@ export type PublicPlayer = {
   accentColor: string | null;
   tier: 'free' | 'premium';
   eventsAttended: number;
+  /** Ladder extras — only populated by getRankings. */
+  awardBadges?: { name: string; icon: string | null; imageUrl: string | null }[];
+  wins?: number;
 };
 
 export function toPublicPlayer(row: UserRow): PublicPlayer {

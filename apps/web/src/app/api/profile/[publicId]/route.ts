@@ -1,6 +1,7 @@
 // Everything a profile surface needs in one round-trip — publicId in, safe
 // fields out. Replaces the separate /api/history and /api/awards endpoints.
 import {
+  getPlayerMilestones,
   getRatingHistoryByPublicId,
   getRecentMatchesForPlayer,
   listAwardsForPlayer,
@@ -8,15 +9,17 @@ import {
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 export async function GET(
   _req: Request,
   { params }: { params: { publicId: string } },
 ) {
-  const [history, awards, matches] = await Promise.all([
+  const [history, awards, matches, milestones] = await Promise.all([
     getRatingHistoryByPublicId(params.publicId),
     listAwardsForPlayer(params.publicId),
     getRecentMatchesForPlayer(params.publicId),
+    getPlayerMilestones(params.publicId),
   ]);
-  return Response.json({ history, awards, matches });
+  return Response.json({ history, awards, matches, milestones });
 }
