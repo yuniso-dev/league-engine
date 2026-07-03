@@ -15,6 +15,7 @@ type Props = {
   rankings: PublicPlayer[];
   tournaments: PublicTournament[];
   voice: VoiceNowEntry[];
+  dataOffline?: boolean;
   isLoggedIn: boolean;
   isAdmin: boolean;
   currentUser: PublicPlayer | null;
@@ -29,7 +30,7 @@ type DragState = {
   vel: number;
 };
 
-export default function StormShell({ rankings, tournaments, voice, isLoggedIn, isAdmin, currentUser }: Props) {
+export default function StormShell({ rankings, tournaments, voice, dataOffline, isLoggedIn, isAdmin, currentUser }: Props) {
   const [index,  setIndex]  = useState(1);  // 0=Frontier, 1=Rankings, 2=Profile
   const [viewed, setViewed] = useState<PublicPlayer | null>(currentUser);
 
@@ -148,6 +149,29 @@ export default function StormShell({ rankings, tournaments, voice, isLoggedIn, i
 
       {/* ── header + tab bar ── */}
       <div style={{ position: 'relative', zIndex: 10, padding: '16px 16px 12px' }}>
+        {dataOffline && (
+          <div style={{
+            ...glass({ padding: '8px 12px', borderRadius: 10 }),
+            marginBottom: 12,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap',
+            border: `1px solid ${rgba('#FFD24A', 0.35)}`,
+          }}>
+            <span style={{ fontFamily: FONT_B, fontSize: 12, color: T.dim }}>
+              ⚡ Live data is reconnecting…
+            </span>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              style={{
+                fontFamily: FONT_B, fontSize: 12, fontWeight: 700,
+                color: '#04060D', background: '#FFD24A',
+                border: 'none', borderRadius: 7, padding: '4px 12px', cursor: 'pointer',
+              }}
+            >
+              Refresh
+            </button>
+          </div>
+        )}
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 14 }}>
           <Bolt size={18} color={T.gold} />
           <span style={{ fontFamily: FONT_D, color: T.text, fontSize: 22, letterSpacing: 3 }}>
