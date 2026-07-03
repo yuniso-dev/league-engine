@@ -20,12 +20,25 @@ export const maxDuration = 30;
 // we report ok:false instead of hanging — so an unreachable / paused / pooled-
 // out database can never wedge the homepage on the loading spinner forever.
 // It renders (with an "offline" banner) within `ms` no matter what.
-function settle<T>(p: Promise<T>, ms: number): Promise<{ ok: true; value: T } | { ok: false }> {
+// Failures are logged with the query's name so the Vercel function logs say
+// exactly WHICH query struggled, not just that "something" did.
+function settle<T>(
+  name: string,
+  p: Promise<T>,
+  ms: number,
+): Promise<{ ok: true; value: T } | { ok: false }> {
   return new Promise(resolve => {
-    const timer = setTimeout(() => resolve({ ok: false }), ms);
+    const timer = setTimeout(() => {
+      console.error(`[home] ${name} timed out after ${ms}ms`);
+      resolve({ ok: false });
+    }, ms);
     p.then(
       value => { clearTimeout(timer); resolve({ ok: true, value }); },
-      () => { clearTimeout(timer); resolve({ ok: false }); },
+      err => {
+        clearTimeout(timer);
+        console.error(`[home] ${name} failed:`, err instanceof Error ? err.message : err);
+        resolve({ ok: false });
+      },
     );
   });
 }
@@ -33,13 +46,16 @@ function settle<T>(p: Promise<T>, ms: number): Promise<{ ok: true; value: T } | 
 const NO_RECORDS: StatLeaderboards = { topScorers: [], topAssisters: [], topCleanSheets: [] };
 
 export default async function HomePage() {
+  // Budgets sit just under the DB's 15s statement_timeout: a cold serverless
+  // start pays connection setup + several query waves, and giving up at 8s
+  // was tripping the "reconnecting" banner on renders that would have made it.
   const [r, t, v, s, se, re] = await Promise.all([
-    settle(getRankings(), 8000),
-    settle(getTournaments(), 8000),
-    settle(getVoiceNow(), 4000),
-    settle(auth(), 6000),
-    settle(getCurrentSeason(), 4000),
-    settle(getAllTimeStats(), 4000),
+    settle('rankings', getRankings(), 14_000),
+    settle('tournaments', getTournaments(), 14_000),
+    settle('voice', getVoiceNow(), 8000),
+    settle('auth', auth(), 8000),
+    settle('season', getCurrentSeason(), 8000),
+    settle('records', getAllTimeStats(), 8000),
   ]);
 
   const rankings: PublicPlayer[] = r.ok ? r.value : [];
@@ -58,7 +74,7 @@ export default async function HomePage() {
 
   if (session?.user?.discordId) {
     isLoggedIn = true;
-    const user = await settle(getCachedUserByDiscordId(session.user.discordId), 6000)
+    const user = await settle('viewer', getCachedUserByDiscordId(session.user.discordId), 8000)
       .then(res => (res.ok ? res.value : null));
     // Only the viewer's own staff flag — never another user's role.
     isAdmin = user?.role === 'owner' || user?.role === 'admin';

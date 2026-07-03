@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import type { PublicPlayer, PublicTournament, StatLeaderboards, VoiceNowEntry } from '@inazuma/db';
 import { FrontierPage } from './FrontierPage';
 import { RankingsPage } from './RankingsPage';
@@ -76,6 +77,30 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
         : prev,
     );
   }, [currentUser]);
+
+  // ── self-healing data ─────────────────────────────────────────────────────────
+  // A cold serverless start or a database blip can miss the render window and
+  // trip the "reconnecting" banner. It usually clears in seconds — so while the
+  // banner is up, quietly re-fetch the server data every few seconds (soft
+  // refresh: no reload, no lost scroll/tab state) instead of waiting for the
+  // user to mash Refresh. Capped so a real outage doesn't hammer the server.
+  const router = useRouter();
+  const retries = useRef(0);
+  useEffect(() => {
+    if (!dataOffline) {
+      retries.current = 0;
+      return;
+    }
+    const id = setInterval(() => {
+      if (retries.current >= 5) {
+        clearInterval(id);
+        return;
+      }
+      retries.current += 1;
+      router.refresh();
+    }, 6000);
+    return () => clearInterval(id);
+  }, [dataOffline, router]);
 
   // ── swipe spring + pill rAF ───────────────────────────────────────────────────
   useEffect(() => {
@@ -173,7 +198,7 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
             border: `1px solid ${rgba('#FFD24A', 0.35)}`,
           }}>
             <span style={{ fontFamily: FONT_B, fontSize: 12, color: T.dim }}>
-              ⚡ Live data is reconnecting…
+              ⚡ Live data is reconnecting — retrying automatically…
             </span>
             <button
               type="button"
