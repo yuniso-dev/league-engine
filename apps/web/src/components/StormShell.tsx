@@ -62,6 +62,19 @@ export default function StormShell({ rankings, tournaments, voice, dataOffline, 
     animTo(2);
   };
 
+  // Keep the viewed profile in sync with fresh server data. router.refresh()
+  // (e.g. after saving your accent/quote) re-renders us with a new currentUser,
+  // but useState's initial value is sticky — without this the profile keeps
+  // showing the pre-save colour. Only re-sync when we're looking at ourselves
+  // (or nothing yet), so browsing another player isn't yanked back.
+  useEffect(() => {
+    setViewed(prev =>
+      currentUser && (prev === null || prev.publicId === currentUser.publicId)
+        ? currentUser
+        : prev,
+    );
+  }, [currentUser]);
+
   // ── swipe spring + pill rAF ───────────────────────────────────────────────────
   useEffect(() => {
     let raf: number;
@@ -140,6 +153,7 @@ export default function StormShell({ rankings, tournaments, voice, dataOffline, 
       ref={wrapRef}
       style={{
         height: '100vh', overflow: 'hidden', position: 'relative',
+        display: 'flex', flexDirection: 'column',
         fontFamily: FONT_B,
         background: 'linear-gradient(160deg, #09091f 0%, #04050c 55%, #0a0412 100%)',
       }}
@@ -148,7 +162,7 @@ export default function StormShell({ rankings, tournaments, voice, dataOffline, 
       <div style={{ position: 'absolute', inset: 0, zIndex: 2, pointerEvents: 'none', background: 'radial-gradient(125% 80% at 50% 0%, transparent 52%, rgba(0,0,0,0.5) 100%)' }} />
 
       {/* ── header + tab bar ── */}
-      <div style={{ position: 'relative', zIndex: 10, padding: '16px 16px 12px' }}>
+      <div style={{ position: 'relative', zIndex: 10, flexShrink: 0, padding: '16px 16px 12px' }}>
         {dataOffline && (
           <div style={{
             ...glass({ padding: '8px 12px', borderRadius: 10 }),
@@ -227,7 +241,7 @@ export default function StormShell({ rankings, tournaments, voice, dataOffline, 
         onPointerUp={onUp}
         onPointerCancel={onUp}
         style={{
-          position: 'absolute', top: 102, left: 0, right: 0, bottom: 0,
+          position: 'relative', flex: 1, minHeight: 0,
           overflow: 'hidden', touchAction: 'pan-y', zIndex: 5,
         }}
       >
