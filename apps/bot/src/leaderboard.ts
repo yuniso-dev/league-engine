@@ -2,29 +2,45 @@ import {
   ChatInputCommandInteraction,
   Client,
   EmbedBuilder,
+  Guild,
   MessageFlags,
 } from 'discord.js';
+import { flagEmoji } from '@inazuma/core';
 import { getConfig, getRankings, setRankingsRef, type PublicPlayer } from '@inazuma/db';
 
 const GOLD = 0xffd24a;
+const MEDALS = ['🥇', '🥈', '🥉'];
 
-/** Pure builder so the embed is identical in /leaderboard replies and the pinned message. */
-export function buildLeaderboardEmbed(players: PublicPlayer[], siteUrl: string): EmbedBuilder {
-  const top = players.slice(0, 15);
+/** Pure builder so the embed is identical in /leaderboard replies and the pinned
+ *  message. Ranks + flags, no Elo (the owner wants the numbers to stay on-site). */
+export function buildLeaderboardEmbed(
+  players: PublicPlayer[],
+  siteUrl: string,
+  guild?: Guild | null,
+): EmbedBuilder {
+  const ranked = players.filter(p => !p.provisional && p.rank != null).slice(0, 15);
 
-  const lines = top.length === 0
+  const lines = ranked.length === 0
     ? ['No ranked players yet — play some Frontier matches!']
-    : top.map(p => {
-        const rank = p.provisional || p.rank == null ? '`P `' : `\`#${p.rank}\``;
-        return `${rank} **${p.displayName}** — ${Math.round(p.elo)}`;
+    : ranked.map(p => {
+        const medal = p.rank! <= 3 ? MEDALS[p.rank! - 1] : `\`#${String(p.rank).padStart(2, ' ')}\``;
+        const flag = flagEmoji(p.country);
+        return `${medal} ${flag ? `${flag} ` : ''}**${p.displayName}**${p.title ? ` — *${p.title}*` : ''}`;
       });
 
-  return new EmbedBuilder()
-    .setTitle('⚡ INAZUMA FC — Rankings')
+  const embed = new EmbedBuilder()
+    .setTitle('⚡ INAZUMA FC — RANKINGS')
     .setDescription(lines.join('\n'))
     .setColor(GOLD)
-    .setFooter({ text: `Full rankings → ${siteUrl}` })
+    .setFooter({ text: `Full rankings, profiles & history → ${siteUrl}` })
     .setTimestamp();
+
+  const banner = guild?.bannerURL({ size: 1024 });
+  if (banner) embed.setImage(banner);
+  const icon = guild?.iconURL({ size: 128 });
+  if (icon) embed.setThumbnail(icon);
+
+  return embed;
 }
 
 export async function handleLeaderboard(
@@ -33,7 +49,9 @@ export async function handleLeaderboard(
 ): Promise<void> {
   await interaction.deferReply();
   const players = await getRankings();
-  await interaction.editReply({ embeds: [buildLeaderboardEmbed(players, siteUrl)] });
+  await interaction.editReply({
+    embeds: [buildLeaderboardEmbed(players, siteUrl, interaction.guild)],
+  });
 }
 
 /** Posts the embed in the current channel and remembers it — the bot keeps
@@ -52,7 +70,9 @@ export async function handlePostLeaderboard(
   }
 
   const players = await getRankings();
-  const message = await channel.send({ embeds: [buildLeaderboardEmbed(players, siteUrl)] });
+  const message = await channel.send({
+    embeds: [buildLeaderboardEmbed(players, siteUrl, interaction.guild)],
+  });
 
   if (readOnly) {
     // Test mode: don't persist the rankings-message reference to the shared config.
@@ -76,7 +96,10 @@ export async function updateRankingsMessage(client: Client, siteUrl: string): Pr
 
     const message = await channel.messages.fetch(cfg.rankingsMessageId);
     const players = await getRankings();
-    await message.edit({ embeds: [buildLeaderboardEmbed(players, siteUrl)] });
+    const guild = cfg.guildId
+      ? await client.guilds.fetch(cfg.guildId).catch(() => null)
+      : null;
+    await message.edit({ embeds: [buildLeaderboardEmbed(players, siteUrl, guild)] });
     console.log('[leaderboard] rankings message updated');
   } catch (e) {
     console.warn(

@@ -1,13 +1,14 @@
 'use client';
 import { memo } from 'react';
 import Link from 'next/link';
-import type { PublicTournament } from '@inazuma/db';
+import type { PublicTournament, VoiceNowEntry } from '@inazuma/db';
 import { Bolt } from '@/components/ui/Bolt';
+import { VoiceNowCard } from '@/components/VoiceNowCard';
 import { REALMS, T, FONT_D, FONT_B, FONT_M, rgba, glass } from '@/lib/realm-colors';
 
-type Props = { tournaments: PublicTournament[] };
+type Props = { tournaments: PublicTournament[]; voice: VoiceNowEntry[] };
 
-export const FrontierPage = memo(function FrontierPage({ tournaments }: Props) {
+export const FrontierPage = memo(function FrontierPage({ tournaments, voice }: Props) {
   const accent = REALMS[0].accent;
 
   return (
@@ -24,6 +25,8 @@ export const FrontierPage = memo(function FrontierPage({ tournaments }: Props) {
           Every server draft, archived in full.
         </p>
       </div>
+
+      <VoiceNowCard voice={voice} />
 
       {tournaments.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '64px 0', color: T.faint }}>

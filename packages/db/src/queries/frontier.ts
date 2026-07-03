@@ -19,6 +19,7 @@ export type PublicTeamMember = {
 export type PublicBracketTeam = {
   id: string;
   name: string;
+  captainPublicId: string | null;
   members: PublicTeamMember[];
 };
 
@@ -67,6 +68,7 @@ export async function getTournamentDetail(tournamentId: string): Promise<PublicT
     ? await db
         .select({
           teamId: teamMembers.teamId,
+          userId: teamMembers.userId, // used only to resolve the captain — never returned
           publicId: users.publicId,
           displayName: users.displayName,
           position1: users.position1,
@@ -123,6 +125,8 @@ export async function getTournamentDetail(tournamentId: string): Promise<PublicT
     teams: teamRows.map(t => ({
       id: t.id,
       name: t.name,
+      captainPublicId:
+        memberRows.find(m => m.teamId === t.id && m.userId === t.captainId)?.publicId ?? null,
       members: memberRows
         .filter(m => m.teamId === t.id && m.publicId != null)
         .map(m => ({

@@ -3,6 +3,7 @@ import { listAwardsForAdmin } from '@inazuma/db';
 import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, T, glass } from '@/lib/realm-colors';
 import AwardForm from '@/components/admin/AwardForm';
+import AwardPresets from '@/components/admin/AwardPresets';
 import { AwardBadgeIcon } from '@/components/AwardsBadgeRow';
 
 export const dynamic = 'force-dynamic';
@@ -58,6 +59,7 @@ export default async function AdminAwardsPage() {
         </div>
       )}
 
+      <AwardPresets />
       <AwardForm />
     </>
   );

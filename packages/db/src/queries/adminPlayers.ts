@@ -40,6 +40,8 @@ export type AdminPlayerDetail = {
     provisional: boolean;
     gamesPlayed: number;
     country: string | null;
+    position1: string | null;
+    position2: string | null;
     quote: string | null;
     bio: string | null;
     title: string | null;
@@ -135,6 +137,8 @@ export async function getAdminPlayer(publicId: string): Promise<AdminPlayerDetai
       provisional: row.provisional,
       gamesPlayed: row.gamesPlayed,
       country: row.country,
+      position1: row.position1,
+      position2: row.position2,
       quote: row.quote,
       bio: row.bio,
       title: row.title,
@@ -193,5 +197,45 @@ export async function updatePlayerProfileByAdmin(
     showCharacter: data.showCharacter,
     showAchievements: data.showAchievements,
     showAwards: data.showAwards,
+  });
+}
+
+/** Admin edit of a player's own profile fields (name, positions, country,
+ *  quote, bio) — for fixing up profiles on their behalf. */
+export async function updatePlayerIdentityByAdmin(
+  adminId: string,
+  publicId: string,
+  data: {
+    displayName: string;
+    position1: string | null;
+    position2: string | null;
+    country: string | null;
+    quote: string | null;
+    bio: string | null;
+  },
+): Promise<void> {
+  const [player] = await getDb()
+    .select({ discordId: users.discordId })
+    .from(users)
+    .where(and(eq(users.publicId, publicId), eq(users.isBlacklisted, false)))
+    .limit(1);
+  if (!player) throw new Error('Unknown player.');
+
+  await getDb()
+    .update(users)
+    .set({
+      displayName: data.displayName,
+      position1: data.position1,
+      position2: data.position2,
+      country: data.country,
+      quote: data.quote,
+      bio: data.bio,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.discordId, player.discordId));
+
+  await logAdminAction(adminId, 'player.identity.update', player.discordId, {
+    publicId,
+    displayName: data.displayName,
   });
 }

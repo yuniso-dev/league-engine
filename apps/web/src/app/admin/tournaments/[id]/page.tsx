@@ -3,11 +3,13 @@ import { notFound } from 'next/navigation';
 import { getAdminTournament } from '@inazuma/db';
 import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, FONT_M, T, glass, rgba } from '@/lib/realm-colors';
-import { STAGE_LABELS, STATUS_COLORS } from '@/components/admin/ui';
+import { ADMIN_ACCENT, STAGE_LABELS, STATUS_COLORS } from '@/components/admin/ui';
 import StatusControls from '@/components/admin/StatusControls';
 import TeamForm from '@/components/admin/TeamForm';
 import MatchEntryForm from '@/components/admin/MatchEntryForm';
 import DeleteButton from '@/components/admin/DeleteButton';
+import BracketControls from '@/components/admin/BracketControls';
+import FixtureResultForm from '@/components/admin/FixtureResultForm';
 import { deleteMatchAction, deleteTeamAction, deleteTournamentAction } from '@/app/admin/actions';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +34,10 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
     : null;
   const takenPublicIds = teams.flatMap(t => t.members.map(m => m.publicId));
 
+  const fixtures = matches.filter(m => m.homeScore === null || m.awayScore === null);
+  const results = matches.filter(m => m.homeScore !== null && m.awayScore !== null);
+  const membersOf = (teamId: string) => teams.find(t => t.id === teamId)?.members ?? [];
+
   return (
     <>
       <Link href="/admin" style={{ fontFamily: FONT_B, color: T.dim, fontSize: 13, textDecoration: 'none' }}>
@@ -51,7 +57,7 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
             {winnerName && ` · 🏆 ${winnerName}`}
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
           <span style={{
             fontFamily: FONT_M,
             fontSize: 11,
@@ -64,6 +70,21 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
           }}>
             {tournament.status}
           </span>
+          <Link
+            href={`/admin/tournaments/${tournament.id}/draft`}
+            style={{
+              fontFamily: FONT_D,
+              fontSize: 13,
+              letterSpacing: 1,
+              color: ADMIN_ACCENT,
+              border: `1px solid ${rgba(ADMIN_ACCENT, 0.5)}`,
+              borderRadius: 8,
+              padding: '6px 14px',
+              textDecoration: 'none',
+            }}
+          >
+            🧢 DRAFT BOARD
+          </Link>
           <Link
             href={`/admin/tournaments/${tournament.id}/edit`}
             style={{
@@ -128,6 +149,9 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
                   ? <span style={{ color: T.faint }}>No players</span>
                   : team.members.map(m => (
                       <div key={m.publicId}>
+                        {team.captainPublicId === m.publicId && (
+                          <span style={{ color: T.gold, fontFamily: FONT_M, fontSize: 11 }} title="Captain">© </span>
+                        )}
                         {m.displayName}
                         {m.position1 && (
                           <span style={{ color: T.faint, fontFamily: FONT_M, fontSize: 11 }}>
@@ -151,15 +175,52 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
         takenPublicIds={takenPublicIds}
       />
 
-      {/* ── Matches ── */}
-      <h2 style={sectionTitle}>MATCHES</h2>
+      {/* ── Bracket ── */}
+      <h2 style={sectionTitle}>BRACKET</h2>
       {matches.length === 0 ? (
+        teams.length >= 2 ? (
+          <div style={{ marginBottom: 16 }}>
+            <p style={{ fontFamily: FONT_B, color: T.faint, fontSize: 14, margin: '0 0 12px' }}>
+              Randomly pairs the {teams.length} teams into a knockout (works with 2, 4, 8 or 16 teams).
+              Results are entered per fixture, then you draw the next round.
+            </p>
+            <BracketControls tournamentId={tournament.id} mode="draw" teamCount={teams.length} />
+          </div>
+        ) : (
+          <p style={{ fontFamily: FONT_B, color: T.faint, fontSize: 14, margin: '0 0 16px' }}>
+            Add the teams first, then draw the bracket here.
+          </p>
+        )
+      ) : fixtures.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          {fixtures.map(m => (
+            <FixtureResultForm
+              key={m.id}
+              tournamentId={tournament.id}
+              match={m}
+              homeMembers={membersOf(m.homeTeamId)}
+              awayMembers={membersOf(m.awayTeamId)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ fontFamily: FONT_B, color: T.faint, fontSize: 14, margin: '0 0 12px' }}>
+            Every fixture in the current round has a result.
+          </p>
+          <BracketControls tournamentId={tournament.id} mode="next" teamCount={teams.length} />
+        </div>
+      )}
+
+      {/* ── Results ── */}
+      <h2 style={sectionTitle}>RESULTS</h2>
+      {results.length === 0 ? (
         <p style={{ fontFamily: FONT_B, color: T.faint, fontSize: 14, margin: '0 0 16px' }}>
           No results entered yet.
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-          {matches.map(m => (
+          {results.map(m => (
             <div key={m.id} style={glass({
               padding: '12px 16px',
               display: 'flex',

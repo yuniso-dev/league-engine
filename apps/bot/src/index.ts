@@ -8,6 +8,7 @@ import { registerCommands, dispatch } from './commands.js';
 import { onMemberAdd, onMemberRemove, syncAllMembers } from './memberSync.js';
 import { syncNicknames } from './nicknameSync.js';
 import { updateRankingsMessage } from './leaderboard.js';
+import { onVoiceStateUpdate, scanVoicePresence } from './voicePresence.js';
 
 // ── env ───────────────────────────────────────────────────────────────────────
 const token = process.env.DISCORD_BOT_TOKEN;
@@ -33,7 +34,11 @@ const GUILD_RETRY_MS = 60_000;        // re-check config.guildId when unset
 
 // ── client ────────────────────────────────────────────────────────────────────
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildVoiceStates, // "in voice now" on the website
+  ],
 });
 
 let activeGuildId: string | null = null;
@@ -57,6 +62,7 @@ function every(ms: number, label: string, fn: () => Promise<void>): void {
 async function fullPass(guild: Guild): Promise<void> {
   if (!READ_ONLY) await syncAllMembers(guild); // member sync writes to the DB
   await syncNicknames(guild);                  // only edits nicknames in this guild — no DB writes
+  if (!READ_ONLY) await scanVoicePresence(guild);
   if (!READ_ONLY) await updateRankingsMessage(client, SITE_URL);
 }
 
@@ -130,6 +136,12 @@ client.on(Events.GuildMemberAdd, member => {
 client.on(Events.GuildMemberRemove, member => {
   if (READ_ONLY || member.guild.id !== activeGuildId) return;
   onMemberRemove(member).catch(e => console.error('[bot] member remove sync failed —', e));
+});
+
+client.on(Events.VoiceStateUpdate, (oldState, newState) => {
+  const guildId = newState.guild?.id ?? oldState.guild?.id;
+  if (READ_ONLY || guildId !== activeGuildId) return;
+  onVoiceStateUpdate(oldState, newState).catch(e => console.error('[bot] voice update failed —', e));
 });
 
 client.on(Events.InteractionCreate, interaction => {

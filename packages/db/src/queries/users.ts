@@ -114,6 +114,22 @@ export async function initialiseUser(
   throw new Error('Failed to generate unique public_id after 5 attempts');
 }
 
+/** Partial self-service update — only the provided fields change.
+ *  Powers the inline (pen-icon) editors on a player's own profile. */
+export async function updateOwnProfileFields(
+  discordId: string,
+  data: { quote?: string | null; accentColor?: string | null },
+): Promise<void> {
+  await getDb()
+    .update(users)
+    .set({
+      ...(data.quote !== undefined && { quote: data.quote }),
+      ...(data.accentColor !== undefined && { accentColor: data.accentColor }),
+      updatedAt: new Date(),
+    })
+    .where(eq(users.discordId, discordId));
+}
+
 /** Update mutable settings fields for an existing user. */
 export async function updateSettings(
   discordId: string,

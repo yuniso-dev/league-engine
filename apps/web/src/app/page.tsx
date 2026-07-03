@@ -1,4 +1,4 @@
-import { getRankings, getTournaments, toPublicPlayer } from '@inazuma/db';
+import { getRankings, getTournaments, getVoiceNow, toPublicPlayer } from '@inazuma/db';
 import type { PublicPlayer } from '@inazuma/db';
 import { auth } from '@/auth';
 import { getCachedUserByDiscordId } from '@/lib/user';
@@ -8,9 +8,11 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function HomePage() {
-  const [rankings, tournaments, session] = await Promise.all([
+  const [rankings, tournaments, voice, session] = await Promise.all([
     getRankings(),
     getTournaments(),
+    // Tolerate the voice_presence table not existing yet (migration 0004).
+    getVoiceNow().catch(() => []),
     auth(),
   ]);
 
@@ -30,6 +32,7 @@ export default async function HomePage() {
     <StormShell
       rankings={rankings}
       tournaments={tournaments}
+      voice={voice}
       isLoggedIn={isLoggedIn}
       isAdmin={isAdmin}
       currentUser={currentUser}

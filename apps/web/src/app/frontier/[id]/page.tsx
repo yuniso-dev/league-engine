@@ -79,6 +79,9 @@ export default async function FrontierDetailPage({ params }: Props) {
                       ? <span style={{ color: T.faint }}>No players</span>
                       : team.members.map(m => (
                           <div key={m.publicId}>
+                            {team.captainPublicId === m.publicId && (
+                              <span style={{ color: T.gold, fontFamily: FONT_M, fontSize: 11 }} title="Captain">© </span>
+                            )}
                             {m.displayName}
                             {!m.hidePositions && m.position1 && (
                               <span style={{ color: T.faint, fontFamily: FONT_M, fontSize: 11 }}>

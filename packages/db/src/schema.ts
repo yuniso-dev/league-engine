@@ -194,6 +194,13 @@ export const adminActions = pgTable('admin_actions', {
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Live voice-channel presence, written by the Discord bot.
+export const voicePresence = pgTable('voice_presence', {
+  discordId:   text('discord_id').primaryKey().references(() => users.discordId, { onDelete: 'cascade' }),
+  channelName: text('channel_name').notNull(),
+  joinedAt:    timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const blacklistedUsers = pgTable('blacklisted_users', {
   discordId:      text('discord_id').primaryKey(),
   reason:         text('reason'),

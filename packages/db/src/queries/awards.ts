@@ -120,6 +120,19 @@ export async function getAdminAward(awardId: string): Promise<AdminAwardDetail |
   };
 }
 
+export async function updateAward(
+  adminId: string,
+  awardId: string,
+  data: { name: string; icon: string | null; imageUrl: string | null; description: string | null },
+): Promise<void> {
+  await getDb()
+    .update(awards)
+    .set({ name: data.name, icon: data.icon, imageUrl: data.imageUrl, description: data.description })
+    .where(eq(awards.id, awardId));
+
+  await logAdminAction(adminId, 'award.update', { awardId, name: data.name });
+}
+
 /** Blocks if the award has been granted to anyone — revoke those first. */
 export async function deleteAward(adminId: string, awardId: string): Promise<void> {
   const [grant] = await getDb()
