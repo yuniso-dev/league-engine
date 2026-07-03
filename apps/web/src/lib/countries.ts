@@ -1,15 +1,7 @@
 // Country display: players pick from this list in Settings; the UI renders
 // ONLY the flag emoji (never the raw ISO code).
-
-/** ISO 3166-1 alpha-2 code → flag emoji (regional indicator pair). */
-export function flagEmoji(code: string | null): string | null {
-  if (!code || !/^[a-z]{2}$/i.test(code)) return null;
-  const upper = code.toUpperCase();
-  return String.fromCodePoint(
-    0x1f1e6 + upper.charCodeAt(0) - 65,
-    0x1f1e6 + upper.charCodeAt(1) - 65,
-  );
-}
+// flagEmoji lives in @inazuma/core so the Discord bot shares it.
+export { flagEmoji } from '@inazuma/core';
 
 export function countryName(code: string | null): string | null {
   if (!code) return null;

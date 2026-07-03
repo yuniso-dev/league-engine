@@ -2,7 +2,34 @@
 
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/auth';
-import { updateSettings } from '@inazuma/db';
+import { updateOwnProfileFields, updateSettings } from '@inazuma/db';
+
+/** Inline (pen-icon) edits on a player's own profile — quote and accent only.
+ *  Returns an error string, or null on success. */
+export async function saveOwnFlair(data: {
+  quote?: string;
+  accentColor?: string;
+}): Promise<string | null> {
+  const session = await auth();
+  if (!session?.user?.discordId) return 'Not signed in.';
+
+  const fields: { quote?: string | null; accentColor?: string | null } = {};
+
+  if (data.quote !== undefined) {
+    fields.quote = data.quote.trim().slice(0, 100) || null;
+  }
+  if (data.accentColor !== undefined) {
+    const raw = data.accentColor.trim();
+    if (raw === '') fields.accentColor = null;
+    else if (/^#[0-9a-f]{6}$/i.test(raw)) fields.accentColor = raw.toLowerCase();
+    else return 'Invalid colour.';
+  }
+
+  await updateOwnProfileFields(session.user.discordId, fields);
+  revalidatePath('/');
+  revalidatePath('/settings');
+  return null;
+}
 
 export async function saveSettings(formData: FormData) {
   const session = await auth();

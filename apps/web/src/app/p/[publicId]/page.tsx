@@ -8,7 +8,7 @@ import {
 import { Avatar } from '@/components/ui/Avatar';
 import { BackPill } from '@/components/ui/BackPill';
 import { RatingGraph } from '@/components/RatingGraph';
-import { AwardsBadgeRow } from '@/components/AwardsBadgeRow';
+import { AwardShowcase } from '@/components/AwardShowcase';
 import { RecentMatchesCard } from '@/components/RecentMatchesCard';
 import { glass, T, FONT_D, FONT_B, FONT_M, rankColor, rgba, lighten } from '@/lib/realm-colors';
 import { flagEmoji, countryName } from '@/lib/countries';
@@ -132,7 +132,13 @@ export default async function PublicProfilePage({ params }: Props) {
 
         {player.showAwards && playerAwards.length > 0 && (
           <div style={{ marginBottom: 20 }}>
-            <AwardsBadgeRow awards={playerAwards} />
+            <div style={{
+              fontFamily: FONT_M, fontSize: 10, color: T.faint,
+              letterSpacing: 1, marginBottom: 8,
+            }}>
+              TROPHY CABINET
+            </div>
+            <AwardShowcase awards={playerAwards} />
           </div>
         )}
 

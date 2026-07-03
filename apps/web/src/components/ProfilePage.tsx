@@ -5,8 +5,9 @@ import { Bolt } from '@/components/ui/Bolt';
 import { Avatar } from '@/components/ui/Avatar';
 import { CountUp } from '@/components/ui/CountUp';
 import { RatingGraph } from '@/components/RatingGraph';
-import { AwardsBadgeRow } from '@/components/AwardsBadgeRow';
+import { AwardShowcase } from '@/components/AwardShowcase';
 import { RecentMatchesCard } from '@/components/RecentMatchesCard';
+import { AccentEditor, QuoteEditor } from '@/components/ProfileFlairEditor';
 import { Tilt } from '@/components/ui/Tilt';
 import { REALMS, T, FONT_D, FONT_B, FONT_M, rankColor, lighten, rgba, glass } from '@/lib/realm-colors';
 import { flagEmoji, countryName } from '@/lib/countries';
@@ -195,7 +196,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
           }} />
 
           <div style={{ display: 'flex', gap: 18, alignItems: 'center', position: 'relative' }}>
-            <Avatar initials={initials(player.displayName)} size={82} ring={showRank ? rc : null} />
+            <Avatar initials={initials(player.displayName)} src={player.avatarUrl} size={82} ring={showRank ? rc : null} />
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
                 <span style={{ fontFamily: FONT_D, color: T.text, fontSize: 32, letterSpacing: '0.02em' }}>
@@ -206,6 +207,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
                     {flagEmoji(player.country)}
                   </span>
                 )}
+                {isOwn && <AccentEditor accentColor={player.accentColor} />}
               </div>
               {player.title && (
                 <div style={{
@@ -247,7 +249,9 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
             </div>
           </div>
 
-          {player.quote && (
+          {isOwn ? (
+            <QuoteEditor quote={player.quote} accent={accent} />
+          ) : player.quote && (
             <div style={{
               marginTop: 18, padding: '14px 18px',
               background: 'rgba(255,255,255,0.035)',
@@ -278,7 +282,13 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
       {/* awards */}
       {player.showAwards && awards.length > 0 && (
         <div style={{ ...glass({ padding: 18 }), marginBottom: 12 }}>
-          <AwardsBadgeRow awards={awards} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Bolt size={13} color={T.gold} />
+            <h3 style={{ fontFamily: FONT_D, color: T.gold, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+              TROPHY CABINET
+            </h3>
+          </div>
+          <AwardShowcase awards={awards} />
         </div>
       )}
 

@@ -18,6 +18,7 @@ export {
   getUserByPublicId,
   initialiseUser,
   updateSettings,
+  updateOwnProfileFields,
 } from './queries/users';
 export type { UserRow } from './queries/users';
 export {
@@ -35,6 +36,12 @@ export {
   deleteTeam,
   createMatch,
   deleteMatch,
+  addTeamMember,
+  removeTeamMember,
+  setTeamCaptain,
+  generateBracket,
+  generateNextRound,
+  recordMatchResult,
 } from './queries/admin';
 export type {
   TournamentRow,
@@ -47,6 +54,7 @@ export type {
 export {
   listAwardsForAdmin,
   createAward,
+  updateAward,
   getAdminAward,
   deleteAward,
   grantAward,
@@ -75,7 +83,15 @@ export {
   listPlayersDirectory,
   getAdminPlayer,
   updatePlayerProfileByAdmin,
+  updatePlayerIdentityByAdmin,
 } from './queries/adminPlayers';
+export {
+  replaceVoicePresence,
+  setVoicePresence,
+  clearVoicePresence,
+  getVoiceNow,
+} from './queries/voice';
+export type { VoiceNowEntry } from './queries/voice';
 export type {
   AdminPlayerListItem,
   AdminPlayerAwardGrant,

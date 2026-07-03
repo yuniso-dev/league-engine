@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import {
   MATCH_STAGES,
+  addTeamMember,
   commitReveal,
   createAward,
   createMatch,
@@ -13,9 +14,16 @@ import {
   deleteMatch,
   deleteTeam,
   deleteTournament,
+  generateBracket,
+  generateNextRound,
   grantAward,
+  recordMatchResult,
+  removeTeamMember,
   revokeAward,
+  setTeamCaptain,
+  updateAward,
   updateConfig,
+  updatePlayerIdentityByAdmin,
   updatePlayerProfileByAdmin,
   updateTournament,
   updateTournamentStatus,
@@ -439,6 +447,214 @@ export async function updateConfigAction(
 
     revalidatePath('/admin/settings');
     return { ok: true, message: 'Settings saved.' };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+// ── Draft board ────────────────────────────────────────────────────────────────
+
+export async function addTeamMemberAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const teamId = str(formData, 'teamId');
+    const publicId = str(formData, 'publicId');
+    const tournamentId = str(formData, 'tournamentId');
+    if (!teamId || !publicId) return { error: 'Missing team or player.' };
+
+    await addTeamMember(admin.discordId, { teamId, publicId });
+    revalidatePath(`/admin/tournaments/${tournamentId}/draft`);
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return { ok: true };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function removeTeamMemberAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const teamId = str(formData, 'teamId');
+    const publicId = str(formData, 'publicId');
+    const tournamentId = str(formData, 'tournamentId');
+    if (!teamId || !publicId) return { error: 'Missing team or player.' };
+
+    await removeTeamMember(admin.discordId, { teamId, publicId });
+    revalidatePath(`/admin/tournaments/${tournamentId}/draft`);
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return { ok: true };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function setCaptainAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const teamId = str(formData, 'teamId');
+    const publicId = str(formData, 'publicId') || null;
+    const tournamentId = str(formData, 'tournamentId');
+    if (!teamId) return { error: 'Missing team.' };
+
+    await setTeamCaptain(admin.discordId, { teamId, publicId });
+    revalidatePath(`/admin/tournaments/${tournamentId}/draft`);
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return { ok: true };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+// ── Bracket ────────────────────────────────────────────────────────────────────
+
+export async function generateBracketAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const tournamentId = str(formData, 'tournamentId');
+    if (!tournamentId) return { error: 'Missing tournament.' };
+
+    const created = await generateBracket(admin.discordId, tournamentId);
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return { ok: true, message: `Bracket drawn — ${created} fixture${created === 1 ? '' : 's'} created.` };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function generateNextRoundAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const tournamentId = str(formData, 'tournamentId');
+    if (!tournamentId) return { error: 'Missing tournament.' };
+
+    const created = await generateNextRound(admin.discordId, tournamentId);
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return { ok: true, message: `Next round drawn — ${created} fixture${created === 1 ? '' : 's'} created.` };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function recordMatchResultAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+
+    const matchId = str(formData, 'matchId');
+    const tournamentId = str(formData, 'tournamentId');
+    if (!matchId) return { error: 'Missing match.' };
+
+    const homeScore = parseInt(str(formData, 'homeScore'), 10);
+    const awayScore = parseInt(str(formData, 'awayScore'), 10);
+    if (!Number.isInteger(homeScore) || homeScore < 0 || !Number.isInteger(awayScore) || awayScore < 0) {
+      return { error: 'Enter a valid scoreline.' };
+    }
+
+    const playedAtRaw = str(formData, 'playedAt');
+    const playedAt = playedAtRaw ? new Date(playedAtRaw) : null;
+    if (playedAt && Number.isNaN(playedAt.getTime())) return { error: 'Invalid played-at date.' };
+
+    await recordMatchResult(admin.discordId, {
+      matchId,
+      homeScore,
+      awayScore,
+      playedAt,
+      homePlayerPublicIds: formData.getAll('homePlayers').map(String),
+      awayPlayerPublicIds: formData.getAll('awayPlayers').map(String),
+    });
+
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return { ok: true };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+// ── Awards: edit ───────────────────────────────────────────────────────────────
+
+export async function updateAwardAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+
+    const awardId = str(formData, 'awardId');
+    if (!awardId) return { error: 'Missing award.' };
+
+    const name = str(formData, 'name').slice(0, 60);
+    if (!name) return { error: 'Name is required.' };
+    const icon = str(formData, 'icon').slice(0, 8) || null;
+    const description = str(formData, 'description').slice(0, 200) || null;
+
+    const imageUrlRaw = str(formData, 'imageUrl').slice(0, 500);
+    let imageUrl: string | null = null;
+    if (imageUrlRaw) {
+      try {
+        const u = new URL(imageUrlRaw);
+        if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error();
+        imageUrl = u.toString();
+      } catch {
+        return { error: 'Image URL must be a valid http(s) link.' };
+      }
+    }
+
+    await updateAward(admin.discordId, awardId, { name, icon, imageUrl, description });
+    revalidatePath(`/admin/awards/${awardId}`);
+    revalidatePath('/admin/awards');
+    return { ok: true, message: 'Award saved.' };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+// ── Player identity (admin edit of a player's own fields) ─────────────────────
+
+export async function updatePlayerIdentityAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+
+    const publicId = str(formData, 'publicId');
+    if (!publicId) return { error: 'Missing player.' };
+
+    const displayName = str(formData, 'displayName').slice(0, 32);
+    if (!displayName) return { error: 'Display name is required.' };
+
+    const country = str(formData, 'country').toUpperCase().slice(0, 2) || null;
+    if (country && !/^[A-Z]{2}$/.test(country)) return { error: 'Invalid country.' };
+
+    await updatePlayerIdentityByAdmin(admin.discordId, publicId, {
+      displayName,
+      position1: str(formData, 'position1') || null,
+      position2: str(formData, 'position2') || null,
+      country,
+      quote: str(formData, 'quote').slice(0, 100) || null,
+      bio: str(formData, 'bio').slice(0, 300) || null,
+    });
+
+    revalidatePath(`/admin/players/${publicId}`);
+    revalidatePath(`/p/${publicId}`);
+    return { ok: true, message: 'Player profile saved.' };
   } catch (e) {
     return { error: message(e) };
   }

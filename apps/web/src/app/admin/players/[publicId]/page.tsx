@@ -10,6 +10,7 @@ import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, FONT_M, T, glass } from '@/lib/realm-colors';
 import { AwardBadgeIcon } from '@/components/AwardsBadgeRow';
 import AdminPlayerProfileForm from '@/components/admin/AdminPlayerProfileForm';
+import AdminPlayerIdentityForm from '@/components/admin/AdminPlayerIdentityForm';
 import PlayerAwardGrantForm from '@/components/admin/PlayerAwardGrantForm';
 import DeleteButton from '@/components/admin/DeleteButton';
 import { revokeAwardAction } from '@/app/admin/actions';
@@ -75,6 +76,9 @@ export default async function AdminPlayerPage({ params }: { params: { publicId: 
 
       <h2 style={sectionTitle}>PROFILE</h2>
       <AdminPlayerProfileForm player={player} />
+
+      <h2 style={sectionTitle}>IDENTITY</h2>
+      <AdminPlayerIdentityForm player={player} />
 
       <h2 style={sectionTitle}>
         AWARDS

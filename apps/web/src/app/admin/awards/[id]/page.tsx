@@ -5,6 +5,7 @@ import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, T, glass } from '@/lib/realm-colors';
 import DeleteButton from '@/components/admin/DeleteButton';
 import AwardGrantForm from '@/components/admin/AwardGrantForm';
+import AwardEditForm from '@/components/admin/AwardEditForm';
 import { AwardBadgeIcon } from '@/components/AwardsBadgeRow';
 import { deleteAwardAction, revokeAwardAction } from '@/app/admin/actions';
 
@@ -51,14 +52,17 @@ export default async function AdminAwardDetailPage({ params }: { params: { id: s
             </p>
           )}
         </div>
-        {grants.length === 0 && (
-          <DeleteButton
-            action={deleteAwardAction}
-            hidden={{ awardId: award.id }}
-            confirmText={`Delete award "${award.name}"?`}
-            label="Delete"
-          />
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <AwardEditForm award={award} />
+          {grants.length === 0 && (
+            <DeleteButton
+              action={deleteAwardAction}
+              hidden={{ awardId: award.id }}
+              confirmText={`Delete award "${award.name}"?`}
+              label="Delete"
+            />
+          )}
+        </div>
       </div>
 
       <h2 style={sectionTitle}>GRANTED TO</h2>

@@ -32,6 +32,7 @@ export type AdminPlayerOption = {
 export type AdminTeam = {
   id: string;
   name: string;
+  captainPublicId: string | null;
   members: AdminPlayerOption[];
   matchCount: number;
 };
@@ -210,6 +211,7 @@ export async function getAdminTournament(tournamentId: string): Promise<AdminTou
     ? await db
         .select({
           teamId: teamMembers.teamId,
+          userId: teamMembers.userId, // used only to resolve captain — never returned
           publicId: users.publicId,
           displayName: users.displayName,
           username: users.username,
@@ -239,6 +241,8 @@ export async function getAdminTournament(tournamentId: string): Promise<AdminTou
     teams: teamRows.map(t => ({
       id: t.id,
       name: t.name,
+      captainPublicId:
+        memberRows.find(m => m.teamId === t.id && m.userId === t.captainId)?.publicId ?? null,
       matchCount: matchCounts.get(t.id) ?? 0,
       members: memberRows
         .filter(m => m.teamId === t.id && m.publicId != null)
@@ -420,4 +424,270 @@ export async function deleteMatch(adminId: string, matchId: string): Promise<voi
 
   await db.delete(matches).where(eq(matches.id, matchId));
   await logAdminAction(adminId, 'match.delete', { matchId });
+}
+
+// ── Draft board: per-player roster moves ─────────────────────────────────────
+
+export async function addTeamMember(
+  adminId: string,
+  data: { teamId: string; publicId: string },
+): Promise<void> {
+  const resolved = await resolvePlayers([data.publicId]);
+  const userId = resolved.get(data.publicId)!;
+
+  await getDb()
+    .insert(teamMembers)
+    .values({ teamId: data.teamId, userId })
+    .onConflictDoNothing();
+
+  await logAdminAction(adminId, 'team.member.add', { teamId: data.teamId });
+}
+
+export async function removeTeamMember(
+  adminId: string,
+  data: { teamId: string; publicId: string },
+): Promise<void> {
+  const resolved = await resolvePlayers([data.publicId]);
+  const userId = resolved.get(data.publicId)!;
+  const db = getDb();
+
+  await db
+    .delete(teamMembers)
+    .where(and(eq(teamMembers.teamId, data.teamId), eq(teamMembers.userId, userId)));
+  // A removed player can't stay captain.
+  await db
+    .update(teams)
+    .set({ captainId: null })
+    .where(and(eq(teams.id, data.teamId), eq(teams.captainId, userId)));
+
+  await logAdminAction(adminId, 'team.member.remove', { teamId: data.teamId });
+}
+
+/** publicId null clears the captaincy. The captain must be on the team. */
+export async function setTeamCaptain(
+  adminId: string,
+  data: { teamId: string; publicId: string | null },
+): Promise<void> {
+  const db = getDb();
+  let userId: string | null = null;
+
+  if (data.publicId) {
+    const resolved = await resolvePlayers([data.publicId]);
+    userId = resolved.get(data.publicId)!;
+    const [member] = await db
+      .select({ userId: teamMembers.userId })
+      .from(teamMembers)
+      .where(and(eq(teamMembers.teamId, data.teamId), eq(teamMembers.userId, userId)))
+      .limit(1);
+    if (!member) throw new Error('Captain must be a member of the team.');
+  }
+
+  await db.update(teams).set({ captainId: userId }).where(eq(teams.id, data.teamId));
+  await logAdminAction(adminId, 'team.captain', { teamId: data.teamId });
+}
+
+// ── Bracket generation ───────────────────────────────────────────────────────
+
+const KNOCKOUT_STAGE_BY_COUNT: Record<number, MatchStage> = {
+  16: 'round_of_16',
+  8: 'quarter',
+  4: 'semi',
+  2: 'final',
+};
+
+const NEXT_STAGE: Partial<Record<MatchStage, MatchStage>> = {
+  round_of_16: 'quarter',
+  quarter: 'semi',
+  semi: 'final',
+};
+
+function shuffle<T>(list: T[]): T[] {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** Random first-round draw for a knockout of 2/4/8/16 teams.
+ *  Creates fixtures with empty scores — results are entered per fixture later. */
+export async function generateBracket(adminId: string, tournamentId: string): Promise<number> {
+  const db = getDb();
+
+  const [tournament] = await db
+    .select()
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1);
+  if (!tournament) throw new Error('Unknown tournament.');
+
+  const [existing] = await db
+    .select({ id: matches.id })
+    .from(matches)
+    .where(eq(matches.tournamentId, tournamentId))
+    .limit(1);
+  if (existing) throw new Error('This tournament already has matches — delete them first to redraw.');
+
+  const teamRows = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.tournamentId, tournamentId))
+    .orderBy(asc(teams.createdAt));
+
+  const stage = KNOCKOUT_STAGE_BY_COUNT[teamRows.length];
+  if (!stage) {
+    throw new Error(
+      `A knockout needs exactly 2, 4, 8 or 16 teams — this tournament has ${teamRows.length}.`,
+    );
+  }
+
+  const drawn = shuffle(teamRows.map(t => t.id));
+  // Insert sequentially so createdAt preserves bracket order (winner of match 1
+  // meets winner of match 2, and so on).
+  let created = 0;
+  for (let i = 0; i < drawn.length; i += 2) {
+    await db.insert(matches).values({
+      tournamentId,
+      homeTeamId: drawn[i],
+      awayTeamId: drawn[i + 1],
+      stage,
+      ranked: tournament.ranked,
+    });
+    created++;
+  }
+
+  await logAdminAction(adminId, 'bracket.generate', { tournamentId, stage, matches: created });
+  return created;
+}
+
+/** Once every fixture in the current round has a score, pair the winners into
+ *  the next round (and after the semis, also create the third-place playoff). */
+export async function generateNextRound(adminId: string, tournamentId: string): Promise<number> {
+  const db = getDb();
+
+  const [tournament] = await db
+    .select()
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1);
+  if (!tournament) throw new Error('Unknown tournament.');
+
+  const all = await db
+    .select()
+    .from(matches)
+    .where(eq(matches.tournamentId, tournamentId))
+    .orderBy(asc(matches.createdAt));
+  if (all.length === 0) throw new Error('No bracket yet — generate the bracket first.');
+
+  // The current round is the deepest knockout stage that has matches.
+  const order: MatchStage[] = ['round_of_16', 'quarter', 'semi', 'final'];
+  const current = [...order].reverse().find(s => all.some(m => m.stage === s));
+  if (!current) throw new Error('No knockout rounds found.');
+  if (current === 'final') throw new Error('The bracket is complete — set the tournament winner.');
+
+  const round = all.filter(m => m.stage === current);
+  const unplayed = round.filter(m => m.homeScore === null || m.awayScore === null);
+  if (unplayed.length > 0) {
+    throw new Error(`${unplayed.length} fixture${unplayed.length === 1 ? '' : 's'} in this round still need a result.`);
+  }
+  const tied = round.find(m => m.homeScore === m.awayScore);
+  if (tied) throw new Error('A knockout fixture ended level — edit it to a decisive score (e.g. after pens).');
+
+  const winners = round.map(m => (m.homeScore! > m.awayScore! ? m.homeTeamId : m.awayTeamId));
+  const losers = round.map(m => (m.homeScore! > m.awayScore! ? m.awayTeamId : m.homeTeamId));
+  const next = NEXT_STAGE[current]!;
+
+  let created = 0;
+  // Third-place playoff between the semi-final losers, ahead of the final.
+  if (current === 'semi' && losers.length === 2) {
+    await db.insert(matches).values({
+      tournamentId,
+      homeTeamId: losers[0],
+      awayTeamId: losers[1],
+      stage: 'third_place',
+      ranked: tournament.ranked,
+    });
+    created++;
+  }
+  for (let i = 0; i < winners.length; i += 2) {
+    await db.insert(matches).values({
+      tournamentId,
+      homeTeamId: winners[i],
+      awayTeamId: winners[i + 1],
+      stage: next,
+      ranked: tournament.ranked,
+    });
+    created++;
+  }
+
+  await logAdminAction(adminId, 'bracket.next_round', { tournamentId, stage: next, matches: created });
+  return created;
+}
+
+/** Fill in the result of a generated fixture (a match whose scores are still null). */
+export async function recordMatchResult(
+  adminId: string,
+  data: {
+    matchId: string;
+    homeScore: number;
+    awayScore: number;
+    playedAt: Date | null;
+    homePlayerPublicIds: string[];
+    awayPlayerPublicIds: string[];
+  },
+): Promise<void> {
+  const db = getDb();
+  const [match] = await db.select().from(matches).where(eq(matches.id, data.matchId)).limit(1);
+  if (!match) throw new Error('Unknown match.');
+  if (match.processed) throw new Error('Match already processed for Elo.');
+  if (match.homeScore !== null || match.awayScore !== null) {
+    throw new Error('This fixture already has a result — delete it and re-enter if it was wrong.');
+  }
+
+  const overlap = data.homePlayerPublicIds.filter(id => data.awayPlayerPublicIds.includes(id));
+  if (overlap.length > 0) throw new Error('A player cannot be on both teams.');
+  if (data.homePlayerPublicIds.length === 0 || data.awayPlayerPublicIds.length === 0) {
+    throw new Error('Select the players who took part on each side.');
+  }
+
+  const resolved = await resolvePlayers([...data.homePlayerPublicIds, ...data.awayPlayerPublicIds]);
+
+  const homeResult = data.homeScore > data.awayScore ? 'win' : data.homeScore < data.awayScore ? 'loss' : 'draw';
+  const awayResult = homeResult === 'win' ? 'loss' : homeResult === 'loss' ? 'win' : 'draw';
+
+  const participants = [
+    ...data.homePlayerPublicIds.map(publicId => ({
+      userId: resolved.get(publicId)!,
+      teamId: match.homeTeamId,
+      result: homeResult as 'win' | 'loss' | 'draw',
+      cleanSheet: data.awayScore === 0,
+    })),
+    ...data.awayPlayerPublicIds.map(publicId => ({
+      userId: resolved.get(publicId)!,
+      teamId: match.awayTeamId,
+      result: awayResult as 'win' | 'loss' | 'draw',
+      cleanSheet: data.homeScore === 0,
+    })),
+  ];
+
+  await db.transaction(async tx => {
+    await tx
+      .update(matches)
+      .set({
+        homeScore: data.homeScore,
+        awayScore: data.awayScore,
+        playedAt: data.playedAt ?? new Date(),
+      })
+      .where(eq(matches.id, data.matchId));
+    await tx.insert(matchParticipants).values(
+      participants.map(p => ({ matchId: data.matchId, ...p })),
+    );
+  });
+
+  await logAdminAction(adminId, 'match.result', {
+    matchId: data.matchId,
+    score: `${data.homeScore}-${data.awayScore}`,
+    participants: participants.length,
+  });
 }
