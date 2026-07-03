@@ -43,24 +43,36 @@ export type VoiceNowEntry = {
 
 /** Website: who's in voice right now. */
 export async function getVoiceNow(): Promise<VoiceNowEntry[]> {
-  const rows = await getDb()
-    .select({
-      displayName: users.displayName,
-      avatarUrl: users.avatarUrl,
-      publicId: users.publicId,
-      channelName: voicePresence.channelName,
-      isBlacklisted: users.isBlacklisted,
-    })
-    .from(voicePresence)
-    .innerJoin(users, eq(voicePresence.discordId, users.discordId))
-    .orderBy(asc(voicePresence.channelName), asc(voicePresence.joinedAt));
+  try {
+    const rows = await getDb()
+      .select({
+        displayName: users.displayName,
+        avatarUrl: users.avatarUrl,
+        publicId: users.publicId,
+        channelName: voicePresence.channelName,
+        isBlacklisted: users.isBlacklisted,
+      })
+      .from(voicePresence)
+      .innerJoin(users, eq(voicePresence.discordId, users.discordId))
+      .orderBy(asc(voicePresence.channelName), asc(voicePresence.joinedAt));
 
-  return rows
-    .filter(r => !r.isBlacklisted)
-    .map(r => ({
-      displayName: r.displayName,
-      avatarUrl: r.avatarUrl,
-      publicId: r.publicId,
-      channelName: r.channelName,
-    }));
+    return rows
+      .filter(r => !r.isBlacklisted)
+      .map(r => ({
+        displayName: r.displayName,
+        avatarUrl: r.avatarUrl,
+        publicId: r.publicId,
+        channelName: r.channelName,
+      }));
+  } catch (err) {
+    // The live-voice card is non-essential. If the voice_presence table doesn't
+    // exist yet (migration 0004 not run) or the query errors, never let it break
+    // or slow the homepage — self-contain the failure and return empty so the
+    // caller renders the rest of the page normally.
+    console.error(
+      '[getVoiceNow] returning empty (voice presence unavailable):',
+      err instanceof Error ? err.message : err,
+    );
+    return [];
+  }
 }

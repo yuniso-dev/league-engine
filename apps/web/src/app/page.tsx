@@ -6,6 +6,12 @@ import StormShell from '@/components/StormShell';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+// Give the serverless function more budget than the DB's 15s statement_timeout.
+// Otherwise a cold/slow DB round-trip is killed mid-stream at Vercel's ~10s
+// default, truncating the RSC stream and leaving the client stuck on the
+// loading.tsx spinner forever. With headroom the query either completes or
+// fails cleanly into error.tsx — never an eternal spinner.
+export const maxDuration = 30;
 
 export default async function HomePage() {
   const [rankings, tournaments, voice, session] = await Promise.all([
