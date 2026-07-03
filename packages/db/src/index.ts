@@ -10,6 +10,17 @@ export type { NicknamePlayer } from './queries/bot';
 export * from './schema';
 export { getRankings, searchRankings, recomputeRanks } from './queries/rankings';
 export { getTournaments } from './queries/tournaments';
+export {
+  signUpForTournament,
+  withdrawSignup,
+  isSignedUp,
+  getSignupsForTournament,
+  getInVoicePublicIds,
+  markAttendedIfSignedUp,
+} from './queries/signups';
+export type { PublicSignup } from './queries/signups';
+export { getHallOfFame } from './queries/hallOfFame';
+export type { HallAward, HallTournament } from './queries/hallOfFame';
 export { getHealth } from './queries/health';
 export type { HealthResult } from './queries/health';
 export {
