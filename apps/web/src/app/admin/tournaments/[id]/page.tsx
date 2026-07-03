@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getAdminTournament } from '@inazuma/db';
+import { computeGroupTable, getAdminTournament } from '@inazuma/db';
 import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, FONT_M, T, glass, rgba } from '@/lib/realm-colors';
 import { ADMIN_ACCENT, STAGE_LABELS, STATUS_COLORS } from '@/components/admin/ui';
@@ -10,6 +10,8 @@ import MatchEntryForm from '@/components/admin/MatchEntryForm';
 import DeleteButton from '@/components/admin/DeleteButton';
 import BracketControls from '@/components/admin/BracketControls';
 import FixtureResultForm from '@/components/admin/FixtureResultForm';
+import MatchStatsForm from '@/components/admin/MatchStatsForm';
+import { LeagueTable } from '@/components/LeagueTable';
 import { deleteMatchAction, deleteTeamAction, deleteTournamentAction } from '@/app/admin/actions';
 
 export const dynamic = 'force-dynamic';
@@ -37,6 +39,12 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
   const fixtures = matches.filter(m => m.homeScore === null || m.awayScore === null);
   const results = matches.filter(m => m.homeScore !== null && m.awayScore !== null);
   const membersOf = (teamId: string) => teams.find(t => t.id === teamId)?.members ?? [];
+
+  const groupMatches = matches.filter(m => m.stage === 'group');
+  const hasKnockout = matches.some(m => m.stage !== 'group' && m.stage !== 'friendly');
+  const groupComplete = groupMatches.length > 0 &&
+    groupMatches.every(m => m.homeScore !== null && m.awayScore !== null);
+  const table = groupMatches.length > 0 ? await computeGroupTable(tournament.id) : null;
 
   return (
     <>
@@ -175,41 +183,83 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
         takenPublicIds={takenPublicIds}
       />
 
-      {/* ── Bracket ── */}
-      <h2 style={sectionTitle}>BRACKET</h2>
+      {/* ── Fixtures ── */}
+      <h2 style={sectionTitle}>FIXTURES</h2>
       {matches.length === 0 ? (
         teams.length >= 2 ? (
           <div style={{ marginBottom: 16 }}>
             <p style={{ fontFamily: FONT_B, color: T.faint, fontSize: 14, margin: '0 0 12px' }}>
-              Randomly pairs the {teams.length} teams into a knockout (works with 2, 4, 8 or 16 teams).
-              Results are entered per fixture, then you draw the next round.
+              <strong style={{ color: T.dim }}>Group stage</strong> gives every team a game against every
+              other team and builds a league table, then the knockout is seeded from the standings —
+              the usual Frontier format. <strong style={{ color: T.dim }}>Random knockout</strong> skips
+              straight to a cup draw (needs 2, 4, 8 or 16 teams).
             </p>
-            <BracketControls tournamentId={tournament.id} mode="draw" teamCount={teams.length} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {teams.length >= 3 && (
+                <BracketControls tournamentId={tournament.id} mode="group" teamCount={teams.length} />
+              )}
+              <BracketControls tournamentId={tournament.id} mode="draw" teamCount={teams.length} />
+            </div>
           </div>
         ) : (
           <p style={{ fontFamily: FONT_B, color: T.faint, fontSize: 14, margin: '0 0 16px' }}>
-            Add the teams first, then draw the bracket here.
+            Add the teams first, then generate the fixtures here.
           </p>
         )
-      ) : fixtures.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-          {fixtures.map(m => (
-            <FixtureResultForm
-              key={m.id}
-              tournamentId={tournament.id}
-              match={m}
-              homeMembers={membersOf(m.homeTeamId)}
-              awayMembers={membersOf(m.awayTeamId)}
-            />
-          ))}
-        </div>
       ) : (
-        <div style={{ marginBottom: 16 }}>
-          <p style={{ fontFamily: FONT_B, color: T.faint, fontSize: 14, margin: '0 0 12px' }}>
-            Every fixture in the current round has a result.
-          </p>
-          <BracketControls tournamentId={tournament.id} mode="next" teamCount={teams.length} />
-        </div>
+        <>
+          {fixtures.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+              {fixtures.map(m => (
+                <FixtureResultForm
+                  key={m.id}
+                  tournamentId={tournament.id}
+                  match={m}
+                  homeMembers={membersOf(m.homeTeamId)}
+                  awayMembers={membersOf(m.awayTeamId)}
+                />
+              ))}
+            </div>
+          )}
+          {fixtures.length === 0 && groupComplete && !hasKnockout && (
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontFamily: FONT_B, color: T.faint, fontSize: 14, margin: '0 0 12px' }}>
+                The group stage is complete — draw the knockout from the standings
+                ({teams.length >= 4 ? 'top 4 → semi-finals' : 'top 2 → final'}).
+              </p>
+              <BracketControls tournamentId={tournament.id} mode="knockout" teamCount={teams.length} />
+            </div>
+          )}
+          {fixtures.length === 0 && hasKnockout && (
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontFamily: FONT_B, color: T.faint, fontSize: 14, margin: '0 0 12px' }}>
+                Every fixture in the current round has a result.
+              </p>
+              <BracketControls tournamentId={tournament.id} mode="next" teamCount={teams.length} />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── League table (group stage) ── */}
+      {table && table.length > 0 && (
+        <>
+          <h2 style={sectionTitle}>
+            TABLE
+            {!groupComplete && (
+              <span style={{ color: T.faint, fontSize: 12, marginLeft: 10, letterSpacing: 0.5 }}>
+                live — updates as group results go in
+              </span>
+            )}
+          </h2>
+          <div style={{ marginBottom: 16 }}>
+            <LeagueTable
+              rows={table}
+              accent={ADMIN_ACCENT}
+              qualifyCount={hasKnockout || groupComplete ? (teams.length >= 4 ? 4 : 2) : 0}
+            />
+          </div>
+        </>
       )}
 
       {/* ── Results ── */}
@@ -255,6 +305,8 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
                   confirmText="Delete this match result?"
                 />
               )}
+              {/* goals / assists / clean sheets — feeds leaderboards + milestones */}
+              <MatchStatsForm matchId={m.id} tournamentId={tournament.id} />
             </div>
           ))}
         </div>

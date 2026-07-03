@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { AdminPlayerListItem } from '@inazuma/db';
 import { Avatar } from '@/components/ui/Avatar';
-import { flagEmoji } from '@/lib/countries';
+import { FlagIcon } from '@/components/ui/FlagIcon';
 import { FONT_B, FONT_D, FONT_M, T, glass, rgba } from '@/lib/realm-colors';
 import { ADMIN_ACCENT, inputBase } from '@/components/admin/ui';
 
@@ -93,9 +93,7 @@ export default function PlayerDirectory({ players }: Props) {
                 />
                 <div style={{ flex: 1, minWidth: 140 }}>
                   <span style={{ fontFamily: FONT_B, fontSize: 15, color: T.text }}>
-                    {p.country && (
-                      <span style={{ marginRight: 6 }}>{flagEmoji(p.country)}</span>
-                    )}
+                    <FlagIcon code={p.country} size={16} style={{ marginRight: 6 }} />
                     {p.displayName}
                   </span>
                   <span style={{ fontFamily: FONT_B, fontSize: 12, color: T.faint }}> @{p.username}</span>

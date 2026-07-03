@@ -1,5 +1,12 @@
-import { getRankings, getTournaments, getVoiceNow, toPublicPlayer } from '@inazuma/db';
-import type { PublicPlayer, PublicTournament, VoiceNowEntry } from '@inazuma/db';
+import {
+  getAllTimeStats,
+  getCurrentSeason,
+  getRankings,
+  getTournaments,
+  getVoiceNow,
+  toPublicPlayer,
+} from '@inazuma/db';
+import type { PublicPlayer, PublicTournament, StatLeaderboards, VoiceNowEntry } from '@inazuma/db';
 import { auth } from '@/auth';
 import { getCachedUserByDiscordId } from '@/lib/user';
 import StormShell from '@/components/StormShell';
@@ -23,18 +30,24 @@ function settle<T>(p: Promise<T>, ms: number): Promise<{ ok: true; value: T } | 
   });
 }
 
+const NO_RECORDS: StatLeaderboards = { topScorers: [], topAssisters: [], topCleanSheets: [] };
+
 export default async function HomePage() {
-  const [r, t, v, s] = await Promise.all([
+  const [r, t, v, s, se, re] = await Promise.all([
     settle(getRankings(), 8000),
     settle(getTournaments(), 8000),
     settle(getVoiceNow(), 4000),
     settle(auth(), 6000),
+    settle(getCurrentSeason(), 4000),
+    settle(getAllTimeStats(), 4000),
   ]);
 
   const rankings: PublicPlayer[] = r.ok ? r.value : [];
   const tournaments: PublicTournament[] = t.ok ? t.value : [];
   const voice: VoiceNowEntry[] = v.ok ? v.value : [];
   const session = s.ok ? s.value : null;
+  const season = se.ok ? se.value : 1;
+  const records: StatLeaderboards = re.ok ? re.value : NO_RECORDS;
   // True only when core data failed/timed out — lets the UI say "reconnecting"
   // rather than misleadingly showing an empty league.
   const dataOffline = !r.ok || !t.ok;
@@ -57,6 +70,8 @@ export default async function HomePage() {
       rankings={rankings}
       tournaments={tournaments}
       voice={voice}
+      season={season}
+      records={records}
       dataOffline={dataOffline}
       isLoggedIn={isLoggedIn}
       isAdmin={isAdmin}

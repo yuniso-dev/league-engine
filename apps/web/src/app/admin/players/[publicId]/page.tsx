@@ -10,7 +10,7 @@ import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, FONT_M, T, glass } from '@/lib/realm-colors';
 import { AwardBadgeIcon } from '@/components/AwardsBadgeRow';
 import { Avatar } from '@/components/ui/Avatar';
-import { flagEmoji } from '@/lib/countries';
+import { FlagIcon } from '@/components/ui/FlagIcon';
 import AdminPlayerProfileForm from '@/components/admin/AdminPlayerProfileForm';
 import AdminPlayerIdentityForm from '@/components/admin/AdminPlayerIdentityForm';
 import PlayerAwardGrantForm from '@/components/admin/PlayerAwardGrantForm';
@@ -67,7 +67,7 @@ export default async function AdminPlayerPage({ params }: { params: { publicId: 
           />
           <div>
             <h1 style={{ fontFamily: FONT_D, fontSize: 26, letterSpacing: 2, color: T.text, margin: 0 }}>
-              {player.country && <span style={{ marginRight: 8 }}>{flagEmoji(player.country)}</span>}
+              <FlagIcon code={player.country} size={22} style={{ marginRight: 8 }} />
               {player.displayName}
             </h1>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>

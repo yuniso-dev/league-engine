@@ -4,17 +4,41 @@ import { FONT_B, FONT_D, T, rgba } from '@/lib/realm-colors';
 import { ADMIN_ACCENT } from '@/components/admin/ui';
 import {
   generateBracketAction,
+  generateGroupStageAction,
+  generateKnockoutAction,
   generateNextRoundAction,
   type AdminFormState,
 } from '@/app/admin/actions';
 
-// "Draw the bracket" (random first-round pairing from the teams) and
-// "draw the next round" (pairs the winners once every fixture has a score).
+// Fixture generators: random knockout draw, round-robin group stage,
+// knockout seeded from the finished table, and next-round pairing.
+
+type Mode = 'draw' | 'group' | 'knockout' | 'next';
 
 type Props = {
   tournamentId: string;
-  mode: 'draw' | 'next';
+  mode: Mode;
   teamCount: number;
+};
+
+const ACTION_OF: Record<Mode, typeof generateBracketAction> = {
+  draw: generateBracketAction,
+  group: generateGroupStageAction,
+  knockout: generateKnockoutAction,
+  next: generateNextRoundAction,
+};
+
+const LABEL_OF: Record<Mode, string> = {
+  draw: '🎲 DRAW KNOCKOUT (random)',
+  group: '📋 GROUP FIXTURES (round robin)',
+  knockout: '🏁 DRAW KNOCKOUT FROM TABLE',
+  next: '⏭ DRAW NEXT ROUND',
+};
+
+const CONFIRM_OF: Partial<Record<Mode, (teams: number) => string>> = {
+  draw: n => `Randomly draw the knockout for ${n} teams?`,
+  group: n => `Generate a round robin for ${n} teams (every team plays every other team once)?`,
+  knockout: () => 'Draw the knockout from the current table standings?',
 };
 
 function GoButton({ label }: { label: string }) {
@@ -43,23 +67,19 @@ function GoButton({ label }: { label: string }) {
 }
 
 export default function BracketControls({ tournamentId, mode, teamCount }: Props) {
-  const [state, action] = useFormState<AdminFormState, FormData>(
-    mode === 'draw' ? generateBracketAction : generateNextRoundAction,
-    {},
-  );
+  const [state, action] = useFormState<AdminFormState, FormData>(ACTION_OF[mode], {});
 
   return (
     <form
       action={action}
       onSubmit={e => {
-        if (mode === 'draw' && !window.confirm(`Randomly draw the bracket for ${teamCount} teams?`)) {
-          e.preventDefault();
-        }
+        const confirmText = CONFIRM_OF[mode]?.(teamCount);
+        if (confirmText && !window.confirm(confirmText)) e.preventDefault();
       }}
       style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
     >
       <input type="hidden" name="tournamentId" value={tournamentId} />
-      <GoButton label={mode === 'draw' ? '🎲 DRAW BRACKET' : '⏭ DRAW NEXT ROUND'} />
+      <GoButton label={LABEL_OF[mode]} />
       {state.error && (
         <span style={{ fontFamily: FONT_B, color: T.loss, fontSize: 13 }}>{state.error}</span>
       )}

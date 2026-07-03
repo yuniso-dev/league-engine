@@ -4,6 +4,12 @@ import { getDb } from '../client';
 import { matches, teamMembers, teams, tournaments, users } from '../schema';
 import { toPublicTournament, type PublicTournament } from '../dto';
 import type { MatchStage } from './admin';
+import {
+  computeGroupTable,
+  getTournamentStats,
+  type LeagueTableRow,
+  type StatLeaderboards,
+} from './stats';
 
 // Public, read-only view of a tournament's teams and matches — for the
 // "click a Frontier, see its fixtures" page. Never exposes discordId.
@@ -39,6 +45,9 @@ export type PublicTournamentDetail = {
   tournament: PublicTournament;
   teams: PublicBracketTeam[];
   matchesByStage: { stage: MatchStage; matches: PublicBracketMatch[] }[];
+  /** Group-stage league table — null until group fixtures exist. */
+  table: LeagueTableRow[] | null;
+  stats: StatLeaderboards;
 };
 
 // Display order differs from the enum's declaration order (which has
@@ -120,7 +129,15 @@ export async function getTournamentDetail(tournamentId: string): Promise<PublicT
     grouped.set(m.stage, list);
   }
 
+  const hasGroupStage = matchRows.some(m => m.stage === 'group');
+  const [table, stats] = await Promise.all([
+    hasGroupStage ? computeGroupTable(tournamentId) : Promise.resolve(null),
+    getTournamentStats(tournamentId),
+  ]);
+
   return {
+    table,
+    stats,
     tournament: toPublicTournament(row.tournament, row.winnerName),
     teams: teamRows.map(t => ({
       id: t.id,

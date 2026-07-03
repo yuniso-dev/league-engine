@@ -1,15 +1,56 @@
 'use client';
 import { memo } from 'react';
 import Link from 'next/link';
-import type { PublicTournament, VoiceNowEntry } from '@inazuma/db';
+import type { PublicTournament, StatLeader, StatLeaderboards, VoiceNowEntry } from '@inazuma/db';
 import { Bolt } from '@/components/ui/Bolt';
+import { Avatar } from '@/components/ui/Avatar';
 import { VoiceNowCard } from '@/components/VoiceNowCard';
 import { REALMS, T, FONT_D, FONT_B, FONT_M, rgba, glass } from '@/lib/realm-colors';
 
-type Props = { tournaments: PublicTournament[]; voice: VoiceNowEntry[] };
+type Props = {
+  tournaments: PublicTournament[];
+  voice: VoiceNowEntry[];
+  records?: StatLeaderboards;
+};
 
-export const FrontierPage = memo(function FrontierPage({ tournaments, voice }: Props) {
+function RecordColumn({ title, emoji, leaders, unit }: {
+  title: string; emoji: string; leaders: StatLeader[]; unit: string;
+}) {
+  if (leaders.length === 0) return null;
+  return (
+    <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+      <div style={{ fontFamily: FONT_M, fontSize: 10, letterSpacing: 1.5, color: T.faint, marginBottom: 8 }}>
+        {emoji} {title}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {leaders.map((l, i) => (
+          <div key={l.publicId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontFamily: FONT_D, fontSize: 12, color: i === 0 ? T.gold : T.faint, width: 12 }}>
+              {i + 1}
+            </span>
+            <Avatar initials={l.displayName.slice(0, 2).toUpperCase()} src={l.avatarUrl} size={22} />
+            <span style={{
+              fontFamily: FONT_B, fontSize: 13, color: T.text, flex: 1,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {l.displayName}
+            </span>
+            <span style={{ fontFamily: FONT_D, fontSize: 14, color: i === 0 ? T.gold : T.dim }}>
+              {l.value}
+              <span style={{ fontFamily: FONT_M, fontSize: 8, color: T.faint, marginLeft: 2 }}>{unit}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export const FrontierPage = memo(function FrontierPage({ tournaments, voice, records }: Props) {
   const accent = REALMS[0].accent;
+  const hasRecords =
+    records != null &&
+    (records.topScorers.length > 0 || records.topAssisters.length > 0 || records.topCleanSheets.length > 0);
 
   return (
     <div style={{ padding: '28px 18px 96px', maxWidth: 680, margin: '0 auto' }}>
@@ -27,6 +68,23 @@ export const FrontierPage = memo(function FrontierPage({ tournaments, voice }: P
       </div>
 
       <VoiceNowCard voice={voice} />
+
+      {/* all-time records — appears once real match stats exist */}
+      {hasRecords && (
+        <div style={{ ...glass({ padding: 18 }), marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <Bolt size={13} color={T.gold} />
+            <h3 style={{ fontFamily: FONT_D, color: T.gold, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+              ALL-TIME FRONTIER RECORDS
+            </h3>
+          </div>
+          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+            <RecordColumn title="TOP SCORERS" emoji="⚽" leaders={records!.topScorers} unit="G" />
+            <RecordColumn title="TOP ASSISTS" emoji="🎯" leaders={records!.topAssisters} unit="A" />
+            <RecordColumn title="CLEAN SHEETS" emoji="🧤" leaders={records!.topCleanSheets} unit="CS" />
+          </div>
+        </div>
+      )}
 
       {tournaments.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '64px 0', color: T.faint }}>

@@ -15,9 +15,12 @@ import {
   deleteTeam,
   deleteTournament,
   generateBracket,
+  generateGroupStage,
+  generateKnockoutFromTable,
   generateNextRound,
   grantAward,
   recordMatchResult,
+  updateMatchStats,
   removeTeamMember,
   revokeAward,
   setTeamCaptain,
@@ -530,6 +533,83 @@ export async function generateBracketAction(
     const created = await generateBracket(admin.discordId, tournamentId);
     revalidatePath(`/admin/tournaments/${tournamentId}`);
     return { ok: true, message: `Bracket drawn — ${created} fixture${created === 1 ? '' : 's'} created.` };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function generateGroupStageAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const tournamentId = str(formData, 'tournamentId');
+    if (!tournamentId) return { error: 'Missing tournament.' };
+
+    const created = await generateGroupStage(admin.discordId, tournamentId);
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return { ok: true, message: `Group stage drawn — ${created} fixture${created === 1 ? '' : 's'} created.` };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function generateKnockoutAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const tournamentId = str(formData, 'tournamentId');
+    if (!tournamentId) return { error: 'Missing tournament.' };
+
+    const created = await generateKnockoutFromTable(admin.discordId, tournamentId);
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return {
+      ok: true,
+      message: created === 2
+        ? 'Semi-finals drawn from the table (1st v 4th, 2nd v 3rd).'
+        : 'Final drawn from the table (1st v 2nd).',
+    };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function updateMatchStatsAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+
+    const matchId = str(formData, 'matchId');
+    const tournamentId = str(formData, 'tournamentId');
+    if (!matchId) return { error: 'Missing match.' };
+
+    // One set of g_/a_/cs_ inputs per participant, keyed by publicId.
+    const stats: { publicId: string; goals: number; assists: number; cleanSheet: boolean }[] = [];
+    for (const key of Array.from(formData.keys())) {
+      if (!key.startsWith('g_')) continue;
+      const publicId = key.slice(2);
+      const goals = parseInt(str(formData, `g_${publicId}`) || '0', 10);
+      const assists = parseInt(str(formData, `a_${publicId}`) || '0', 10);
+      if (!Number.isInteger(goals) || goals < 0 || !Number.isInteger(assists) || assists < 0) {
+        return { error: 'Goals and assists must be whole numbers.' };
+      }
+      stats.push({
+        publicId,
+        goals,
+        assists,
+        cleanSheet: formData.get(`cs_${publicId}`) === 'on',
+      });
+    }
+    if (stats.length === 0) return { error: 'No players to save stats for.' };
+
+    await updateMatchStats(admin.discordId, matchId, stats);
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return { ok: true, message: 'Stats saved.' };
   } catch (e) {
     return { error: message(e) };
   }
