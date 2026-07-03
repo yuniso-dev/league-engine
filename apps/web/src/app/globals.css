@@ -75,6 +75,11 @@ body {
   .rank-wrap { max-width: 950px; }
 }
 
+/* Drop the least essential stat column on narrow phones. */
+@media (max-width: 560px) {
+  .hide-sm { display: none; }
+}
+
 /* Frontier detail: stacked on phones; table+groups left, knockout+leaders right on PC. */
 .fr-grid { display: flex; flex-direction: column; gap: 0; }
 .fr-col { min-width: 0; }

@@ -21,7 +21,7 @@ function AwardIcon({ imageUrl, icon }: { imageUrl: string | null; icon: string |
   return <span style={{ fontSize: 30, lineHeight: 1 }}>{icon ?? '🏅'}</span>;
 }
 
-export function AwardShowcase({ awards }: { awards: PublicAward[] }) {
+export function AwardShowcase({ awards, accent = T.gold }: { awards: PublicAward[]; accent?: string }) {
   if (awards.length === 0) return null;
 
   return (
@@ -40,16 +40,16 @@ export function AwardShowcase({ awards }: { awards: PublicAward[] }) {
             padding: '16px 12px 13px',
             textAlign: 'center',
             borderRadius: 14,
-            background: `linear-gradient(160deg, ${rgba(T.gold, 0.13)}, rgba(255,255,255,0.03) 55%)`,
-            border: `1px solid ${rgba(T.gold, 0.35)}`,
-            boxShadow: `inset 0 1px 0 ${rgba(T.gold, 0.25)}`,
+            background: `linear-gradient(160deg, ${rgba(accent, 0.13)}, rgba(255,255,255,0.03) 55%)`,
+            border: `1px solid ${rgba(accent, 0.35)}`,
+            boxShadow: `inset 0 1px 0 ${rgba(accent, 0.25)}`,
           }}
         >
           {/* soft glow behind the trophy */}
           <div style={{
             position: 'absolute', top: -22, left: '50%', transform: 'translateX(-50%)',
             width: 90, height: 90, pointerEvents: 'none',
-            background: `radial-gradient(circle, ${rgba(T.gold, 0.28)}, transparent 70%)`,
+            background: `radial-gradient(circle, ${rgba(accent, 0.28)}, transparent 70%)`,
           }} />
           <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
             <AwardIcon imageUrl={a.imageUrl} icon={a.icon} />
@@ -70,7 +70,7 @@ export function AwardShowcase({ awards }: { awards: PublicAward[] }) {
               fontFamily: FONT_M,
               fontSize: 9,
               letterSpacing: 1,
-              color: rgba(T.gold, 0.85),
+              color: rgba(accent, 0.85),
               marginTop: 5,
               textTransform: 'uppercase',
             }}>
