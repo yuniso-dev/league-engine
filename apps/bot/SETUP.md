@@ -72,7 +72,7 @@ The bot must run 24/7, which Vercel can't do. Railway (~$5/month hobby plan) dep
    | `DATABASE_URL` | the **same** Supabase pooler URL (port 6543) your Vercel project uses |
    | `SITE_URL` | `https://inazuma-fc.vercel.app` |
    | `NIXPACKS_NODE_VERSION` | `22` |
-   | `DB_POOL_MAX` | `3` *(optional, keeps commands snappy during big syncs)* |
+   | `DB_POOL_MAX` | `2` *(optional — the bot defaults to 2 already; the free-tier database is memory-tight and every permanent connection costs it)* |
 
 4. Deploy. In the logs you should see `logged in as …` and `serving guild: …`.
 

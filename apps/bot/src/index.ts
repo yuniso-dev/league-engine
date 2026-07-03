@@ -2,6 +2,13 @@
 // Long-running gateway client: member sync, rank nicknames after each weekly
 // reveal, /leaderboard + auto-updating rankings message, /profile.
 // Needs an always-on host (see SETUP.md) — cannot run on Vercel.
+
+// Before anything touches the DB: this process runs 24/7 against a
+// memory-tight free-tier database, and every permanent connection costs it.
+// The shared client default (4) suits bursty serverless, not us. Railway's
+// DB_POOL_MAX env var still overrides.
+process.env.DB_POOL_MAX ??= '2';
+
 import { Client, Events, GatewayIntentBits, type Guild } from 'discord.js';
 import { closeDb, getConfig } from '@inazuma/db';
 import { registerCommands, dispatch } from './commands.js';
