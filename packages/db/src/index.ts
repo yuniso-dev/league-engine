@@ -1,4 +1,4 @@
-export { getDb, closeDb } from './client';
+export { getDb, closeDb, resetDb, runResilient } from './client';
 export {
   listPlayersForNicknames,
   syncGuildMember,

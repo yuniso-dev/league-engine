@@ -21,6 +21,7 @@ export function getDb(): Db {
       idle_timeout: 20,      // close idle conns so a reused lambda never grabs a dead one
       max_lifetime: 60 * 30, // recycle a connection every 30 min
       connect_timeout: 10,   // fail fast if the DB is unreachable
+      keep_alive: 20,        // TCP keepalive while the process is actually running
       connection: {
         // Cancel any query that runs longer than 15s at the DATABASE, so a query
         // blocked on a lock fails fast instead of hanging until Vercel's function
@@ -44,5 +45,52 @@ export async function closeDb(): Promise<void> {
     await _client.end({ timeout: 5 });
     _client = undefined;
     _db = undefined;
+  }
+}
+
+/**
+ * Abandon a wedged pool so the next getDb() builds a fresh one.
+ *
+ * Why this exists: a thawed serverless instance can hold TCP sockets the
+ * pooler silently closed while the function was frozen. Queries written to
+ * those sockets get no reply and no error — EVERY query in that instance
+ * just hangs until its timeout, and since one warm instance serves all
+ * visitors, the whole site looks down. Dropping the pool is the only cure;
+ * reconnecting through the pooler costs ~100ms.
+ */
+export function resetDb(): void {
+  const dead = _client;
+  _client = undefined;
+  _db = undefined;
+  // Best-effort close in the background; dead sockets may never answer.
+  if (dead) void dead.end({ timeout: 1 }).catch(() => {});
+}
+
+/**
+ * Run a DB operation with a client-side time limit; on timeout or failure,
+ * reset the pool and retry ONCE on fresh connections. This is what lets a
+ * profile save (quote/accent/bio) survive a poisoned pool: attempt one hangs,
+ * the pool is rebuilt, attempt two lands in ~100ms.
+ */
+export async function runResilient<T>(fn: () => Promise<T>, timeoutMs = 8000): Promise<T> {
+  const attempt = (): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`Database did not respond within ${timeoutMs}ms`)),
+        timeoutMs,
+      );
+      fn().then(
+        v => { clearTimeout(timer); resolve(v); },
+        e => { clearTimeout(timer); reject(e); },
+      );
+    });
+
+  try {
+    return await attempt();
+  } catch (first) {
+    console.error('[db] operation failed, rebuilding pool and retrying once:',
+      first instanceof Error ? first.message : first);
+    resetDb();
+    return attempt();
   }
 }
