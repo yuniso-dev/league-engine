@@ -161,9 +161,12 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
           const rc = rankColor(p.rank);
           const showRank = p.rank != null;
           const isTop3 = showRank && p.rank! <= 3;
+          // Win rate off matches actually recorded, so it's live the moment
+          // results are entered — not only after a reveal bumps games_played.
+          const decided = (p.played ?? 0) > 0 ? p.played! : p.gamesPlayed;
           const winRate =
-            p.wins != null && p.gamesPlayed > 0
-              ? Math.round((p.wins / p.gamesPlayed) * 100)
+            p.wins != null && decided > 0
+              ? Math.round((p.wins / decided) * 100)
               : null;
           const rs = roleStat(p);
           return (

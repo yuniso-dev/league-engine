@@ -40,6 +40,7 @@ export async function getRankings(): Promise<PublicPlayer[]> {
       .select({
         userId: matchParticipants.userId,
         wins: sql<number>`(count(*) filter (where ${matchParticipants.result} = 'win'))::int`,
+        played: sql<number>`(count(*) filter (where ${matchParticipants.result} is not null))::int`,
         goals: sql<number>`coalesce(sum(${matchParticipants.goals}), 0)::int`,
         assists: sql<number>`coalesce(sum(${matchParticipants.assists}), 0)::int`,
         cleanSheets: sql<number>`(count(*) filter (where ${matchParticipants.cleanSheet}))::int`,
@@ -63,6 +64,7 @@ export async function getRankings(): Promise<PublicPlayer[]> {
       ...toPublicPlayer(r),
       awardBadges: badges.get(r.discordId) ?? [],
       wins: s?.wins ?? 0,
+      played: s?.played ?? 0,
       goals: s?.goals ?? 0,
       assists: s?.assists ?? 0,
       cleanSheets: s?.cleanSheets ?? 0,
