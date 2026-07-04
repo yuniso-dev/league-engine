@@ -222,9 +222,12 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
             </span>
             <span style={{
               fontFamily: FONT_M, fontSize: 8.5, letterSpacing: 3,
-              color: rgba(T.gold, 0.85), marginTop: 3,
+              color: process.env.NEXT_PUBLIC_TEST_MODE === 'true' ? '#FF9B3D' : rgba(T.gold, 0.85),
+              marginTop: 3,
             }}>
-              SEASON {season ?? 1}
+              {/* NEXT_PUBLIC_TEST_MODE=true marks a rehearsal deployment so
+                  nobody mistakes the dress run for the real launch. */}
+              {process.env.NEXT_PUBLIC_TEST_MODE === 'true' ? '⚠ TEST SEASON' : `SEASON ${season ?? 1}`}
             </span>
           </div>
           <div style={{ position: 'absolute', right: 0 }}>
