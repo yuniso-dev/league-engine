@@ -8,7 +8,7 @@ import { ProfilePage } from './ProfilePage';
 import { AccountMenu } from './AccountMenu';
 import { Bolt } from './ui/Bolt';
 import {
-  REALMS, T, FONT_D, FONT_B,
+  REALMS, T, FONT_D, FONT_B, FONT_M,
   clamp, rgba, lighten, realmAt, glass,
 } from '@/lib/realm-colors';
 
@@ -18,6 +18,7 @@ type Props = {
   voice: VoiceNowEntry[];
   season?: number;
   records?: StatLeaderboards;
+  recordsPreview?: boolean;
   dataOffline?: boolean;
   isLoggedIn: boolean;
   isAdmin: boolean;
@@ -33,7 +34,7 @@ type DragState = {
   vel: number;
 };
 
-export default function StormShell({ rankings, tournaments, voice, season, records, dataOffline, isLoggedIn, isAdmin, currentUser }: Props) {
+export default function StormShell({ rankings, tournaments, voice, season, records, recordsPreview, dataOffline, isLoggedIn, isAdmin, currentUser }: Props) {
   const [index,  setIndex]  = useState(1);  // 0=Frontier, 1=Rankings, 2=Profile
   const [viewed, setViewed] = useState<PublicPlayer | null>(currentUser);
 
@@ -213,11 +214,19 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
             </button>
           </div>
         )}
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 14 }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
           <Bolt size={18} color={T.gold} />
-          <span style={{ fontFamily: FONT_D, color: T.text, fontSize: 22, letterSpacing: 3 }}>
-            INAZUMA <span style={{ color: T.gold }}>FC</span>
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+            <span style={{ fontFamily: FONT_D, color: T.text, fontSize: 22, letterSpacing: 3 }}>
+              INAZUMA <span style={{ color: T.gold }}>FC</span>
+            </span>
+            <span style={{
+              fontFamily: FONT_M, fontSize: 8.5, letterSpacing: 3,
+              color: rgba(T.gold, 0.85), marginTop: 3,
+            }}>
+              SEASON {season ?? 1}
+            </span>
+          </div>
           <div style={{ position: 'absolute', right: 0 }}>
             <AccountMenu currentUser={currentUser} isLoggedIn={isLoggedIn} isAdmin={isAdmin} />
           </div>
@@ -281,7 +290,7 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
           }}
         >
           <div className="ina-scroll" style={{ width: '33.3333%', height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
-            <FrontierPage tournaments={tournaments} voice={voice} records={records} />
+            <FrontierPage tournaments={tournaments} voice={voice} records={records} recordsPreview={recordsPreview} />
           </div>
           <div className="ina-scroll" style={{ width: '33.3333%', height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
             <RankingsPage players={rankings} onOpen={openPlayer} season={season} />
@@ -297,8 +306,8 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
         </div>
       </div>
 
-      {/* nav dots */}
-      <div style={{ position: 'absolute', bottom: 18, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 8, zIndex: 10 }}>
+      {/* nav dots — lifted above the iOS home indicator */}
+      <div style={{ position: 'absolute', bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 8, zIndex: 10 }}>
         {REALMS.map((s, i) => (
           <button
             key={i}

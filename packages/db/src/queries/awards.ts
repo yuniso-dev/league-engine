@@ -194,18 +194,33 @@ export async function deleteAward(adminId: string, awardId: string): Promise<voi
   await logAdminAction(adminId, 'award.delete', { awardId });
 }
 
+export type GrantResult = {
+  userAwardId: string;
+  playerName: string;
+  awardName: string;
+  awardIcon: string | null;
+};
+
 export async function grantAward(
   adminId: string,
   data: { awardId: string; publicId: string; tournamentId: string | null; season: number | null },
-): Promise<string> {
-  const [player] = await getDb()
-    .select({ discordId: users.discordId })
+): Promise<GrantResult> {
+  const db = getDb();
+  const [player] = await db
+    .select({ discordId: users.discordId, displayName: users.displayName })
     .from(users)
     .where(and(eq(users.publicId, data.publicId), eq(users.isBlacklisted, false)))
     .limit(1);
   if (!player) throw new Error('Unknown player.');
 
-  const [row] = await getDb()
+  const [award] = await db
+    .select({ name: awards.name, icon: awards.icon })
+    .from(awards)
+    .where(eq(awards.id, data.awardId))
+    .limit(1);
+  if (!award) throw new Error('Unknown award.');
+
+  const [row] = await db
     .insert(userAwards)
     .values({
       userId: player.discordId,
@@ -216,7 +231,7 @@ export async function grantAward(
     .returning({ id: userAwards.id });
 
   await logAdminAction(adminId, 'award.grant', { awardId: data.awardId, userAwardId: row.id });
-  return row.id;
+  return { userAwardId: row.id, playerName: player.displayName, awardName: award.name, awardIcon: award.icon };
 }
 
 export async function revokeAward(adminId: string, userAwardId: string): Promise<void> {

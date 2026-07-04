@@ -46,6 +46,27 @@ function settle<T>(
 
 const NO_RECORDS: StatLeaderboards = { topScorers: [], topAssisters: [], topCleanSheets: [] };
 
+// Before any match stats exist the all-time record tables are empty, so the
+// layout can't be seen. Fill them with real players + sample numbers so the
+// design is visible; the UI tags it "EXAMPLE" and it flips to real data the
+// moment goals/assists/clean-sheets are recorded.
+function buildSampleRecords(players: PublicPlayer[]): StatLeaderboards {
+  const top = players.slice(0, 3);
+  const rot = (n: number) => top.map((_, i) => top[(i + n) % top.length]);
+  const lead = (order: PublicPlayer[], values: number[]) =>
+    order.slice(0, values.length).map((p, i) => ({
+      publicId: p.publicId,
+      displayName: p.displayName,
+      avatarUrl: p.avatarUrl,
+      value: values[i],
+    }));
+  return {
+    topScorers: lead(top, [12, 9, 6]),
+    topAssisters: lead(rot(1), [11, 8, 5]),
+    topCleanSheets: lead(rot(2), [5, 4, 2]),
+  };
+}
+
 export default async function HomePage() {
   // Budgets sit just under the DB's 15s statement_timeout: a cold serverless
   // start pays connection setup + several query waves, and giving up at 8s
@@ -64,7 +85,13 @@ export default async function HomePage() {
   const voice: VoiceNowEntry[] = v.ok ? v.value : [];
   const session = s.ok ? s.value : null;
   const season = se.ok ? se.value : 1;
-  const records: StatLeaderboards = re.ok ? re.value : NO_RECORDS;
+  const realRecords: StatLeaderboards = re.ok ? re.value : NO_RECORDS;
+  const recordsEmpty =
+    realRecords.topScorers.length === 0 &&
+    realRecords.topAssisters.length === 0 &&
+    realRecords.topCleanSheets.length === 0;
+  const recordsPreview = recordsEmpty && rankings.length > 0;
+  const records: StatLeaderboards = recordsPreview ? buildSampleRecords(rankings) : realRecords;
   // True only when core data failed/timed out — lets the UI say "reconnecting"
   // rather than misleadingly showing an empty league.
   const dataOffline = !r.ok || !t.ok;
@@ -95,6 +122,7 @@ export default async function HomePage() {
       voice={voice}
       season={season}
       records={records}
+      recordsPreview={recordsPreview}
       dataOffline={dataOffline}
       isLoggedIn={isLoggedIn}
       isAdmin={isAdmin}

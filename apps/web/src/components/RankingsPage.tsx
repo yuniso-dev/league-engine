@@ -51,12 +51,16 @@ function RankBadge({ rank }: { rank: number | null }) {
   );
 }
 
-function Num({ v, l, c, className }: { v: number | string; l: string; c?: string; className?: string }) {
+// Compact stat pill — a label + value that wraps gracefully on any width.
+function Chip({ label, value, c }: { label: string; value: number | string; c?: string }) {
   return (
-    <div className={className} style={{ textAlign: 'center', minWidth: 36 }}>
-      <div style={{ color: c ?? T.text, fontFamily: FONT_D, fontSize: 17 }}>{v}</div>
-      <div style={{ color: T.faint, fontFamily: FONT_M, fontSize: 8 }}>{l}</div>
-    </div>
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      background: 'rgba(255,255,255,0.05)', borderRadius: 7, padding: '2px 8px',
+    }}>
+      <span style={{ fontFamily: FONT_M, fontSize: 8, color: T.faint, letterSpacing: 0.4 }}>{label}</span>
+      <span style={{ fontFamily: FONT_D, fontSize: 12, color: c ?? T.text, letterSpacing: 0.3 }}>{value}</span>
+    </span>
   );
 }
 
@@ -75,6 +79,7 @@ function initials(name: string): string {
 
 export const RankingsPage = memo(function RankingsPage({ players, onOpen, season }: Props) {
   const accent = REALMS[1].accent;
+  const accent2 = REALMS[1].accent2;
   const [q, setQ] = useState('');
 
   // Client-side filter — /api/rankings?q= exists for external use but is not called here
@@ -96,7 +101,7 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
           </h1>
         </div>
         <p style={{ color: T.dim, fontFamily: FONT_B, fontSize: 13, margin: '8px 0 0 32px' }}>
-          The Frontier ladder. Tap a player to open their profile.
+          The Season {season ?? 1} ladder. Tap a player to open their profile.
         </p>
       </div>
 
@@ -155,6 +160,7 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
         {list.map((p, i) => {
           const rc = rankColor(p.rank);
           const showRank = p.rank != null;
+          const isTop3 = showRank && p.rank! <= 3;
           const winRate =
             p.wins != null && p.gamesPlayed > 0
               ? Math.round((p.wins / p.gamesPlayed) * 100)
@@ -163,14 +169,23 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
           return (
             <div
               key={p.publicId ?? p.displayName + i}
-              className="rise"
+              className="rise tap"
               onClick={() => onOpen(p)}
               style={{
-                animationDelay: `${i * 55}ms`,
+                animationDelay: `${Math.min(i, 12) * 45}ms`,
                 ...glass({
-                  padding: '12px 14px',
-                  display: 'flex', alignItems: 'center', gap: 13,
+                  padding: '11px 14px',
+                  display: 'flex', alignItems: 'center', gap: 12,
                   cursor: 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  borderLeft: `3px solid ${isTop3 ? rc : rgba(accent, 0.4)}`,
+                  ...(isTop3
+                    ? {
+                        background: `linear-gradient(100deg, ${rgba(rc, 0.14)}, rgba(255,255,255,0.05) 58%)`,
+                        boxShadow: `0 10px 44px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.07), 0 0 22px ${rgba(rc, 0.14)}`,
+                      }
+                    : {}),
                 }),
               }}
             >
@@ -179,13 +194,14 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
               <Avatar
                 initials={initials(p.displayName)}
                 src={p.avatarUrl}
-                size={42}
-                ring={showRank && p.rank! <= 3 ? rc : null}
+                size={44}
+                ring={isTop3 ? rc : null}
               />
 
               <div style={{ flex: 1, minWidth: 0 }}>
+                {/* line 1 — identity */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-                  <span style={{ color: T.text, fontFamily: FONT_B, fontWeight: 700, fontSize: 15 }}>
+                  <span style={{ color: T.text, fontFamily: FONT_B, fontWeight: 700, fontSize: 15.5 }}>
                     {p.displayName}
                   </span>
                   <FlagIcon code={p.country} size={17} />
@@ -198,42 +214,40 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
                       {p.title}
                     </span>
                   )}
-                </div>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  color: T.dim, fontFamily: FONT_M, fontSize: 10, marginTop: 2,
-                }}>
-                  {!p.hidePositions && p.position1 && (
-                    <span>{[p.position1, p.position2].filter(Boolean).join(' · ')}</span>
-                  )}
                   {(p.awardBadges?.length ?? 0) > 0 && (
                     <span style={{ display: 'inline-flex', gap: 3, fontSize: 13, lineHeight: 1 }}>
                       {p.awardBadges!.slice(0, 4).map((a, j) =>
                         a.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img key={j} src={a.imageUrl} alt={a.name} title={a.name} width={14} height={14} style={{ borderRadius: 3, objectFit: 'cover' }} />
-                        ) : a.icon ? (
-                          <span key={j} title={a.name}>{a.icon}</span>
                         ) : (
-                          <span key={j} title={a.name}>🏅</span>
+                          <span key={j} title={a.name}>{a.icon ?? '🏅'}</span>
                         ),
-                      )}
-                      {p.awardBadges!.length > 4 && (
-                        <span style={{ color: T.faint, fontSize: 9, fontFamily: FONT_M }}>
-                          +{p.awardBadges!.length - 4}
-                        </span>
                       )}
                     </span>
                   )}
                 </div>
+                {/* line 2 — position + stat chips (wraps cleanly on any width) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                  {!p.hidePositions && p.position1 && (
+                    <span style={{ fontFamily: FONT_M, fontSize: 10, color: accent2, letterSpacing: 0.5 }}>
+                      {[p.position1, p.position2].filter(Boolean).join('·')}
+                    </span>
+                  )}
+                  <Chip label={rs.l} value={rs.v} c={T.text} />
+                  <Chip label="GW" value={p.wins ?? 0} c={(p.wins ?? 0) > 0 ? T.win : T.dim} />
+                  <Chip label="WR" value={winRate != null ? `${winRate}%` : '—'} c={winRate != null && winRate >= 50 ? T.win : T.dim} />
+                </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 13, alignItems: 'center' }}>
-                <Num v={rs.v} l={rs.l} c={T.dim} />
-                <Num v={p.wins ?? 0} l="GW" c={(p.wins ?? 0) > 0 ? T.win : T.dim} />
-                <Num v={winRate != null ? `${winRate}%` : '—'} l="WR %" c={winRate != null && winRate >= 50 ? T.win : T.dim} />
-                <Num v={Math.round(p.elo)} l="ELO" />
-                <Num v={p.gamesPlayed} l="GP" className="hide-sm" />
+              {/* ELO — the headline number */}
+              <div style={{ textAlign: 'center', flexShrink: 0, minWidth: 46 }}>
+                <div style={{ fontFamily: FONT_D, fontSize: 22, color: accent2, lineHeight: 1 }}>
+                  {Math.round(p.elo)}
+                </div>
+                <div style={{ color: T.faint, fontFamily: FONT_M, fontSize: 8, letterSpacing: 1, marginTop: 2 }}>
+                  ELO
+                </div>
               </div>
             </div>
           );
