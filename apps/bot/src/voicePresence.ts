@@ -1,54 +1,60 @@
-import type { Guild, VoiceState } from 'discord.js';
-import { clearVoicePresence, replaceVoicePresence, setVoicePresence, syncGuildMember } from '@inazuma/db';
+import type { VoiceBasedChannel } from 'discord.js';
+import {
+  addDiscordIdsToDraftPool,
+  ensurePublicId,
+  replaceVoicePresence,
+  syncGuildMember,
+} from '@inazuma/db';
 
-// Mirrors who's in voice channels into the voice_presence table so the
-// website can show a live "in voice now" card. All writes are skipped in
-// read-only test mode (gated by the caller).
+// On-demand voice snapshot. Nothing tracks voice continuously anymore — this
+// runs ONLY when an admin invokes /checkvc. It grabs everyone currently in a
+// specific voice channel (regardless of whether they ever signed into the
+// website), stages them in the draft pool, and refreshes the live-voice mirror
+// so the site's "in voice" indicators reflect the moment of the check.
 
-/** Startup: replace the table with the guild's current voice occupancy. */
-export async function scanVoicePresence(guild: Guild): Promise<number> {
-  const entries: { discordId: string; channelName: string }[] = [];
-  for (const [, state] of guild.voiceStates.cache) {
-    if (!state.channelId || !state.member || state.member.user.bot) continue;
-    entries.push({
-      discordId: state.member.id,
-      channelName: state.channel?.name ?? 'Voice',
-    });
-  }
-  // Rows FK to users — make sure everyone in VC exists first (member sync
-  // usually has, but a scan can race a brand-new joiner).
-  for (const e of entries) {
-    const member = guild.members.cache.get(e.discordId);
-    if (member) {
-      await syncGuildMember({
-        discordId: member.id,
-        username: member.user.username,
-        displayName: member.user.globalName ?? member.user.username,
-        avatarUrl: member.user.displayAvatarURL({ size: 128 }),
-      });
-    }
-  }
-  await replaceVoicePresence(entries);
-  console.log(`[voice] presence scan: ${entries.length} in voice`);
-  return entries.length;
-}
+export type VoiceCheckResult = {
+  channelName: string;
+  total: number;        // non-bot members found in the channel
+  added: number;        // newly added to the draft pool this check
+  alreadyPooled: number;
+};
 
-/** Live updates: joins, leaves and channel moves. */
-export async function onVoiceStateUpdate(oldState: VoiceState, newState: VoiceState): Promise<void> {
-  const member = newState.member ?? oldState.member;
-  if (!member || member.user.bot) return;
+/** Snapshot a voice channel into the draft pool + voice mirror. */
+export async function snapshotVoiceChannel(channel: VoiceBasedChannel): Promise<VoiceCheckResult> {
+  const members = [...channel.members.values()].filter(m => !m.user.bot);
 
-  if (newState.channelId) {
-    // FK safety: the row needs a users entry (also reactivates re-joiners).
+  const discordIds: string[] = [];
+  const presence: { discordId: string; channelName: string }[] = [];
+
+  for (const m of members) {
+    // Make sure a users row exists (creates one for people who never used the
+    // site) and skip anyone blacklisted.
     const blocked = await syncGuildMember({
-      discordId: member.id,
-      username: member.user.username,
-      displayName: member.user.globalName ?? member.user.username,
-      avatarUrl: member.user.displayAvatarURL({ size: 128 }),
+      discordId: m.id,
+      username: m.user.username,
+      displayName: m.user.globalName ?? m.user.username,
+      avatarUrl: m.user.displayAvatarURL({ size: 128 }),
     });
-    if (blocked) return;
-    await setVoicePresence(member.id, newState.channel?.name ?? 'Voice');
-  } else {
-    await clearVoicePresence(member.id);
+    if (blocked) continue;
+
+    // Give them a public_id so they're draftable, without marking them
+    // initialised (they stay off the public ladder until they sign up properly).
+    await ensurePublicId(m.id);
+
+    discordIds.push(m.id);
+    presence.push({ discordId: m.id, channelName: channel.name });
   }
+
+  // Mirror this snapshot so the site's live-voice card/dots reflect the check.
+  await replaceVoicePresence(presence);
+  const added = await addDiscordIdsToDraftPool(
+    discordIds.map(id => ({ discordId: id, source: 'vc' })),
+  );
+
+  return {
+    channelName: channel.name,
+    total: discordIds.length,
+    added,
+    alreadyPooled: discordIds.length - added,
+  };
 }

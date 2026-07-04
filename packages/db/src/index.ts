@@ -28,10 +28,19 @@ export {
   getUserByDiscordId,
   getUserByPublicId,
   initialiseUser,
+  ensurePublicId,
   updateSettings,
   updateOwnProfileFields,
 } from './queries/users';
 export type { UserRow } from './queries/users';
+export {
+  getDraftPool,
+  addDiscordIdsToDraftPool,
+  addToDraftPoolByPublicId,
+  removeFromDraftPool,
+  clearDraftPool,
+} from './queries/draftPool';
+export type { DraftPoolEntry } from './queries/draftPool';
 export {
   MATCH_STAGES,
   getCurrentSeason,

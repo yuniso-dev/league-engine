@@ -92,6 +92,17 @@ body {
   .hide-sm { display: none; }
 }
 
+/* Rankings stat strip (G/A · GW · WR · ELO): one size, matching the ELO
+   number. Shrinks only on small phones so the row still fits. */
+.rank-strip { gap: 16px; }
+.rank-stat { min-width: 46px; }
+.rank-stat-v { font-size: 22px; }
+@media (max-width: 560px) {
+  .rank-strip { gap: 8px; }
+  .rank-stat { min-width: 32px; }
+  .rank-stat-v { font-size: 15px; }
+}
+
 /* Frontier detail: stacked on phones; table+groups left, knockout+leaders right on PC. */
 .fr-grid { display: flex; flex-direction: column; gap: 0; }
 .fr-col { min-width: 0; }

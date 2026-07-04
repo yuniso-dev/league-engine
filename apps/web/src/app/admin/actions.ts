@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache';
 import {
   MATCH_STAGES,
   addTeamMember,
+  addToDraftPoolByPublicId,
+  clearDraftPool,
   commitReveal,
   createAward,
   createMatch,
@@ -23,6 +25,7 @@ import {
   grantAward,
   recomputeRanks,
   recordMatchResult,
+  removeFromDraftPool,
   updateMatchStats,
   removeTeamMember,
   revokeAward,
@@ -563,6 +566,60 @@ export async function setCaptainAction(
     await setTeamCaptain(admin.discordId, { teamId, publicId });
     revalidatePath(`/admin/tournaments/${tournamentId}/draft`);
     revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return { ok: true };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+// ── Draft pool (fed on-demand by the bot's /checkvc, edited here) ────────────────
+
+export async function addToDraftPoolAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    await requireAdminAction();
+    const publicId = str(formData, 'publicId');
+    const tournamentId = str(formData, 'tournamentId');
+    if (!publicId) return { error: 'Missing player.' };
+
+    await addToDraftPoolByPublicId(publicId);
+    revalidatePath(`/admin/tournaments/${tournamentId}/draft`);
+    return { ok: true };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function removeFromDraftPoolAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    await requireAdminAction();
+    const publicId = str(formData, 'publicId');
+    const tournamentId = str(formData, 'tournamentId');
+    if (!publicId) return { error: 'Missing player.' };
+
+    await removeFromDraftPool(publicId);
+    revalidatePath(`/admin/tournaments/${tournamentId}/draft`);
+    return { ok: true };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function clearDraftPoolAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    await requireAdminAction();
+    const tournamentId = str(formData, 'tournamentId');
+
+    await clearDraftPool();
+    revalidatePath(`/admin/tournaments/${tournamentId}/draft`);
     return { ok: true };
   } catch (e) {
     return { error: message(e) };

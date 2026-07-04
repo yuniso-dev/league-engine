@@ -35,6 +35,8 @@ export type PublicPlayer = {
   /** Ladder extras — only populated by getRankings. */
   awardBadges?: { name: string; icon: string | null; imageUrl: string | null }[];
   wins?: number;
+  /** Matches actually recorded (decided), for a live win rate before any reveal. */
+  played?: number;
   goals?: number;
   assists?: number;
   cleanSheets?: number;

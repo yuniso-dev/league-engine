@@ -20,7 +20,7 @@ back and the site returns to the launch state.
 2. Open the **SQL Editor**, paste the entire contents of
    [`packages/db/schema-full.sql`](packages/db/schema-full.sql), and **Run**.
    That one file creates every table, index and enum the app uses (it's the
-   original schema with all four migrations folded in).
+   original schema with all migrations folded in, including the draft pool).
 3. Project Settings → Database → **Connection string → Transaction pooler**
    (port **6543**). Copy it — this is your test `DATABASE_URL`.
 
@@ -66,8 +66,10 @@ Check that `/admin` now opens. Promote extra helpers the same way with `'admin'`
 - Admin → Settings → set **Guild ID** to the test server's ID → save.
 - In Discord, run the bot's **/postleaderboard** in your rankings channel so the
   auto-updating rankings message exists.
-- Quick checks: `/leaderboard`, `/profile`, and join a VC — the **LIVE IN VOICE**
-  card on the site's Frontier tab should show you within ~a minute.
+- Quick checks: `/leaderboard`, `/profile`, then join a VC and run **`/checkvc`** —
+  the **LIVE IN VOICE** card on the site's Frontier tab should show whoever was in
+  the call. (Voice is snapshotted on demand now, not tracked continuously — the
+  card reflects the last `/checkvc`.)
 
 ---
 
@@ -93,13 +95,18 @@ Run these in order — together they touch every feature:
 
 1. **Create the Frontier** — Admin → + NEW ("Test Frontier I", season 1, ranked).
    ➜ *Verifies: signups-open announcement, ROSTER CALL card, signup counter on the Frontier card.*
-2. **Players join VC.** ➜ *Green pulse dots on ROSTER CALL + LIVE IN VOICE card.*
+2. **Players join VC**, then an admin runs **`/checkvc`** in Discord (optionally
+   passing the `channel` to target a specific voice channel). It snapshots
+   everyone in the call — signed up or not — into the draft pool.
+   ➜ *Verifies /checkvc grabs all IDs, backfills ghost accounts, LIVE IN VOICE card.*
 3. **Create the teams** (empty) on the tournament page — 4 teams for a
    round-robin + straight final, 6 teams for round-robin + semis.
-4. **Draft** — open the **DRAFT BOARD**: filter defaults to *⚡ Signed up*,
-   in-VC players float up with green dots; click players onto the active team;
-   ☆ to set captains; **↻ VC** to re-check presence as stragglers arrive.
-   ➜ *Verifies signups + live voice + attendance counters.*
+4. **Draft** — open the **DRAFT BOARD**: the pool holds everyone `/checkvc`
+   caught (green dot = was in the call). Click players onto the active team;
+   ☆ to set captains; ✕ to disregard alts/extras; **＋ Add player** to stage
+   anyone the snapshot missed; **↻ Refresh** after re-running `/checkvc` as
+   stragglers arrive.
+   ➜ *Verifies the on-demand pool, manual add, disregard, and drafting ghosts.*
 5. **📋 GROUP FIXTURES** — generates the round robin. Set status **live**.
    ➜ *Kickoff announcement.*
 6. **Play + enter results** per fixture (tick who played on each side).

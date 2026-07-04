@@ -51,16 +51,18 @@ function RankBadge({ rank }: { rank: number | null }) {
   );
 }
 
-// Compact stat pill — a label + value that wraps gracefully on any width.
-function Chip({ label, value, c }: { label: string; value: number | string; c?: string }) {
+// A stat block: big value over a tiny label, sized to match the ELO number.
+// The value font shrinks only on small phones (see .rank-stat-v in globals.css).
+function StatBlock({ label, value, color }: { label: string; value: number | string; color?: string }) {
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      background: 'rgba(255,255,255,0.05)', borderRadius: 7, padding: '2px 8px',
-    }}>
-      <span style={{ fontFamily: FONT_M, fontSize: 8, color: T.faint, letterSpacing: 0.4 }}>{label}</span>
-      <span style={{ fontFamily: FONT_D, fontSize: 12, color: c ?? T.text, letterSpacing: 0.3 }}>{value}</span>
-    </span>
+    <div className="rank-stat" style={{ textAlign: 'center', flexShrink: 0 }}>
+      <div className="rank-stat-v" style={{ fontFamily: FONT_D, color: color ?? T.text, lineHeight: 1 }}>
+        {value}
+      </div>
+      <div style={{ fontFamily: FONT_M, fontSize: 8, color: T.faint, letterSpacing: 1, marginTop: 3 }}>
+        {label}
+      </div>
+    </div>
   );
 }
 
@@ -161,9 +163,12 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
           const rc = rankColor(p.rank);
           const showRank = p.rank != null;
           const isTop3 = showRank && p.rank! <= 3;
+          // Win rate off matches actually recorded, so it's live the moment
+          // results are entered — not only after a reveal bumps games_played.
+          const decided = (p.played ?? 0) > 0 ? p.played! : p.gamesPlayed;
           const winRate =
-            p.wins != null && p.gamesPlayed > 0
-              ? Math.round((p.wins / p.gamesPlayed) * 100)
+            p.wins != null && decided > 0
+              ? Math.round((p.wins / decided) * 100)
               : null;
           const rs = roleStat(p);
           return (
@@ -227,27 +232,22 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
                     </span>
                   )}
                 </div>
-                {/* line 2 — position + stat chips (wraps cleanly on any width) */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                  {!p.hidePositions && p.position1 && (
+                {/* line 2 — position only; the stats sit in the strip on the right */}
+                {!p.hidePositions && p.position1 && (
+                  <div style={{ marginTop: 5 }}>
                     <span style={{ fontFamily: FONT_M, fontSize: 10, color: accent2, letterSpacing: 0.5 }}>
                       {[p.position1, p.position2].filter(Boolean).join('·')}
                     </span>
-                  )}
-                  <Chip label={rs.l} value={rs.v} c={T.text} />
-                  <Chip label="GW" value={p.wins ?? 0} c={(p.wins ?? 0) > 0 ? T.win : T.dim} />
-                  <Chip label="WR" value={winRate != null ? `${winRate}%` : '—'} c={winRate != null && winRate >= 50 ? T.win : T.dim} />
-                </div>
+                  </div>
+                )}
               </div>
 
-              {/* ELO — the headline number */}
-              <div style={{ textAlign: 'center', flexShrink: 0, minWidth: 46 }}>
-                <div style={{ fontFamily: FONT_D, fontSize: 22, color: accent2, lineHeight: 1 }}>
-                  {Math.round(p.elo)}
-                </div>
-                <div style={{ color: T.faint, fontFamily: FONT_M, fontSize: 8, letterSpacing: 1, marginTop: 2 }}>
-                  ELO
-                </div>
+              {/* stat strip — role stat, games won, win rate and ELO, all one size */}
+              <div className="rank-strip" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                <StatBlock label={rs.l} value={rs.v} />
+                <StatBlock label="GW" value={p.wins ?? 0} color={(p.wins ?? 0) > 0 ? T.win : T.dim} />
+                <StatBlock label="WR" value={winRate != null ? `${winRate}%` : '—'} color={winRate != null && winRate >= 50 ? T.win : T.dim} />
+                <StatBlock label="ELO" value={Math.round(p.elo)} color={accent2} />
               </div>
             </div>
           );
