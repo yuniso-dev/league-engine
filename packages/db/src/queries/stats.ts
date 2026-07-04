@@ -198,7 +198,7 @@ function top(
 }
 
 /** Per-tournament leaders (goals, assists, clean sheets). */
-export async function getTournamentStats(tournamentId: string, limit = 5): Promise<StatLeaderboards> {
+export async function getTournamentStats(tournamentId: string, limit = 10): Promise<StatLeaderboards> {
   const totals = await aggregateStats(tournamentId);
   return {
     topScorers: top(totals, 'goals', limit),
@@ -208,7 +208,7 @@ export async function getTournamentStats(tournamentId: string, limit = 5): Promi
 }
 
 /** All-time Frontier records across every tournament. */
-export async function getAllTimeStats(limit = 3): Promise<StatLeaderboards> {
+export async function getAllTimeStats(limit = 10): Promise<StatLeaderboards> {
   const totals = await aggregateStats(null);
   return {
     topScorers: top(totals, 'goals', limit),

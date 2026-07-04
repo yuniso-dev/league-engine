@@ -51,19 +51,20 @@ const NO_RECORDS: StatLeaderboards = { topScorers: [], topAssisters: [], topClea
 // design is visible; the UI tags it "EXAMPLE" and it flips to real data the
 // moment goals/assists/clean-sheets are recorded.
 function buildSampleRecords(players: PublicPlayer[]): StatLeaderboards {
-  const top = players.slice(0, 3);
-  const rot = (n: number) => top.map((_, i) => top[(i + n) % top.length]);
-  const lead = (order: PublicPlayer[], values: number[]) =>
-    order.slice(0, values.length).map((p, i) => ({
+  const pool = players.slice(0, 10);
+  // Rotate the order per column so a different name tops each, and give
+  // descending sample values so it reads like a real leaderboard.
+  const column = (rot: number, top: number) =>
+    pool.map((_, i) => pool[(i + rot) % pool.length]).map((p, i) => ({
       publicId: p.publicId,
       displayName: p.displayName,
       avatarUrl: p.avatarUrl,
-      value: values[i],
+      value: Math.max(1, top - i),
     }));
   return {
-    topScorers: lead(top, [12, 9, 6]),
-    topAssisters: lead(rot(1), [11, 8, 5]),
-    topCleanSheets: lead(rot(2), [5, 4, 2]),
+    topScorers: column(0, 14),
+    topAssisters: column(3, 11),
+    topCleanSheets: column(6, 8),
   };
 }
 

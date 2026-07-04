@@ -1,10 +1,10 @@
 'use client';
 import { memo } from 'react';
 import Link from 'next/link';
-import type { PublicTournament, StatLeader, StatLeaderboards, VoiceNowEntry } from '@inazuma/db';
+import type { PublicTournament, StatLeaderboards, VoiceNowEntry } from '@inazuma/db';
 import { Bolt } from '@/components/ui/Bolt';
-import { Avatar } from '@/components/ui/Avatar';
 import { VoiceNowCard } from '@/components/VoiceNowCard';
+import { StatLeaderList } from '@/components/StatLeaderList';
 import { REALMS, T, FONT_D, FONT_B, FONT_M, rgba, glass } from '@/lib/realm-colors';
 
 type Props = {
@@ -13,44 +13,6 @@ type Props = {
   records?: StatLeaderboards;
   recordsPreview?: boolean;
 };
-
-function RecordColumn({ title, emoji, leaders, unit }: {
-  title: string; emoji: string; leaders: StatLeader[]; unit: string;
-}) {
-  return (
-    <div style={{ flex: '1 1 150px', minWidth: 0 }}>
-      <div style={{ fontFamily: FONT_M, fontSize: 10, letterSpacing: 1.5, color: T.faint, marginBottom: 8 }}>
-        {emoji} {title}
-      </div>
-      {leaders.length === 0 && (
-        <div style={{ fontFamily: FONT_M, fontSize: 10.5, color: T.faint, opacity: 0.7, lineHeight: 1.7, letterSpacing: 0.4 }}>
-          Unclaimed — the record books
-          <br />are waiting to be written.
-        </div>
-      )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {leaders.map((l, i) => (
-          <div key={l.publicId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontFamily: FONT_D, fontSize: 12, color: i === 0 ? T.gold : T.faint, width: 12 }}>
-              {i + 1}
-            </span>
-            <Avatar initials={l.displayName.slice(0, 2).toUpperCase()} src={l.avatarUrl} size={22} />
-            <span style={{
-              fontFamily: FONT_B, fontSize: 13, color: T.text, flex: 1,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {l.displayName}
-            </span>
-            <span style={{ fontFamily: FONT_D, fontSize: 14, color: i === 0 ? T.gold : T.dim }}>
-              {l.value}
-              <span style={{ fontFamily: FONT_M, fontSize: 8, color: T.faint, marginLeft: 2 }}>{unit}</span>
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export const FrontierPage = memo(function FrontierPage({ tournaments, voice, records, recordsPreview }: Props) {
   const accent = REALMS[0].accent;
@@ -107,10 +69,14 @@ export const FrontierPage = memo(function FrontierPage({ tournaments, voice, rec
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-          <RecordColumn title="TOP SCORERS" emoji="⚽" leaders={recs.topScorers} unit="G" />
-          <RecordColumn title="TOP ASSISTS" emoji="🎯" leaders={recs.topAssisters} unit="A" />
-          <RecordColumn title="CLEAN SHEETS" emoji="🧤" leaders={recs.topCleanSheets} unit="CS" />
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+          gap: 18,
+        }}>
+          <StatLeaderList title="TOP SCORERS" emoji="⚽" leaders={recs.topScorers} unit="G" />
+          <StatLeaderList title="TOP ASSISTS" emoji="🎯" leaders={recs.topAssisters} unit="A" />
+          <StatLeaderList title="CLEAN SHEETS" emoji="🧤" leaders={recs.topCleanSheets} unit="CS" />
         </div>
         {recordsPreview && (
           <p style={{ fontFamily: FONT_M, fontSize: 10, color: T.faint, margin: '13px 0 0', letterSpacing: 0.3, lineHeight: 1.6 }}>
