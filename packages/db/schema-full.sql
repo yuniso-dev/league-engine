@@ -261,6 +261,16 @@ create table blacklisted_users (
 
 
 -- ----------------------------------------------------------------------------
+--  DRAFT_POOL  — on-demand draft staging (bot /checkvc snapshot + manual adds)
+-- ----------------------------------------------------------------------------
+create table draft_pool (
+    discord_id      text primary key references users(discord_id) on delete cascade,
+    source          text not null default 'vc',
+    added_at        timestamptz not null default now()
+);
+
+
+-- ----------------------------------------------------------------------------
 --  INDEXES
 -- ----------------------------------------------------------------------------
 create index idx_users_elo            on users (elo desc);

@@ -1,10 +1,11 @@
 # INAZUMA FC Discord bot — setup guide
 
-This bot lives in your Discord server and does four things:
+This bot lives in your Discord server and does five things:
 
 - keeps everyone's **nickname** stamped with their rank after each weekly reveal (`#3 Name | ST/GK`)
 - keeps one **rankings message** permanently up to date in a channel you choose
 - answers **`/leaderboard`** and **`/profile`** for anyone
+- snapshots a voice channel into the website's **draft pool** on demand with **`/checkvc`** (admins only) — it grabs everyone in the call, signed up or not
 - automatically registers every server member as a player, and hides people from the rankings if they leave the server
 
 Setup takes about 15 minutes. You'll do three things: create the bot on Discord, tell the site which server is yours, and put the bot on a host so it runs 24/7.
@@ -82,7 +83,8 @@ The bot must run 24/7, which Vercel can't do. Railway (~$5/month hobby plan) dep
 2. Type **`/leaderboard`** in any channel — it should reply with the rankings.
 3. Go to your rankings channel and run **`/postleaderboard`** (admins only). The message it posts will now update itself after every reveal.
 4. Try **`/profile`** — yours, or pick another player.
-5. After your next **weekly reveal** on the site, nicknames and the rankings message update within ~5 minutes. To force it immediately, run **`/syncnicks`**.
+5. Join a voice channel and run **`/checkvc`** (admins only). It snapshots everyone in the call into the site's **draft pool** — open a tournament's **Draft Board** to see them and build teams. Pass a `channel` to check a specific voice channel instead of the one you're in.
+6. After your next **weekly reveal** on the site, nicknames and the rankings message update within ~5 minutes. To force it immediately, run **`/syncnicks`**.
 
 ## Switching from another rank/nickname bot
 

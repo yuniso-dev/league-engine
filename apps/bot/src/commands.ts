@@ -1,4 +1,5 @@
 import {
+  ChannelType,
   ChatInputCommandInteraction,
   Client,
   EmbedBuilder,
@@ -10,6 +11,7 @@ import {
 import { getUserByDiscordId, listAwardsForPlayer } from '@inazuma/db';
 import { handleLeaderboard, handlePostLeaderboard } from './leaderboard.js';
 import { resetAllNicknames, syncNicknames } from './nicknameSync.js';
+import { snapshotVoiceChannel } from './voicePresence.js';
 
 const definitions = [
   new SlashCommandBuilder()
@@ -26,6 +28,14 @@ const definitions = [
   new SlashCommandBuilder()
     .setName('postleaderboard')
     .setDescription('Admin: post the auto-updating rankings message in this channel')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+  new SlashCommandBuilder()
+    .setName('checkvc')
+    .setDescription('Admin: snapshot a voice channel into the website draft pool')
+    .addChannelOption(o =>
+      o.setName('channel')
+        .setDescription('Voice channel to check (defaults to the one you are in)')
+        .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder()
     .setName('resetnicknames')
@@ -86,6 +96,52 @@ async function handleProfile(
   await interaction.editReply({ embeds: [embed] });
 }
 
+async function handleCheckVc(
+  interaction: ChatInputCommandInteraction,
+  ctx: { siteUrl: string; readOnly: boolean },
+): Promise<void> {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  if (ctx.readOnly) {
+    await interaction.editReply('The bot is in read-only test mode — voice checks are disabled. Unset BOT_READ_ONLY to enable them.');
+    return;
+  }
+
+  const guild = interaction.guild ?? await interaction.client.guilds.fetch(interaction.guildId!);
+
+  // Target: the channel option if given, otherwise the caller's current voice channel.
+  let channelId = interaction.options.getChannel('channel')?.id ?? null;
+  if (!channelId) {
+    const me = await guild.members.fetch(interaction.user.id).catch(() => null);
+    channelId = me?.voice.channelId ?? null;
+  }
+  if (!channelId) {
+    await interaction.editReply('Join a voice channel first, or pass one with the **channel** option.');
+    return;
+  }
+
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  if (!channel || !channel.isVoiceBased()) {
+    await interaction.editReply('That channel is not a voice channel — pick a voice channel and try again.');
+    return;
+  }
+
+  const result = await snapshotVoiceChannel(channel);
+  if (result.total === 0) {
+    await interaction.editReply(`🔇 **${result.channelName}** is empty — nobody to add to the draft pool.`);
+    return;
+  }
+
+  const lines = [
+    `📋 Checked **${result.channelName}** — **${result.total}** in voice.`,
+    result.added > 0
+      ? `Added **${result.added}** to the draft pool${result.alreadyPooled > 0 ? ` (${result.alreadyPooled} already staged).` : '.'}`
+      : `Everyone was already in the pool (${result.alreadyPooled}).`,
+    `Open the tournament's **Draft Board** on the site to build teams.`,
+  ];
+  await interaction.editReply(lines.join('\n'));
+}
+
 export async function dispatch(
   interaction: Interaction,
   ctx: { siteUrl: string; readOnly: boolean },
@@ -103,6 +159,9 @@ export async function dispatch(
         break;
       case 'postleaderboard':
         await handlePostLeaderboard(interaction, ctx.siteUrl, ctx.readOnly);
+        break;
+      case 'checkvc':
+        await handleCheckVc(interaction, ctx);
         break;
       case 'syncnicks': {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });

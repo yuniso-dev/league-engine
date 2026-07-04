@@ -207,3 +207,12 @@ export const blacklistedUsers = pgTable('blacklisted_users', {
   blacklistedBy:  text('blacklisted_by').references(() => users.discordId),
   createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// On-demand draft staging: the bot's /checkvc snapshots a voice channel's
+// members in here (source 'vc'); admins can also hand-add players ('manual').
+// The website's Draft Board reads this and moves players onto teams.
+export const draftPool = pgTable('draft_pool', {
+  discordId: text('discord_id').primaryKey().references(() => users.discordId, { onDelete: 'cascade' }),
+  source:    text('source').notNull().default('vc'),
+  addedAt:   timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
+});

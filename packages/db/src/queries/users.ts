@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { InferSelectModel } from 'drizzle-orm';
 import { getDb } from '../client';
 import { users, blacklistedUsers } from '../schema';
@@ -112,6 +112,46 @@ export async function initialiseUser(
     }
   }
   throw new Error('Failed to generate unique public_id after 5 attempts');
+}
+
+/**
+ * Ensure a user has a public_id WITHOUT marking them initialised.
+ * Used when the /checkvc snapshot pulls someone who is in the server (and thus
+ * has a users row from member sync) but never signed into the site: they need
+ * a public_id to be draftable and to record match stats, yet must stay off the
+ * ladder until they actually complete a profile. No-op if they already have one.
+ * Returns the public_id, or null if the user row doesn't exist.
+ */
+export async function ensurePublicId(discordId: string): Promise<string | null> {
+  const [row] = await getDb()
+    .select({ publicId: users.publicId })
+    .from(users)
+    .where(eq(users.discordId, discordId))
+    .limit(1);
+  if (!row) return null;
+  if (row.publicId) return row.publicId;
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const publicId = makePublicId();
+    try {
+      await getDb()
+        .update(users)
+        .set({ publicId, updatedAt: new Date() })
+        // isNull guard: if a concurrent writer set it first, update nothing and re-read.
+        .where(and(eq(users.discordId, discordId), isNull(users.publicId)));
+      const [after] = await getDb()
+        .select({ publicId: users.publicId })
+        .from(users)
+        .where(eq(users.discordId, discordId))
+        .limit(1);
+      if (after?.publicId) return after.publicId;
+    } catch (e: unknown) {
+      const code = typeof e === 'object' && e !== null ? (e as { code?: string }).code : undefined;
+      if (code === '23505' && attempt < 4) continue; // collided with another user's id — retry
+      throw e;
+    }
+  }
+  throw new Error('Failed to backfill public_id after 5 attempts');
 }
 
 /** Partial self-service update — only the provided fields change.
