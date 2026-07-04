@@ -1,12 +1,11 @@
 import { notFound } from 'next/navigation';
 import { getTournamentDetail, isSignedUp } from '@inazuma/db';
-import type { StatLeader } from '@inazuma/db';
 import { auth } from '@/auth';
 import { glass, REALMS, T, FONT_D, FONT_B, FONT_M, rgba } from '@/lib/realm-colors';
 import { STAGE_LABELS, STATUS_COLORS } from '@/lib/tournament-ui';
 import { BackPill } from '@/components/ui/BackPill';
-import { Avatar } from '@/components/ui/Avatar';
 import { LeagueTable } from '@/components/LeagueTable';
+import { StatLeaderList } from '@/components/StatLeaderList';
 import { SignupCard } from '@/components/SignupCard';
 
 export const dynamic = 'force-dynamic';
@@ -21,39 +20,6 @@ const sectionHead: React.CSSProperties = {
   color: T.text,
   margin: '24px 0 12px',
 };
-
-function LeaderList({ title, emoji, leaders, unit, accent }: {
-  title: string; emoji: string; leaders: StatLeader[]; unit: string; accent: string;
-}) {
-  if (leaders.length === 0) return null;
-  return (
-    <div style={glass({ padding: 16 })}>
-      <div style={{ fontFamily: FONT_M, fontSize: 10, letterSpacing: 1.5, color: accent, marginBottom: 10 }}>
-        {emoji} {title}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-        {leaders.map((l, i) => (
-          <div key={l.publicId} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <span style={{ fontFamily: FONT_D, fontSize: 12, color: i === 0 ? T.gold : T.faint, width: 13 }}>
-              {i + 1}
-            </span>
-            <Avatar initials={l.displayName.slice(0, 2).toUpperCase()} src={l.avatarUrl} size={24} />
-            <span style={{
-              fontFamily: FONT_B, fontSize: 13.5, color: T.text, flex: 1,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {l.displayName}
-            </span>
-            <span style={{ fontFamily: FONT_D, fontSize: 15, color: i === 0 ? T.gold : T.dim }}>
-              {l.value}
-              <span style={{ fontFamily: FONT_M, fontSize: 8, color: T.faint, marginLeft: 2 }}>{unit}</span>
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default async function FrontierDetailPage({ params }: Props) {
   const [detail, session] = await Promise.all([getTournamentDetail(params.id), auth()]);
@@ -191,9 +157,21 @@ export default async function FrontierDetailPage({ params }: Props) {
               <>
                 <div style={sectionHead}>LEADERS</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <LeaderList title="TOP SCORERS" emoji="⚽" leaders={stats.topScorers} unit="G" accent={accent} />
-                  <LeaderList title="TOP ASSISTS" emoji="🎯" leaders={stats.topAssisters} unit="A" accent={accent} />
-                  <LeaderList title="CLEAN SHEETS" emoji="🧤" leaders={stats.topCleanSheets} unit="CS" accent={accent} />
+                  {stats.topScorers.length > 0 && (
+                    <div style={glass({ padding: 16 })}>
+                      <StatLeaderList title="TOP SCORERS" emoji="⚽" leaders={stats.topScorers} unit="G" accent={accent} maxVisible={5} />
+                    </div>
+                  )}
+                  {stats.topAssisters.length > 0 && (
+                    <div style={glass({ padding: 16 })}>
+                      <StatLeaderList title="TOP ASSISTS" emoji="🎯" leaders={stats.topAssisters} unit="A" accent={accent} maxVisible={5} />
+                    </div>
+                  )}
+                  {stats.topCleanSheets.length > 0 && (
+                    <div style={glass({ padding: 16 })}>
+                      <StatLeaderList title="CLEAN SHEETS" emoji="🧤" leaders={stats.topCleanSheets} unit="CS" accent={accent} maxVisible={5} />
+                    </div>
+                  )}
                 </div>
               </>
             )}
