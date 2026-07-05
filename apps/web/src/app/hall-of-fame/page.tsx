@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getHallOfFame } from '@inazuma/db';
+import { getHallOfFame, runResilient } from '@inazuma/db';
 import type { HallTournament } from '@inazuma/db';
 import { glass, T, FONT_D, FONT_B, FONT_M, rgba, lighten } from '@/lib/realm-colors';
 import { BackPill } from '@/components/ui/BackPill';
@@ -107,7 +107,8 @@ function FrontierPlaque({ t }: { t: HallTournament }) {
 }
 
 export default async function HallOfFamePage() {
-  const hall = await getHallOfFame();
+  // Timeout → rebuild the pool → retry once, instead of the error page.
+  const hall = await runResilient(() => getHallOfFame());
 
   // Group by season, newest first (query is already sorted).
   const seasons = new Map<number, HallTournament[]>();
