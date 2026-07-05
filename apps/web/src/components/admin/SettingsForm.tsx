@@ -111,6 +111,20 @@ export default function SettingsForm({ config }: Props) {
         </div>
       </div>
 
+      <div style={{ ...glass({ padding: 28 }), marginBottom: 20 }}>
+        <div style={{ fontFamily: FONT_D, fontSize: 14, letterSpacing: 1.5, color: T.dim, marginBottom: 18 }}>
+          CASUAL — EA FC CLUBS
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <Field label="EA Club ID(s)" caption="The club the bot polls for casual matches (find it in your club's URL on EA's site). Comma-separate several. Blank = casual sync off.">
+            <input name="eaClubIds" defaultValue={config.eaClubIds ?? ''} autoComplete="off" placeholder="e.g. 123456" style={inputBase} />
+          </Field>
+          <Field label="EA platform" caption="Cross-play pool: common-gen5 (PS5/Xbox Series/PC) or common-gen4 (PS4/Xbox One).">
+            <input name="eaPlatform" defaultValue={config.eaPlatform ?? 'common-gen5'} autoComplete="off" style={inputBase} />
+          </Field>
+        </div>
+      </div>
+
       {config.lastRevealAt && (
         <p style={{ fontFamily: FONT_B, fontSize: 13, color: T.faint, margin: '0 0 16px' }}>
           Last weekly reveal: {config.lastRevealAt.toISOString().slice(0, 16).replace('T', ' ')} UTC.

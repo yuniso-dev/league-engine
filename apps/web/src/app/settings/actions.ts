@@ -55,6 +55,8 @@ export async function saveSettings(formData: FormData) {
   const country = countryRaw && isValidCountryCode(countryRaw) ? countryRaw : null;
   const quote = ((formData.get('quote') as string) || '').trim().slice(0, 100) || null;
   const bio   = ((formData.get('bio')   as string) || '').trim().slice(0, 300) || null;
+  // EA Clubs persona — matched case-insensitively against ingested match data.
+  const eaName = ((formData.get('eaName') as string) || '').trim().slice(0, 32) || null;
 
   // Invalid hex is silently dropped (keeps the previous value); empty clears it.
   const accentRaw = ((formData.get('accentColor') as string) || '').trim();
@@ -72,6 +74,7 @@ export async function saveSettings(formData: FormData) {
       quote,
       bio,
       accentColor,
+      eaName,
     }),
   );
 

@@ -42,6 +42,21 @@ export {
 } from './queries/draftPool';
 export type { DraftPoolEntry } from './queries/draftPool';
 export {
+  ingestCasualMatches,
+  getCasualLeaderboard,
+  getCasualHistory,
+  getCasualCareer,
+  listLinkedCasualPlayers,
+} from './queries/casual';
+export type {
+  CasualMatchInput,
+  CasualPlayerLine,
+  CasualLeaderRow,
+  CasualHistoryMatch,
+  CasualCareer,
+  LinkedCasualPlayer,
+} from './queries/casual';
+export {
   MATCH_STAGES,
   getCurrentSeason,
   listAdminTournaments,

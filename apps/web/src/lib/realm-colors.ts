@@ -18,10 +18,12 @@ export type Realm = {
   accent2: string;
 };
 
+// Casual is appended LAST so REALMS[0..2] indexes stay stable everywhere.
 export const REALMS: Realm[] = [
   { id: 'frontier', label: 'Frontier', top: '#04060D', bottom: '#0B3270', accent: '#3D8BFF', accent2: '#7FB4FF' },
   { id: 'rankings', label: 'Rankings', top: '#070611', bottom: '#281C56', accent: '#8B5CF6', accent2: '#C4A6FF' },
   { id: 'profile',  label: 'Profile',  top: '#120703', bottom: '#5A2708', accent: '#FF7A1A', accent2: '#FFB066' },
+  { id: 'casual',   label: 'Casual',   top: '#03100B', bottom: '#0C4A33', accent: '#2FBE8D', accent2: '#8FF0C8' },
 ];
 
 // Resolved from next/font/google CSS variables — see layout.tsx
@@ -60,8 +62,9 @@ export type RealmResult = {
 };
 
 export function realmAt(f: number): RealmResult {
-  const i0 = Math.floor(clamp(f, 0, 2));
-  const i1 = Math.min(i0 + 1, 2);
+  const last = REALMS.length - 1;
+  const i0 = Math.floor(clamp(f, 0, last));
+  const i1 = Math.min(i0 + 1, last);
   const t = clamp(f - i0, 0, 1);
   const A = REALMS[i0], B = REALMS[i1];
   return {

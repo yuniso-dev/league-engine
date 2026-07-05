@@ -15,6 +15,7 @@ import { registerCommands, dispatch } from './commands.js';
 import { onMemberAdd, onMemberRemove, syncAllMembers } from './memberSync.js';
 import { syncNicknames } from './nicknameSync.js';
 import { updateRankingsMessage } from './leaderboard.js';
+import { syncCasualMatches } from './casualSync.js';
 
 // ── env ───────────────────────────────────────────────────────────────────────
 const token = process.env.DISCORD_BOT_TOKEN;
@@ -37,6 +38,7 @@ const GUILD_OVERRIDE = process.env.BOT_GUILD_ID || null;
 const REVEAL_POLL_MS = 5 * 60_000;   // check for a committed reveal
 const MEMBER_SYNC_MS = 6 * 3_600_000; // periodic full member re-sync
 const GUILD_RETRY_MS = 60_000;        // re-check config.guildId when unset
+const CASUAL_POLL_MS = 10 * 60_000;   // EA Clubs API poll (unofficial API — be gentle)
 
 // ── client ────────────────────────────────────────────────────────────────────
 const client = new Client({
@@ -130,6 +132,13 @@ client.once(Events.ClientReady, async ready => {
     every(MEMBER_SYNC_MS, 'member re-sync', async () => {
       await syncAllMembers(guild);
     });
+  }
+
+  // CASUAL realm: poll the EA Clubs API for new club matches. No-op until
+  // an EA Club ID is configured in Admin → Settings.
+  if (!READ_ONLY) {
+    await syncCasualMatches().catch(e => console.error('[bot] casual sync failed —', e));
+    every(CASUAL_POLL_MS, 'casual sync', syncCasualMatches);
   }
 });
 

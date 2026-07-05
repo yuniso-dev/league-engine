@@ -6,6 +6,7 @@ import type { PublicPlayer, PublicTournament, StatLeaderboards, VoiceNowEntry } 
 import { FrontierPage } from './FrontierPage';
 import { RankingsPage } from './RankingsPage';
 import { ProfilePage } from './ProfilePage';
+import { CasualPage } from './CasualPage';
 import { AccountMenu } from './AccountMenu';
 import { Bolt } from './ui/Bolt';
 import {
@@ -35,8 +36,14 @@ type DragState = {
   vel: number;
 };
 
+// All pane geometry derives from the realm count — adding a realm to REALMS
+// is all it takes for the track, pill and dots to follow.
+const N = REALMS.length;
+const LAST = N - 1;
+const PANE = 100 / N;
+
 export default function StormShell({ rankings, tournaments, voice, season, records, recordsPreview, dataOffline, isLoggedIn, isAdmin, currentUser }: Props) {
-  const [index,  setIndex]  = useState(1);  // 0=Frontier, 1=Rankings, 2=Profile
+  const [index,  setIndex]  = useState(1);  // 0=Frontier, 1=Rankings, 2=Profile, 3=Casual
   const [viewed, setViewed] = useState<PublicPlayer | null>(currentUser);
 
   // ── DOM refs ──────────────────────────────────────────────────────────────────
@@ -57,7 +64,7 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
 
   // ── helpers ───────────────────────────────────────────────────────────────────
   const animTo = (i: number) => {
-    const idx = clamp(i, 0, 2);
+    const idx = clamp(i, 0, LAST);
     target.current = idx;
     setIndex(idx);
   };
@@ -112,7 +119,7 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
       const d = drag.current;
 
       if (d.on && d.lock === 'h') {
-        offset.current = clamp(d.base - d.dx / W, 0, 2);
+        offset.current = clamp(d.base - d.dx / W, 0, LAST);
       } else {
         offset.current += (target.current - offset.current) * 0.15;
         if (Math.abs(target.current - offset.current) < 0.0004) offset.current = target.current;
@@ -122,10 +129,10 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
       const r = realmAt(f);
 
       if (trackRef.current) {
-        trackRef.current.style.transform = `translate3d(${-f * 33.3333}%,0,0)`;
+        trackRef.current.style.transform = `translate3d(${-f * PANE}%,0,0)`;
       }
       if (pillRef.current) {
-        pillRef.current.style.left       = `calc(${(f / 3) * 100}% + 5px)`;
+        pillRef.current.style.left       = `calc(${(f / N) * 100}% + 5px)`;
         pillRef.current.style.background = `linear-gradient(120deg,${r.accent},${lighten(r.accent, 0.5)})`;
         pillRef.current.style.boxShadow  = `0 0 20px ${rgba(r.accentHex, 0.55)}`;
       }
@@ -171,7 +178,7 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
       let tgt = Math.round(o);
       if (d.vel < -0.4)     tgt = Math.ceil(o);
       else if (d.vel > 0.4) tgt = Math.floor(o);
-      animTo(clamp(tgt, 0, 2));
+      animTo(clamp(tgt, 0, LAST));
     }
     d.on = false; d.lock = null;
   };
@@ -261,8 +268,8 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
             ref={pillRef}
             style={{
               position: 'absolute', top: 5, bottom: 5,
-              width: 'calc(33.3333% - 6px)',
-              left: 'calc(33.3333% + 5px)',
+              width: `calc(${PANE}% - 6px)`,
+              left: `calc(${PANE}% + 5px)`,
               borderRadius: 12, overflow: 'hidden', zIndex: 0,
             }}
           >
@@ -307,24 +314,27 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
         <div
           ref={trackRef}
           style={{
-            display: 'flex', width: '300%', height: '100%',
-            transform: 'translate3d(-33.3333%,0,0)',
+            display: 'flex', width: `${N * 100}%`, height: '100%',
+            transform: `translate3d(${-PANE}%,0,0)`,
             willChange: 'transform',
           }}
         >
-          <div className="ina-scroll" style={{ width: '33.3333%', height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
+          <div className="ina-scroll" style={{ width: `${PANE}%`, height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
             <FrontierPage tournaments={tournaments} voice={voice} records={records} recordsPreview={recordsPreview} />
           </div>
-          <div className="ina-scroll" style={{ width: '33.3333%', height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
+          <div className="ina-scroll" style={{ width: `${PANE}%`, height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
             <RankingsPage players={rankings} onOpen={openPlayer} season={season} />
           </div>
-          <div className="ina-scroll" style={{ width: '33.3333%', height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
+          <div className="ina-scroll" style={{ width: `${PANE}%`, height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
             <ProfilePage
               player={viewed}
               isOwn={viewed !== null && currentUser !== null && viewed.publicId === currentUser.publicId}
               isLoggedIn={isLoggedIn}
               currentUser={currentUser}
             />
+          </div>
+          <div className="ina-scroll" style={{ width: `${PANE}%`, height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
+            <CasualPage active={index === 3} mePublicId={currentUser?.publicId ?? null} />
           </div>
         </div>
       </div>

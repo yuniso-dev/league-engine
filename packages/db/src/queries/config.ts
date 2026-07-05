@@ -20,6 +20,8 @@ const DEFAULT_CONFIG: ConfigRow = {
   decayWeeks: 4,
   movMultiplierCap: '1.75',
   lastRevealAt: null,
+  eaClubIds: null,
+  eaPlatform: 'common-gen5',
   updatedAt: new Date(),
 };
 
@@ -39,6 +41,8 @@ export async function updateConfig(
     movMultiplierCap: number;
     guildId: string | null;
     rankingsMessageId: string | null;
+    eaClubIds?: string | null;
+    eaPlatform?: string;
   },
 ): Promise<void> {
   const now = new Date();
@@ -51,6 +55,8 @@ export async function updateConfig(
     movMultiplierCap: data.movMultiplierCap.toFixed(2),
     guildId: data.guildId,
     rankingsMessageId: data.rankingsMessageId,
+    ...(data.eaClubIds !== undefined && { eaClubIds: data.eaClubIds }),
+    ...(data.eaPlatform !== undefined && { eaPlatform: data.eaPlatform }),
     updatedAt: now,
   };
 

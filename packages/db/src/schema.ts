@@ -54,6 +54,7 @@ export const users = pgTable('users', {
   country:         varchar('country', { length: 8 }), // ISO 3166-1 or GB-ENG-style subdivision
   quote:           text('quote'),
   bio:             text('bio'),
+  eaName:          text('ea_name'), // FC Clubs persona — links casual match stats to this player
 
   title:            text('title'),
   characterNote:    text('character_note'),
@@ -182,6 +183,8 @@ export const config = pgTable('config', {
   decayWeeks:         integer('decay_weeks').notNull().default(4),
   movMultiplierCap:   numeric('mov_multiplier_cap', { precision: 4, scale: 2 }).notNull().default('1.75'),
   lastRevealAt:       timestamp('last_reveal_at', { withTimezone: true }),
+  eaClubIds:          text('ea_club_ids'),   // comma-separated EA club IDs the bot polls
+  eaPlatform:         text('ea_platform').notNull().default('common-gen5'),
   updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -216,3 +219,38 @@ export const draftPool = pgTable('draft_pool', {
   source:    text('source').notNull().default('vc'),
   addedAt:   timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ── CASUAL realm: FC Clubs matches ingested from the EA Clubs API ─────────────
+// Written by the bot's poller; read by the website. Players are keyed by EA
+// persona name and joined to users at query time via lower(ea_name), so a
+// player who links their EA ID later still claims their earlier matches.
+
+export const casualMatches = pgTable('casual_matches', {
+  matchId:      text('match_id').primaryKey(),  // EA's matchId — globally unique
+  clubId:       text('club_id').notNull(),
+  matchType:    text('match_type').notNull().default('league'),
+  opponentName: text('opponent_name'),
+  ourGoals:     integer('our_goals').notNull().default(0),
+  oppGoals:     integer('opp_goals').notNull().default(0),
+  result:       text('result').notNull(),        // 'win' | 'loss' | 'draw'
+  playedAt:     timestamp('played_at', { withTimezone: true }).notNull(),
+  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const casualMatchPlayers = pgTable('casual_match_players', {
+  matchId:      text('match_id').notNull().references(() => casualMatches.matchId, { onDelete: 'cascade' }),
+  eaName:       text('ea_name').notNull(),
+  position:     text('position'),
+  rating:       numeric('rating', { precision: 4, scale: 2 }),
+  goals:        integer('goals').notNull().default(0),
+  assists:      integer('assists').notNull().default(0),
+  tackles:      integer('tackles').notNull().default(0),
+  cleanSheet:   boolean('clean_sheet').notNull().default(false),
+  saves:        integer('saves').notNull().default(0),
+  shots:        integer('shots').notNull().default(0),
+  passesMade:   integer('passes_made').notNull().default(0),
+  passAttempts: integer('pass_attempts').notNull().default(0),
+  mom:          boolean('mom').notNull().default(false),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.matchId, table.eaName] }),
+}));

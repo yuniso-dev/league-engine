@@ -54,6 +54,7 @@ create table users (
     country           varchar(8),      -- ISO 3166-1 or GB-ENG-style subdivision
     quote             text,
     bio               text,
+    ea_name           text,            -- FC Clubs persona (casual match linking)
 
     -- profile flair (admin-curated sections + player accent)
     title             text,
@@ -219,6 +220,8 @@ create table config (
     decay_weeks         integer not null default 4,
     mov_multiplier_cap  numeric(4,2) not null default 1.75,
     last_reveal_at      timestamptz,
+    ea_club_ids         text,
+    ea_platform         text not null default 'common-gen5',
     updated_at          timestamptz not null default now(),
     check (id = 1)
 );
@@ -271,6 +274,39 @@ create table draft_pool (
 
 
 -- ----------------------------------------------------------------------------
+--  CASUAL  — FC Clubs matches ingested from the EA Clubs API (bot poller)
+-- ----------------------------------------------------------------------------
+create table casual_matches (
+    match_id        text primary key,
+    club_id         text not null,
+    match_type      text not null default 'league',
+    opponent_name   text,
+    our_goals       integer not null default 0,
+    opp_goals       integer not null default 0,
+    result          text not null,
+    played_at       timestamptz not null,
+    created_at      timestamptz not null default now()
+);
+
+create table casual_match_players (
+    match_id        text not null references casual_matches(match_id) on delete cascade,
+    ea_name         text not null,
+    position        text,
+    rating          numeric(4,2),
+    goals           integer not null default 0,
+    assists         integer not null default 0,
+    tackles         integer not null default 0,
+    clean_sheet     boolean not null default false,
+    saves           integer not null default 0,
+    shots           integer not null default 0,
+    passes_made     integer not null default 0,
+    pass_attempts   integer not null default 0,
+    mom             boolean not null default false,
+    primary key (match_id, ea_name)
+);
+
+
+-- ----------------------------------------------------------------------------
 --  INDEXES
 -- ----------------------------------------------------------------------------
 create index idx_users_elo            on users (elo desc);
@@ -285,6 +321,9 @@ create index idx_matches_unprocessed  on matches (processed) where processed = f
 create index idx_mp_user              on match_participants (user_id);
 create index idx_mp_match             on match_participants (match_id);
 create index idx_history_user_week    on rating_history (user_id, week_of);
+create index idx_casual_matches_played on casual_matches (played_at desc);
+create index idx_cmp_ea_name           on casual_match_players (lower(ea_name));
+create index idx_users_ea_name         on users (lower(ea_name)) where ea_name is not null;
 
 
 -- ----------------------------------------------------------------------------

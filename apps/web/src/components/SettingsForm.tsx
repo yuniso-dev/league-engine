@@ -161,6 +161,22 @@ export default function SettingsForm({ action, user }: Props) {
             </div>
 
             <div>
+              <label style={labelStyle}>EA ID <span style={{ color: T.faint, textTransform: 'none', letterSpacing: 0 }}>(FC Clubs persona)</span></label>
+              <input
+                name="eaName"
+                defaultValue={user.eaName ?? ''}
+                maxLength={32}
+                placeholder="Your in-game Clubs name…"
+                autoComplete="off"
+                style={inputBase}
+              />
+              <p style={{ fontFamily: FONT_B, fontSize: 11.5, color: T.faint, margin: '6px 0 0', lineHeight: 1.5 }}>
+                Exactly as it appears in FC Clubs — links your casual club matches
+                to your profile and the Casual leaderboard.
+              </p>
+            </div>
+
+            <div>
               <label style={labelStyle}>Accent Colour</label>
               <HueWheel name="accentColor" defaultValue={user.accentColor} />
             </div>
