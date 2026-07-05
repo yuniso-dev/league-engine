@@ -4,7 +4,9 @@ import {
   getRatingHistoryByPublicId,
   getRecentMatchesForPlayer,
   listAwardsForPlayer,
+  runResilient,
 } from '@inazuma/db';
+import type { PublicAward, PublicRecentMatch, RatingPoint } from '@inazuma/db';
 import { Avatar } from '@/components/ui/Avatar';
 import { BackPill } from '@/components/ui/BackPill';
 import { RatingGraph } from '@/components/RatingGraph';
@@ -14,17 +16,23 @@ import { glass, T, FONT_D, FONT_B, FONT_M, rankColor, rgba, lighten } from '@/li
 import { FlagIcon } from '@/components/ui/FlagIcon';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 type Props = { params: { publicId: string } };
 
 export default async function PublicProfilePage({ params }: Props) {
-  const player = await getUserByPublicId(params.publicId);
+  // runResilient: timeout → rebuild the pool → retry once, so a dead pooled
+  // socket surfaces as a beat of latency instead of the error page.
+  const player = await runResilient(() => getUserByPublicId(params.publicId));
   if (!player) notFound();
-  const [history, playerAwards, recentMatches] = await Promise.all([
-    getRatingHistoryByPublicId(params.publicId),
-    listAwardsForPlayer(params.publicId),
-    getRecentMatchesForPlayer(params.publicId),
-  ]);
+  // Extras degrade gracefully — the card itself always renders.
+  const [history, playerAwards, recentMatches] = await runResilient(() =>
+    Promise.all([
+      getRatingHistoryByPublicId(params.publicId),
+      listAwardsForPlayer(params.publicId),
+      getRecentMatchesForPlayer(params.publicId),
+    ]),
+  ).catch((): [RatingPoint[], PublicAward[], PublicRecentMatch[]] => [[], [], []]);
 
   const accent = player.accentColor ?? '#FF7A1A';
   const initials = player.displayName.slice(0, 2).toUpperCase();

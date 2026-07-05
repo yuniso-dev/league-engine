@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { getTournamentDetail, isSignedUp } from '@inazuma/db';
+import { getTournamentDetail, isSignedUp, runResilient } from '@inazuma/db';
 import { auth } from '@/auth';
 import { glass, REALMS, T, FONT_D, FONT_B, FONT_M, rgba } from '@/lib/realm-colors';
 import { STAGE_LABELS, STATUS_COLORS } from '@/lib/tournament-ui';
@@ -22,15 +22,21 @@ const sectionHead: React.CSSProperties = {
 };
 
 export default async function FrontierDetailPage({ params }: Props) {
-  const [detail, session] = await Promise.all([getTournamentDetail(params.id), auth()]);
+  // runResilient: timeout → rebuild the pool → retry once, so a dead pooled
+  // socket surfaces as a beat of latency instead of the error page.
+  const [detail, session] = await Promise.all([
+    runResilient(() => getTournamentDetail(params.id)),
+    auth(),
+  ]);
   if (!detail) notFound();
 
   const { tournament, teams, matchesByStage, table, stats, signups } = detail;
   const accent = REALMS[0].accent;
 
   const isLoggedIn = Boolean(session?.user?.discordId);
+  // Button state only — never let it take the page down.
   const signedUp = session?.user?.discordId
-    ? await isSignedUp(session.user.discordId, tournament.id)
+    ? await runResilient(() => isSignedUp(session.user.discordId!, tournament.id)).catch(() => false)
     : false;
 
   const groupStages = matchesByStage.filter(s => s.stage === 'group');
