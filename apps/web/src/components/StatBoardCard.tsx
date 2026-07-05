@@ -4,11 +4,17 @@ import Link from 'next/link';
 import type { StatLeader } from '@inazuma/db';
 import { Avatar } from '@/components/ui/Avatar';
 import { RankMedal } from '@/components/ui/RankMedal';
-import { T, FONT_B, FONT_D, FONT_M, glass, rgba, rankColor } from '@/lib/realm-colors';
+import { T, FONT_B, FONT_D, FONT_M, glass, mixHex, rgba, rankColor } from '@/lib/realm-colors';
 
 // One stat category as a card: the top 3 on display (medals, #1 wears a
 // filled value badge), with a button that expands the list to the top 25.
 // Every row taps through to the player's profile.
+
+// Medal-row tint. It MUST be opaque: a translucent tint over the card's
+// backdrop-filter shifts tone when Chromium promotes the hovered row to its
+// own compositing layer (it stops sampling the blurred backdrop), which read
+// as a "two tone" row. An opaque colour renders identically layer or not.
+const MEDAL_ROW_BASE = '#151A27';
 
 export function StatBoardCard({ title, emoji, leaders, unit, accent }: {
   title: string;
@@ -21,7 +27,9 @@ export function StatBoardCard({ title, emoji, leaders, unit, accent }: {
   const visible = expanded ? leaders : leaders.slice(0, 3);
 
   return (
-    <div style={glass({ padding: '16px 16px 12px' })}>
+    // isolate: give the card its own stacking context so its backdrop-filter
+    // and the rows composite predictably (belt-and-braces with the opaque rows).
+    <div style={glass({ padding: '16px 16px 12px', isolation: 'isolate' })}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <span style={{ fontSize: 15, lineHeight: 1 }}>{emoji}</span>
         <span style={{ fontFamily: FONT_D, fontSize: 14, letterSpacing: 1.5, color: T.text }}>
@@ -45,7 +53,7 @@ export function StatBoardCard({ title, emoji, leaders, unit, accent }: {
                   display: 'flex', alignItems: 'center', gap: 10,
                   textDecoration: 'none',
                   padding: '7px 8px', borderRadius: 10,
-                  background: i < 3 ? rgba(rankColor(i + 1), 0.06) : 'transparent',
+                  background: i < 3 ? mixHex(MEDAL_ROW_BASE, rankColor(i + 1), 0.13) : 'transparent',
                 }}
               >
                 <RankMedal place={i + 1} size={i < 3 ? 24 : 20} />
