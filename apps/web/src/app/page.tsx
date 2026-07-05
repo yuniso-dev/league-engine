@@ -1,13 +1,13 @@
 import {
-  getAllTimeStats,
   getCurrentSeason,
+  getFrontierStatBoards,
   getRankings,
   getTournaments,
   getVoiceNow,
   resetDb,
   toPublicPlayer,
 } from '@inazuma/db';
-import type { PublicPlayer, PublicTournament, StatLeaderboards, VoiceNowEntry } from '@inazuma/db';
+import type { FrontierStatBoards, PublicPlayer, PublicTournament, VoiceNowEntry } from '@inazuma/db';
 import { auth } from '@/auth';
 import { getCachedUserByDiscordId } from '@/lib/user';
 import StormShell from '@/components/StormShell';
@@ -44,13 +44,15 @@ function settle<T>(
   });
 }
 
-const NO_RECORDS: StatLeaderboards = { topScorers: [], topAssisters: [], topCleanSheets: [] };
+const NO_BOARDS: FrontierStatBoards = {
+  goals: [], assists: [], tackles: [], cleanSheets: [], motm: [], gamesWon: [],
+};
 
-// Before any match stats exist the all-time record tables are empty, so the
+// Before any match stats exist the all-time record boards are empty, so the
 // layout can't be seen. Fill them with real players + sample numbers so the
 // design is visible; the UI tags it "EXAMPLE" and it flips to real data the
-// moment goals/assists/clean-sheets are recorded.
-function buildSampleRecords(players: PublicPlayer[]): StatLeaderboards {
+// moment match stats are recorded.
+function buildSampleBoards(players: PublicPlayer[]): FrontierStatBoards {
   const pool = players.slice(0, 10);
   // Rotate the order per column so a different name tops each, and give
   // descending sample values so it reads like a real leaderboard.
@@ -62,9 +64,12 @@ function buildSampleRecords(players: PublicPlayer[]): StatLeaderboards {
       value: Math.max(1, top - i),
     }));
   return {
-    topScorers: column(0, 14),
-    topAssisters: column(3, 11),
-    topCleanSheets: column(6, 8),
+    goals: column(0, 14),
+    assists: column(3, 11),
+    tackles: column(5, 19),
+    cleanSheets: column(6, 8),
+    motm: column(8, 6),
+    gamesWon: column(2, 12),
   };
 }
 
@@ -72,13 +77,15 @@ export default async function HomePage() {
   // Budgets sit just under the DB's 15s statement_timeout: a cold serverless
   // start pays connection setup + several query waves, and giving up at 8s
   // was tripping the "reconnecting" banner on renders that would have made it.
-  const [r, t, v, s, se, re] = await Promise.all([
+  const [r, t, v, s, se, re, li] = await Promise.all([
     settle('rankings', getRankings(), 14_000),
     settle('tournaments', getTournaments(), 14_000),
     settle('voice', getVoiceNow(), 8000),
     settle('auth', auth(), 8000),
     settle('season', getCurrentSeason(), 8000),
-    settle('records', getAllTimeStats(), 8000),
+    settle('allTimeStats', getFrontierStatBoards(null), 9000),
+    // Season-scoped boards need the season number first — one chained trip.
+    settle('liveStats', getCurrentSeason().then(sn => getFrontierStatBoards(sn)), 9000),
   ]);
 
   const rankings: PublicPlayer[] = r.ok ? r.value : [];
@@ -86,13 +93,11 @@ export default async function HomePage() {
   const voice: VoiceNowEntry[] = v.ok ? v.value : [];
   const session = s.ok ? s.value : null;
   const season = se.ok ? se.value : 1;
-  const realRecords: StatLeaderboards = re.ok ? re.value : NO_RECORDS;
-  const recordsEmpty =
-    realRecords.topScorers.length === 0 &&
-    realRecords.topAssisters.length === 0 &&
-    realRecords.topCleanSheets.length === 0;
-  const recordsPreview = recordsEmpty && rankings.length > 0;
-  const records: StatLeaderboards = recordsPreview ? buildSampleRecords(rankings) : realRecords;
+  const liveStats: FrontierStatBoards = li.ok ? li.value : NO_BOARDS;
+  const realBoards: FrontierStatBoards = re.ok ? re.value : NO_BOARDS;
+  const boardsEmpty = Object.values(realBoards).every(list => list.length === 0);
+  const statsPreview = boardsEmpty && rankings.length > 0;
+  const allTimeStats: FrontierStatBoards = statsPreview ? buildSampleBoards(rankings) : realBoards;
   // True only when core data failed/timed out — lets the UI say "reconnecting"
   // rather than misleadingly showing an empty league.
   const dataOffline = !r.ok || !t.ok;
@@ -122,8 +127,9 @@ export default async function HomePage() {
       tournaments={tournaments}
       voice={voice}
       season={season}
-      records={records}
-      recordsPreview={recordsPreview}
+      liveStats={liveStats}
+      allTimeStats={allTimeStats}
+      statsPreview={statsPreview}
       dataOffline={dataOffline}
       isLoggedIn={isLoggedIn}
       isAdmin={isAdmin}

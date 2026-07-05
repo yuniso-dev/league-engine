@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { PublicPlayer, PublicTournament, StatLeaderboards, VoiceNowEntry } from '@inazuma/db';
+import type { FrontierStatBoards, PublicPlayer, PublicTournament, VoiceNowEntry } from '@inazuma/db';
 import { FrontierPage } from './FrontierPage';
 import { RankingsPage } from './RankingsPage';
 import { ProfilePage } from './ProfilePage';
@@ -19,8 +19,9 @@ type Props = {
   tournaments: PublicTournament[];
   voice: VoiceNowEntry[];
   season?: number;
-  records?: StatLeaderboards;
-  recordsPreview?: boolean;
+  liveStats?: FrontierStatBoards;
+  allTimeStats?: FrontierStatBoards;
+  statsPreview?: boolean;
   dataOffline?: boolean;
   isLoggedIn: boolean;
   isAdmin: boolean;
@@ -42,7 +43,7 @@ const N = REALMS.length;
 const LAST = N - 1;
 const PANE = 100 / N;
 
-export default function StormShell({ rankings, tournaments, voice, season, records, recordsPreview, dataOffline, isLoggedIn, isAdmin, currentUser }: Props) {
+export default function StormShell({ rankings, tournaments, voice, season, liveStats, allTimeStats, statsPreview, dataOffline, isLoggedIn, isAdmin, currentUser }: Props) {
   const [index,  setIndex]  = useState(1);  // 0=Frontier, 1=Rankings, 2=Profile, 3=Casual
   const [viewed, setViewed] = useState<PublicPlayer | null>(currentUser);
 
@@ -320,7 +321,14 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
           }}
         >
           <div className="ina-scroll" style={{ width: `${PANE}%`, height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
-            <FrontierPage tournaments={tournaments} voice={voice} records={records} recordsPreview={recordsPreview} />
+            <FrontierPage
+              tournaments={tournaments}
+              voice={voice}
+              liveStats={liveStats}
+              allTimeStats={allTimeStats}
+              statsPreview={statsPreview}
+              season={season}
+            />
           </div>
           <div className="ina-scroll" style={{ width: `${PANE}%`, height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>
             <RankingsPage players={rankings} onOpen={openPlayer} season={season} />

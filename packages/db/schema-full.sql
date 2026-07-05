@@ -159,6 +159,8 @@ create table match_participants (
     goals           integer not null default 0,
     assists         integer not null default 0,
     clean_sheet     boolean not null default false,
+    tackles         integer not null default 0,
+    mom             boolean not null default false,
     elo_before      numeric(7,2),
     elo_after       numeric(7,2),
     elo_change      numeric(6,2),

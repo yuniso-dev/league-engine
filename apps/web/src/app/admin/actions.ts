@@ -708,21 +708,24 @@ export async function updateMatchStatsAction(
     const tournamentId = str(formData, 'tournamentId');
     if (!matchId) return { error: 'Missing match.' };
 
-    // One set of g_/a_/cs_ inputs per participant, keyed by publicId.
-    const stats: { publicId: string; goals: number; assists: number; cleanSheet: boolean }[] = [];
+    // One set of g_/a_/t_/cs_/m_ inputs per participant, keyed by publicId.
+    const stats: { publicId: string; goals: number; assists: number; cleanSheet: boolean; tackles: number; mom: boolean }[] = [];
     for (const key of Array.from(formData.keys())) {
       if (!key.startsWith('g_')) continue;
       const publicId = key.slice(2);
       const goals = parseInt(str(formData, `g_${publicId}`) || '0', 10);
       const assists = parseInt(str(formData, `a_${publicId}`) || '0', 10);
-      if (!Number.isInteger(goals) || goals < 0 || !Number.isInteger(assists) || assists < 0) {
-        return { error: 'Goals and assists must be whole numbers.' };
+      const tackles = parseInt(str(formData, `t_${publicId}`) || '0', 10);
+      if (!Number.isInteger(goals) || goals < 0 || !Number.isInteger(assists) || assists < 0 || !Number.isInteger(tackles) || tackles < 0) {
+        return { error: 'Goals, assists and tackles must be whole numbers.' };
       }
       stats.push({
         publicId,
         goals,
         assists,
+        tackles,
         cleanSheet: formData.get(`cs_${publicId}`) === 'on',
+        mom: formData.get(`m_${publicId}`) === 'on',
       });
     }
     if (stats.length === 0) return { error: 'No players to save stats for.' };

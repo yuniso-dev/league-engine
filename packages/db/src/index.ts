@@ -114,6 +114,7 @@ export {
   updateMatchStats,
   getTournamentStats,
   getAllTimeStats,
+  getFrontierStatBoards,
   getPlayerMilestones,
   computeGroupTable,
 } from './queries/stats';
@@ -122,6 +123,7 @@ export type {
   MatchStatsSheet,
   StatLeader,
   StatLeaderboards,
+  FrontierStatBoards,
   PlayerMilestones,
   LeagueTableRow,
 } from './queries/stats';
