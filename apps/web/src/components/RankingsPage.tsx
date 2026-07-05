@@ -52,10 +52,10 @@ function RankBadge({ rank }: { rank: number | null }) {
 }
 
 // A stat block: big value over a tiny label, sized to match the ELO number.
-// The value font shrinks only on small phones (see .rank-stat-v in globals.css).
-function StatBlock({ label, value, color }: { label: string; value: number | string; color?: string }) {
+// Pass className "desk" for blocks that hide on phones (see globals.css).
+function StatBlock({ label, value, color, className }: { label: string; value: number | string; color?: string; className?: string }) {
   return (
-    <div className="rank-stat" style={{ textAlign: 'center', flexShrink: 0 }}>
+    <div className={`rank-stat${className ? ` ${className}` : ''}`} style={{ textAlign: 'center', flexShrink: 0 }}>
       <div className="rank-stat-v" style={{ fontFamily: FONT_D, color: color ?? T.text, lineHeight: 1 }}>
         {value}
       </div>
@@ -63,6 +63,20 @@ function StatBlock({ label, value, color }: { label: string; value: number | str
         {label}
       </div>
     </div>
+  );
+}
+
+// Phone-only grey stat pill — lives under the name where there's room, so long
+// names never collide with the stat strip.
+function Chip({ label, value, c }: { label: string; value: number | string; c?: string }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      background: 'rgba(255,255,255,0.05)', borderRadius: 7, padding: '2px 8px',
+    }}>
+      <span style={{ fontFamily: FONT_M, fontSize: 8, color: T.faint, letterSpacing: 0.4 }}>{label}</span>
+      <span style={{ fontFamily: FONT_D, fontSize: 12, color: c ?? T.text, letterSpacing: 0.3 }}>{value}</span>
+    </span>
   );
 }
 
@@ -204,12 +218,19 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
               />
 
               <div style={{ flex: 1, minWidth: 0 }}>
-                {/* line 1 — identity */}
+                {/* line 1 — identity. Name + flag are one non-wrapping unit: the
+                    flag stays glued to the name's right, and a long name
+                    truncates instead of running into the stats. */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-                  <span style={{ color: T.text, fontFamily: FONT_B, fontWeight: 700, fontSize: 15.5 }}>
-                    {p.displayName}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, minWidth: 0, maxWidth: '100%' }}>
+                    <span style={{
+                      color: T.text, fontFamily: FONT_B, fontWeight: 700, fontSize: 15.5,
+                      minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {p.displayName}
+                    </span>
+                    <FlagIcon code={p.country} size={17} />
                   </span>
-                  <FlagIcon code={p.country} size={17} />
                   {p.tier === 'premium' && <Bolt size={9} color={T.gold} />}
                   {p.title && (
                     <span style={{
@@ -232,21 +253,27 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
                     </span>
                   )}
                 </div>
-                {/* line 2 — position only; the stats sit in the strip on the right */}
-                {!p.hidePositions && p.position1 && (
-                  <div style={{ marginTop: 5 }}>
+                {/* line 2 — position, plus the phone-only stat chips */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
+                  {!p.hidePositions && p.position1 && (
                     <span style={{ fontFamily: FONT_M, fontSize: 10, color: accent2, letterSpacing: 0.5 }}>
                       {[p.position1, p.position2].filter(Boolean).join('·')}
                     </span>
-                  </div>
-                )}
+                  )}
+                  <span className="rank-chips">
+                    <Chip label={rs.l} value={rs.v} c={T.text} />
+                    <Chip label="GW" value={p.wins ?? 0} c={(p.wins ?? 0) > 0 ? T.win : T.dim} />
+                    <Chip label="WR" value={winRate != null ? `${winRate}%` : '—'} c={winRate != null && winRate >= 50 ? T.win : T.dim} />
+                  </span>
+                </div>
               </div>
 
-              {/* stat strip — role stat, games won, win rate and ELO, all one size */}
+              {/* stat strip — full size on desktop; phones keep only ELO here
+                  (the rest move to the chips under the name) */}
               <div className="rank-strip" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                <StatBlock label={rs.l} value={rs.v} />
-                <StatBlock label="GW" value={p.wins ?? 0} color={(p.wins ?? 0) > 0 ? T.win : T.dim} />
-                <StatBlock label="WR" value={winRate != null ? `${winRate}%` : '—'} color={winRate != null && winRate >= 50 ? T.win : T.dim} />
+                <StatBlock className="desk" label={rs.l} value={rs.v} />
+                <StatBlock className="desk" label="GW" value={p.wins ?? 0} color={(p.wins ?? 0) > 0 ? T.win : T.dim} />
+                <StatBlock className="desk" label="WR" value={winRate != null ? `${winRate}%` : '—'} color={winRate != null && winRate >= 50 ? T.win : T.dim} />
                 <StatBlock label="ELO" value={Math.round(p.elo)} color={accent2} />
               </div>
             </div>
