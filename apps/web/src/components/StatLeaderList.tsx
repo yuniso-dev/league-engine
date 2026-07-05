@@ -2,7 +2,12 @@ import Link from 'next/link';
 import type { StatLeader } from '@inazuma/db';
 import { Avatar } from '@/components/ui/Avatar';
 import { RankMedal } from '@/components/ui/RankMedal';
-import { T, FONT_B, FONT_D, FONT_M, rankColor, rgba } from '@/lib/realm-colors';
+import { T, FONT_B, FONT_D, FONT_M, mixHex, rankColor } from '@/lib/realm-colors';
+
+// Opaque medal-row tint — a translucent tint over the parent glass card shifts
+// tone when Chromium promotes the hovered row to its own compositing layer
+// (the "two tone" hover bug). An opaque colour renders the same either way.
+const MEDAL_ROW_BASE = '#151A27';
 
 // A mini ranking table for a stat (goals / assists / clean sheets): the top 3
 // wear medals, everyone else a number, and every row taps through to the
@@ -52,7 +57,7 @@ export function StatLeaderList({ title, emoji, leaders, unit, accent, maxVisible
                   display: 'flex', alignItems: 'center', gap: 9,
                   textDecoration: 'none',
                   padding: '6px 7px', borderRadius: 9,
-                  background: i < 3 ? rgba(rankColor(i + 1), 0.07) : 'transparent',
+                  background: i < 3 ? mixHex(MEDAL_ROW_BASE, rankColor(i + 1), 0.14) : 'transparent',
                 }}
               >
                 <RankMedal place={i + 1} size={i < 3 ? 24 : 20} />
