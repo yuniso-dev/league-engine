@@ -51,7 +51,7 @@ create table users (
     events_signed_up  integer      not null default 0,
     events_attended   integer      not null default 0,
 
-    country           varchar(2),
+    country           varchar(8),      -- ISO 3166-1 or GB-ENG-style subdivision
     quote             text,
     bio               text,
 

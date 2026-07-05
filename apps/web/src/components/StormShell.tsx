@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { PublicPlayer, PublicTournament, StatLeaderboards, VoiceNowEntry } from '@inazuma/db';
 import { FrontierPage } from './FrontierPage';
@@ -229,6 +230,25 @@ export default function StormShell({ rankings, tournaments, voice, season, recor
                   nobody mistakes the dress run for the real launch. */}
               {process.env.NEXT_PUBLIC_TEST_MODE === 'true' ? '⚠ TEST SEASON' : `SEASON ${season ?? 1}`}
             </span>
+          </div>
+          {/* the guide — mirrors the account menu on the other side */}
+          <div style={{ position: 'absolute', left: 0 }}>
+            <Link
+              href="/guide"
+              className="tap"
+              title="How it works"
+              aria-label="How it works"
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 34, height: 34, borderRadius: '50%',
+                border: '1px solid rgba(255,255,255,0.15)',
+                background: 'rgba(255,255,255,0.05)',
+                color: T.dim, textDecoration: 'none',
+                fontFamily: FONT_D, fontSize: 15,
+              }}
+            >
+              ?
+            </Link>
           </div>
           <div style={{ position: 'absolute', right: 0 }}>
             <AccountMenu currentUser={currentUser} isLoggedIn={isLoggedIn} isAdmin={isAdmin} />

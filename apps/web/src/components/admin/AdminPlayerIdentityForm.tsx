@@ -4,8 +4,9 @@ import type { AdminPlayerDetail } from '@inazuma/db';
 import { FONT_B, FONT_D, T, glass } from '@/lib/realm-colors';
 import { ADMIN_ACCENT, inputBase, labelStyle } from '@/components/admin/ui';
 import GlassSelect from '@/components/ui/GlassSelect';
+import { FlagIcon } from '@/components/ui/FlagIcon';
 import { POSITIONS } from '@/lib/positions';
-import { COUNTRIES, flagEmoji } from '@/lib/countries';
+import { COUNTRIES } from '@/lib/countries';
 import { updatePlayerIdentityAction, type AdminFormState } from '@/app/admin/actions';
 
 // Admin edit of the fields players normally manage themselves — for fixing up
@@ -18,7 +19,11 @@ const POSITION_OPTIONS = [
 
 const COUNTRY_OPTIONS = [
   { value: '', label: '— None —' },
-  ...COUNTRIES.map(c => ({ value: c.code, label: `${flagEmoji(c.code)} ${c.name}` })),
+  ...COUNTRIES.map(c => ({
+    value: c.code,
+    label: c.name,
+    icon: <FlagIcon code={c.code} size={20} />,
+  })),
 ];
 
 function SaveButton() {

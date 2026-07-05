@@ -1,4 +1,5 @@
 import { and, asc, desc, eq } from 'drizzle-orm';
+import { cleanDisplayName } from '@inazuma/core';
 import { getDb } from '../client';
 import { adminActions, awards, tournaments, userAwards, users } from '../schema';
 
@@ -236,7 +237,7 @@ export async function updatePlayerIdentityByAdmin(
   await getDb()
     .update(users)
     .set({
-      displayName: data.displayName,
+      displayName: cleanDisplayName(data.displayName),
       position1: data.position1,
       position2: data.position2,
       country: data.country,

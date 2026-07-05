@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/auth';
 import { runResilient, updateOwnProfileFields, updateSettings } from '@inazuma/db';
+import { isValidCountryCode } from '@/lib/countries';
 
 /** Inline (pen-icon) edits on a player's own profile — quote and accent only.
  *  Returns an error string, or null on success. */
@@ -49,7 +50,9 @@ export async function saveSettings(formData: FormData) {
   const position1 = (formData.get('position1') as string) || null;
   const position2 = (formData.get('position2') as string) || null;
   const hidePositions = formData.get('hidePositions') === 'on';
-  const country = ((formData.get('country') as string) || '').toUpperCase().slice(0, 2) || null;
+  // Accepts ISO codes and home-nation subdivisions (GB-ENG etc.).
+  const countryRaw = ((formData.get('country') as string) || '').toUpperCase().slice(0, 8);
+  const country = countryRaw && isValidCountryCode(countryRaw) ? countryRaw : null;
   const quote = ((formData.get('quote') as string) || '').trim().slice(0, 100) || null;
   const bio   = ((formData.get('bio')   as string) || '').trim().slice(0, 300) || null;
 
