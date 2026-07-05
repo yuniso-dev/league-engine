@@ -498,9 +498,22 @@ export async function updateConfigAction(
     const guildId = str(formData, 'guildId') || null;
     const rankingsMessageId = str(formData, 'rankingsMessageId') || null;
 
+    // CASUAL: which EA club(s) the bot polls, and on which cross-play pool.
+    const eaClubIdsRaw = str(formData, 'eaClubIds');
+    if (eaClubIdsRaw && !/^\d+(\s*,\s*\d+)*$/.test(eaClubIdsRaw)) {
+      return { error: 'EA Club IDs must be numbers, comma-separated.' };
+    }
+    const eaClubIds = eaClubIdsRaw
+      ? eaClubIdsRaw.split(',').map(s => s.trim()).filter(Boolean).join(',')
+      : null;
+    const eaPlatform = str(formData, 'eaPlatform').toLowerCase() || 'common-gen5';
+    if (!/^[a-z0-9-]{2,20}$/.test(eaPlatform)) {
+      return { error: 'EA platform looks wrong — e.g. common-gen5.' };
+    }
+
     await updateConfig(admin.discordId, {
       currentSeason, eloBase, kPlacement, kEstablished, placementGames, movMultiplierCap,
-      guildId, rankingsMessageId,
+      guildId, rankingsMessageId, eaClubIds, eaPlatform,
     });
 
     revalidatePath('/admin/settings');
