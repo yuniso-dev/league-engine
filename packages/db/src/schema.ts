@@ -136,6 +136,8 @@ export const matchParticipants = pgTable('match_participants', {
   goals:       integer('goals').notNull().default(0),
   assists:     integer('assists').notNull().default(0),
   cleanSheet:  boolean('clean_sheet').notNull().default(false),
+  tackles:     integer('tackles').notNull().default(0),
+  mom:         boolean('mom').notNull().default(false),
   eloBefore:   numeric('elo_before', { precision: 7, scale: 2 }),
   eloAfter:    numeric('elo_after', { precision: 7, scale: 2 }),
   eloChange:   numeric('elo_change', { precision: 6, scale: 2 }),

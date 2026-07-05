@@ -1,16 +1,17 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { getDb } from '../client';
 import {
   adminActions,
   matches,
   matchParticipants,
   teams,
+  tournaments,
   users,
 } from '../schema';
 
-// Match statistics: goals / assists / clean sheets per participant.
-// The columns have existed on match_participants since the original schema —
-// this module is what finally writes and aggregates them.
+// Match statistics: goals / assists / clean sheets / tackles / MOTM per
+// participant — written by the admin ⚽ STATS form, aggregated for the
+// Frontier stat boards.
 
 // ── Admin: per-match stat entry ───────────────────────────────────────────────
 
@@ -21,6 +22,8 @@ export type MatchStatsEntry = {
   goals: number;
   assists: number;
   cleanSheet: boolean;
+  tackles: number;
+  mom: boolean;
 };
 
 export type MatchStatsSheet = {
@@ -52,6 +55,8 @@ export async function getMatchStatsEntries(matchId: string): Promise<MatchStatsS
       goals: matchParticipants.goals,
       assists: matchParticipants.assists,
       cleanSheet: matchParticipants.cleanSheet,
+      tackles: matchParticipants.tackles,
+      mom: matchParticipants.mom,
     })
     .from(matchParticipants)
     .innerJoin(users, eq(matchParticipants.userId, users.discordId))
@@ -73,15 +78,17 @@ export async function getMatchStatsEntries(matchId: string): Promise<MatchStatsS
         goals: r.goals,
         assists: r.assists,
         cleanSheet: r.cleanSheet,
+        tackles: r.tackles,
+        mom: r.mom,
       })),
   };
 }
 
-/** Write goals/assists/clean-sheet for a match's participants. */
+/** Write goals/assists/clean-sheet/tackles/MOTM for a match's participants. */
 export async function updateMatchStats(
   adminId: string,
   matchId: string,
-  stats: { publicId: string; goals: number; assists: number; cleanSheet: boolean }[],
+  stats: { publicId: string; goals: number; assists: number; cleanSheet: boolean; tackles: number; mom: boolean }[],
 ): Promise<void> {
   const db = getDb();
   const [match] = await db
@@ -94,6 +101,7 @@ export async function updateMatchStats(
   for (const s of stats) {
     if (!Number.isInteger(s.goals) || s.goals < 0 || s.goals > 99) throw new Error('Goals must be 0–99.');
     if (!Number.isInteger(s.assists) || s.assists < 0 || s.assists > 99) throw new Error('Assists must be 0–99.');
+    if (!Number.isInteger(s.tackles) || s.tackles < 0 || s.tackles > 99) throw new Error('Tackles must be 0–99.');
   }
 
   const publicIds = stats.map(s => s.publicId);
@@ -111,7 +119,7 @@ export async function updateMatchStats(
       if (!userId) continue; // unknown player rows are skipped, not fatal
       await tx
         .update(matchParticipants)
-        .set({ goals: s.goals, assists: s.assists, cleanSheet: s.cleanSheet })
+        .set({ goals: s.goals, assists: s.assists, cleanSheet: s.cleanSheet, tackles: s.tackles, mom: s.mom })
         .where(and(eq(matchParticipants.matchId, matchId), eq(matchParticipants.userId, userId)));
     }
   });
@@ -145,13 +153,18 @@ type StatTotals = {
   goals: number;
   assists: number;
   cleanSheets: number;
+  tackles: number;
+  motm: number;
+  wins: number;
 };
 
-async function aggregateStats(tournamentId: string | null): Promise<StatTotals[]> {
+async function aggregateStats(
+  filter: { tournamentId?: string | null; season?: number | null } = {},
+): Promise<StatTotals[]> {
   const db = getDb();
-  const where = tournamentId
-    ? and(eq(matches.tournamentId, tournamentId), eq(users.isBlacklisted, false))
-    : eq(users.isBlacklisted, false);
+  const conditions: SQL[] = [eq(users.isBlacklisted, false)];
+  if (filter.tournamentId) conditions.push(eq(matches.tournamentId, filter.tournamentId));
+  if (filter.season != null) conditions.push(eq(tournaments.season, filter.season));
 
   const rows = await db
     .select({
@@ -161,11 +174,15 @@ async function aggregateStats(tournamentId: string | null): Promise<StatTotals[]
       goals: sql<number>`coalesce(sum(${matchParticipants.goals}), 0)::int`,
       assists: sql<number>`coalesce(sum(${matchParticipants.assists}), 0)::int`,
       cleanSheets: sql<number>`(count(*) filter (where ${matchParticipants.cleanSheet}))::int`,
+      tackles: sql<number>`coalesce(sum(${matchParticipants.tackles}), 0)::int`,
+      motm: sql<number>`(count(*) filter (where ${matchParticipants.mom}))::int`,
+      wins: sql<number>`(count(*) filter (where ${matchParticipants.result} = 'win'))::int`,
     })
     .from(matchParticipants)
     .innerJoin(matches, eq(matchParticipants.matchId, matches.id))
+    .innerJoin(tournaments, eq(matches.tournamentId, tournaments.id))
     .innerJoin(users, eq(matchParticipants.userId, users.discordId))
-    .where(where)
+    .where(and(...conditions))
     .groupBy(users.publicId, users.displayName, users.avatarUrl);
 
   return rows
@@ -177,14 +194,15 @@ async function aggregateStats(tournamentId: string | null): Promise<StatTotals[]
       goals: r.goals,
       assists: r.assists,
       cleanSheets: r.cleanSheets,
+      tackles: r.tackles,
+      motm: r.motm,
+      wins: r.wins,
     }));
 }
 
-function top(
-  totals: StatTotals[],
-  key: 'goals' | 'assists' | 'cleanSheets',
-  limit: number,
-): StatLeader[] {
+type StatKey = 'goals' | 'assists' | 'cleanSheets' | 'tackles' | 'motm' | 'wins';
+
+function top(totals: StatTotals[], key: StatKey, limit: number): StatLeader[] {
   return totals
     .filter(t => t[key] > 0)
     .sort((a, b) => b[key] - a[key] || a.displayName.localeCompare(b.displayName))
@@ -199,7 +217,7 @@ function top(
 
 /** Per-tournament leaders (goals, assists, clean sheets). */
 export async function getTournamentStats(tournamentId: string, limit = 10): Promise<StatLeaderboards> {
-  const totals = await aggregateStats(tournamentId);
+  const totals = await aggregateStats({ tournamentId });
   return {
     topScorers: top(totals, 'goals', limit),
     topAssisters: top(totals, 'assists', limit),
@@ -209,11 +227,38 @@ export async function getTournamentStats(tournamentId: string, limit = 10): Prom
 
 /** All-time Frontier records across every tournament. */
 export async function getAllTimeStats(limit = 10): Promise<StatLeaderboards> {
-  const totals = await aggregateStats(null);
+  const totals = await aggregateStats();
   return {
     topScorers: top(totals, 'goals', limit),
     topAssisters: top(totals, 'assists', limit),
     topCleanSheets: top(totals, 'cleanSheets', limit),
+  };
+}
+
+// The Frontier realm's stat boards: six categories, top 3 on display with a
+// "show top 25" expansion. season=null → all-time; a season number → that
+// season only (the LIVE STATS tab).
+export type FrontierStatBoards = {
+  goals: StatLeader[];
+  assists: StatLeader[];
+  tackles: StatLeader[];
+  cleanSheets: StatLeader[];
+  motm: StatLeader[];
+  gamesWon: StatLeader[];
+};
+
+export async function getFrontierStatBoards(
+  season: number | null,
+  limit = 25,
+): Promise<FrontierStatBoards> {
+  const totals = await aggregateStats({ season });
+  return {
+    goals: top(totals, 'goals', limit),
+    assists: top(totals, 'assists', limit),
+    tackles: top(totals, 'tackles', limit),
+    cleanSheets: top(totals, 'cleanSheets', limit),
+    motm: top(totals, 'motm', limit),
+    gamesWon: top(totals, 'wins', limit),
   };
 }
 

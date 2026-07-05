@@ -105,7 +105,7 @@ export default function MatchStatsForm({ matchId, tournamentId }: Props) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <span style={{ fontFamily: FONT_D, fontSize: 12, letterSpacing: 1.5, color: ADMIN_ACCENT }}>
-          MATCH STATS — GOALS · ASSISTS · CLEAN SHEETS
+          MATCH STATS — G · A · TKL · CS · MOTM
         </span>
         <button
           type="button"
@@ -142,7 +142,9 @@ export default function MatchStatsForm({ matchId, tournamentId }: Props) {
                     <span style={{ flex: 1 }} />
                     <span style={{ width: 44, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>⚽ G</span>
                     <span style={{ width: 44, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>🎯 A</span>
+                    <span style={{ width: 44, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>🛡 TKL</span>
                     <span style={{ width: 34, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>🧤 CS</span>
+                    <span style={{ width: 34, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>⭐ MOTM</span>
                   </div>
                   {sheet.entries.filter(e => e.side === side).map(e => (
                     <div key={e.publicId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -154,8 +156,12 @@ export default function MatchStatsForm({ matchId, tournamentId }: Props) {
                       </span>
                       <input name={`g_${e.publicId}`} type="number" min={0} max={99} defaultValue={e.goals} style={numInput} />
                       <input name={`a_${e.publicId}`} type="number" min={0} max={99} defaultValue={e.assists} style={numInput} />
+                      <input name={`t_${e.publicId}`} type="number" min={0} max={99} defaultValue={e.tackles} style={numInput} />
                       <span style={{ width: 34, textAlign: 'center' }}>
                         <input name={`cs_${e.publicId}`} type="checkbox" defaultChecked={e.cleanSheet} style={{ accentColor: ADMIN_ACCENT, width: 15, height: 15 }} />
+                      </span>
+                      <span style={{ width: 34, textAlign: 'center' }} title="Man of the Match">
+                        <input name={`m_${e.publicId}`} type="checkbox" defaultChecked={e.mom} style={{ accentColor: '#FFD24A', width: 15, height: 15 }} />
                       </span>
                     </div>
                   ))}
