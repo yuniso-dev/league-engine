@@ -164,7 +164,7 @@ export function AccountMenu({ currentUser, isLoggedIn, isAdmin }: Props) {
             )}
 
             <MenuItem onClick={() => { setOpen(false); router.push('/settings'); }}>
-              ⚙ Settings
+              🪪 Edit profile
             </MenuItem>
 
             {currentUser?.publicId && (
@@ -172,6 +172,10 @@ export function AccountMenu({ currentUser, isLoggedIn, isAdmin }: Props) {
                 {copied ? '✓ Copied!' : '↗ Share profile'}
               </MenuItem>
             )}
+
+            <MenuItem onClick={() => { setOpen(false); router.push('/guide'); }}>
+              ❔ How it works
+            </MenuItem>
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 2, paddingTop: 2 }}>
               <form action={doSignOut}>

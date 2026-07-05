@@ -12,7 +12,9 @@ type Props = {
 };
 
 export function FlagIcon({ code, size = 20, style }: Props) {
-  if (!code || !/^[A-Za-z]{2}$/.test(code)) return null;
+  // Two-letter ISO codes, plus subdivisions like GB-ENG (England) —
+  // flagcdn serves those too (gb-eng.png etc.).
+  if (!code || !/^[A-Za-z]{2}(-[A-Za-z]{2,3})?$/.test(code)) return null;
   const cc = code.toLowerCase();
   const name = countryName(code) ?? code.toUpperCase();
   return (

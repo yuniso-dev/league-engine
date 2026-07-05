@@ -64,6 +64,7 @@ export const COUNTRIES: Country[] = [
   { code: 'EC', name: 'Ecuador' },
   { code: 'EG', name: 'Egypt' },
   { code: 'SV', name: 'El Salvador' },
+  { code: 'GB-ENG', name: 'England' },
   { code: 'GQ', name: 'Equatorial Guinea' },
   { code: 'ER', name: 'Eritrea' },
   { code: 'EE', name: 'Estonia' },
@@ -138,6 +139,7 @@ export const COUNTRIES: Country[] = [
   { code: 'NI', name: 'Nicaragua' },
   { code: 'NE', name: 'Niger' },
   { code: 'NG', name: 'Nigeria' },
+  { code: 'GB-NIR', name: 'Northern Ireland' },
   { code: 'KP', name: 'North Korea' },
   { code: 'MK', name: 'North Macedonia' },
   { code: 'NO', name: 'Norway' },
@@ -164,6 +166,7 @@ export const COUNTRIES: Country[] = [
   { code: 'SM', name: 'San Marino' },
   { code: 'ST', name: 'São Tomé and Príncipe' },
   { code: 'SA', name: 'Saudi Arabia' },
+  { code: 'GB-SCT', name: 'Scotland' },
   { code: 'SN', name: 'Senegal' },
   { code: 'RS', name: 'Serbia' },
   { code: 'SC', name: 'Seychelles' },
@@ -198,7 +201,6 @@ export const COUNTRIES: Country[] = [
   { code: 'UG', name: 'Uganda' },
   { code: 'UA', name: 'Ukraine' },
   { code: 'AE', name: 'United Arab Emirates' },
-  { code: 'GB', name: 'United Kingdom' },
   { code: 'US', name: 'United States' },
   { code: 'UY', name: 'Uruguay' },
   { code: 'UZ', name: 'Uzbekistan' },
@@ -206,9 +208,17 @@ export const COUNTRIES: Country[] = [
   { code: 'VA', name: 'Vatican City' },
   { code: 'VE', name: 'Venezuela' },
   { code: 'VN', name: 'Vietnam' },
+  { code: 'GB-WLS', name: 'Wales' },
   { code: 'YE', name: 'Yemen' },
   { code: 'ZM', name: 'Zambia' },
   { code: 'ZW', name: 'Zimbabwe' },
 ];
-// England/Scotland/Wales flags are emoji tag sequences whose codes don't fit
-// the varchar(2) country column — the GB flag covers the UK. Deliberate omission.
+// The UK is listed as its home nations (England, Scotland, Wales, Northern
+// Ireland) with ISO 3166-2 codes — flagcdn serves gb-eng etc. as images, so
+// they render everywhere, including Windows. Legacy 'GB' values still show
+// the Union Jack via FlagIcon; the picker just no longer offers it.
+
+/** Is this a code the pickers accept? (ISO 3166-1 or a listed subdivision.) */
+export function isValidCountryCode(code: string): boolean {
+  return COUNTRIES.some(c => c.code === code.toUpperCase());
+}

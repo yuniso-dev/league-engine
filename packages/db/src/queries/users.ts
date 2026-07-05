@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { InferSelectModel } from 'drizzle-orm';
+import { cleanDisplayName } from '@inazuma/core';
 import { getDb } from '../client';
 import { users, blacklistedUsers } from '../schema';
 import { toPublicPlayer, type PublicPlayer } from '../dto';
@@ -30,19 +31,23 @@ export async function upsertDiscordUser(data: {
 
   if (blocked) return true;
 
+  // Discord names can carry emoji and "fancy font" Unicode the site can't
+  // render consistently — normalise once at the door.
+  const displayName = cleanDisplayName(data.displayName, data.username);
+
   await getDb()
     .insert(users)
     .values({
       discordId: data.discordId,
       username: data.username,
-      displayName: data.displayName,
+      displayName,
       avatarUrl: data.avatarUrl,
     })
     .onConflictDoUpdate({
       target: users.discordId,
       set: {
         username: data.username,
-        displayName: data.displayName,
+        displayName,
         avatarUrl: data.avatarUrl,
         updatedAt: new Date(),
       },
@@ -93,7 +98,7 @@ export async function initialiseUser(
       await getDb()
         .update(users)
         .set({
-          displayName: data.displayName,
+          displayName: cleanDisplayName(data.displayName),
           position1: data.position1,
           position2: data.position2,
           hidePositions: data.hidePositions,
@@ -187,7 +192,7 @@ export async function updateSettings(
   await getDb()
     .update(users)
     .set({
-      displayName: data.displayName,
+      displayName: cleanDisplayName(data.displayName),
       position1: data.position1,
       position2: data.position2,
       hidePositions: data.hidePositions,

@@ -829,8 +829,8 @@ export async function updatePlayerIdentityAction(
     const displayName = str(formData, 'displayName').slice(0, 32);
     if (!displayName) return { error: 'Display name is required.' };
 
-    const country = str(formData, 'country').toUpperCase().slice(0, 2) || null;
-    if (country && !/^[A-Z]{2}$/.test(country)) return { error: 'Invalid country.' };
+    const country = str(formData, 'country').toUpperCase().slice(0, 8) || null;
+    if (country && !/^[A-Z]{2}(-[A-Z]{2,3})?$/.test(country)) return { error: 'Invalid country.' };
 
     await updatePlayerIdentityByAdmin(admin.discordId, publicId, {
       displayName,

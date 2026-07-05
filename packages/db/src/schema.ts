@@ -51,7 +51,7 @@ export const users = pgTable('users', {
   eventsSignedUp:  integer('events_signed_up').notNull().default(0),
   eventsAttended:  integer('events_attended').notNull().default(0),
 
-  country:         varchar('country', { length: 2 }),
+  country:         varchar('country', { length: 8 }), // ISO 3166-1 or GB-ENG-style subdivision
   quote:           text('quote'),
   bio:             text('bio'),
 

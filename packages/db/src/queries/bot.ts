@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm';
+import { cleanDisplayName } from '@inazuma/core';
 import { getDb } from '../client';
 import { blacklistedUsers, config, users } from '../schema';
 
@@ -68,7 +69,9 @@ export async function syncGuildMember(data: {
     .values({
       discordId: data.discordId,
       username: data.username,
-      displayName: data.displayName,
+      // Emoji and fancy-Unicode names normalised at the door (site font +
+      // nickname truncation both depend on plain text).
+      displayName: cleanDisplayName(data.displayName, data.username),
       avatarUrl: data.avatarUrl,
     })
     .onConflictDoUpdate({

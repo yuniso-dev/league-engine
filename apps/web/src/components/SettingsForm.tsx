@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { FONT_D, FONT_B, glass, T } from '@/lib/realm-colors';
 import { POSITIONS } from '@/lib/positions';
-import { COUNTRIES, flagEmoji } from '@/lib/countries';
+import { COUNTRIES } from '@/lib/countries';
 import { BackPill } from '@/components/ui/BackPill';
+import { FlagIcon } from '@/components/ui/FlagIcon';
 import GlassSelect from '@/components/ui/GlassSelect';
 import HueWheel from '@/components/ui/HueWheel';
 import type { UserRow } from '@inazuma/db';
@@ -14,9 +15,15 @@ const POSITION_OPTIONS = [
   ...POSITIONS.map(p => ({ value: p, label: p })),
 ];
 
+// Flag IMAGES, not emoji — Windows renders flag emoji as bare letter pairs
+// ("GB"), so the picker shows the country name with a real flag beside it.
 const COUNTRY_OPTIONS = [
   { value: '', label: '— None —' },
-  ...COUNTRIES.map(c => ({ value: c.code, label: `${flagEmoji(c.code)} ${c.name}` })),
+  ...COUNTRIES.map(c => ({
+    value: c.code,
+    label: c.name,
+    icon: <FlagIcon code={c.code} size={20} />,
+  })),
 ];
 
 type Props = {
@@ -102,10 +109,10 @@ export default function SettingsForm({ action, user }: Props) {
             fontFamily: FONT_D, fontSize: 28, color: ACCENT,
             margin: '0 0 4px', letterSpacing: 2,
           }}>
-            SETTINGS
+            EDIT PROFILE
           </h1>
           <p style={{ fontFamily: FONT_B, color: T.dim, fontSize: 14, margin: '0 0 28px' }}>
-            Changes take effect immediately.
+            This is your player card — changes take effect immediately.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>

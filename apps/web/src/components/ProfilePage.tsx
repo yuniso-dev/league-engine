@@ -200,6 +200,24 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
           <h1 style={{ fontFamily: FONT_D, color: T.text, fontSize: 34, letterSpacing: '0.02em', margin: 0, lineHeight: 1 }}>
             {isOwn ? 'YOUR PROFILE' : 'PROFILE'}
           </h1>
+          {isOwn && (
+            <Link
+              href="/settings"
+              className="tap"
+              style={{
+                marginLeft: 'auto',
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '7px 14px', borderRadius: 999,
+                border: `1px solid ${rgba(accent, 0.5)}`,
+                background: rgba(accent, 0.12),
+                color: lighten(accent, 0.25),
+                fontFamily: FONT_M, fontSize: 11, letterSpacing: 1.2,
+                textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0,
+              }}
+            >
+              ✎ EDIT PROFILE
+            </Link>
+          )}
         </div>
         <p style={{ color: T.dim, fontFamily: FONT_B, fontSize: 13, margin: '8px 0 0 32px' }}>
           {isOwn ? 'This is how the server sees you.' : `Viewing ${player.displayName}`}
@@ -479,7 +497,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
             ) : (
               <p style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, margin: 0, letterSpacing: 0.5, lineHeight: 1.7 }}>
                 {isOwn
-                  ? 'Nothing in your own words yet — add a bio in Settings.'
+                  ? 'Nothing in your own words yet — add a bio with ✎ Edit Profile.'
                   : 'This player hasn’t written their own story yet.'}
               </p>
             )}

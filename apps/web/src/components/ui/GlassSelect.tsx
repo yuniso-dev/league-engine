@@ -8,7 +8,12 @@ import { FONT_B, T, glass } from '@/lib/realm-colors';
 // and listens for the owning form's reset event so formRef.current?.reset()
 // restores the default (the award forms rely on that).
 
-export type GlassSelectOption = { value: string; label: string };
+export type GlassSelectOption = {
+  value: string;
+  label: string;
+  /** Optional leading visual (e.g. a <FlagIcon/>), shown in the list and on the trigger. */
+  icon?: React.ReactNode;
+};
 
 type Props = {
   name?: string;
@@ -150,12 +155,16 @@ export default function GlassSelect({
         style={{ ...triggerBase, ...style }}
       >
         <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 8,
           overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
           color: selected ? T.text : T.faint,
         }}>
-          {selected ? selected.label : placeholder}
+          {selected?.icon}
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {selected ? selected.label : placeholder}
+          </span>
         </span>
         <span aria-hidden style={{
           color: T.faint,
@@ -223,7 +232,9 @@ export default function GlassSelect({
                   onClick={() => pick(o.value)}
                   onMouseEnter={() => setFocusIdx(i)}
                   style={{
-                    display: 'block',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
                     width: '100%',
                     textAlign: 'left',
                     padding: '9px 10px',
@@ -238,12 +249,12 @@ export default function GlassSelect({
                     fontFamily: FONT_B,
                     fontSize: 14,
                     cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
                   }}
                 >
-                  {o.label}
+                  {o.icon}
+                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {o.label}
+                  </span>
                 </button>
               );
             })
