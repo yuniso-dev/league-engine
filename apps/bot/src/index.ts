@@ -18,6 +18,7 @@ import { updateRankingsMessage } from './leaderboard.js';
 import { syncCasualMatches } from './casualSync.js';
 import { syncFrontierMatches } from './frontierSync.js';
 import { pollFriendlyTest } from './friendlyTest.js';
+import { fetchAllMembers } from './guildMembers.js';
 
 // ── env ───────────────────────────────────────────────────────────────────────
 const token = process.env.DISCORD_BOT_TOKEN;
@@ -71,8 +72,12 @@ function every(ms: number, label: string, fn: () => Promise<void>): void {
 }
 
 async function fullPass(guild: Guild): Promise<void> {
-  if (!READ_ONLY) await syncAllMembers(guild); // member sync writes to the DB
-  await syncNicknames(guild);                  // only edits nicknames in this guild — no DB writes
+  // ONE member fetch shared by both syncs — each fetch is a gateway request
+  // (opcode 8) with its own rate limit, and two back-to-back fetches right
+  // after a couple of restarts is exactly what trips it.
+  const members = await fetchAllMembers(guild);
+  if (!READ_ONLY) await syncAllMembers(guild, members); // member sync writes to the DB
+  await syncNicknames(guild, members);                  // only edits nicknames in this guild — no DB writes
   if (!READ_ONLY) await updateRankingsMessage(client, SITE_URL);
 }
 
