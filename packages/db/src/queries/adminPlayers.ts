@@ -224,7 +224,8 @@ export async function updatePlayerIdentityByAdmin(
     position2: string | null;
     country: string | null;
     quote: string | null;
-    bio: string | null;
+    /** Retired from the UI — only written when explicitly provided. */
+    bio?: string | null;
   },
 ): Promise<void> {
   const [player] = await getDb()
@@ -242,7 +243,7 @@ export async function updatePlayerIdentityByAdmin(
       position2: data.position2,
       country: data.country,
       quote: data.quote,
-      bio: data.bio,
+      ...(data.bio !== undefined && { bio: data.bio }),
       updatedAt: new Date(),
     })
     .where(eq(users.discordId, player.discordId));

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import {
+  getFrontierHistory,
   getHeadToHead,
   getUserByDiscordId,
   getUserByPublicId,
@@ -8,9 +9,10 @@ import {
   listAwardsForPlayer,
   runResilient,
 } from '@inazuma/db';
-import type { HeadToHead, PublicAward, PublicRecentMatch, RatingPoint } from '@inazuma/db';
+import type { FrontierHistoryEntry, HeadToHead, PublicAward, PublicRecentMatch, RatingPoint } from '@inazuma/db';
 import { auth } from '@/auth';
 import { HeadToHeadCard } from '@/components/HeadToHeadCard';
+import { FrontierHistoryCard } from '@/components/FrontierHistoryCard';
 import { Avatar } from '@/components/ui/Avatar';
 import { BackPill } from '@/components/ui/BackPill';
 import { RatingGraph } from '@/components/RatingGraph';
@@ -42,14 +44,15 @@ export default async function PublicProfilePage({ params }: Props) {
     .catch(() => null);
 
   // Extras degrade gracefully — the card itself always renders.
-  const [[history, playerAwards, recentMatches], headToHead] = await Promise.all([
+  const [[history, playerAwards, recentMatches, frontierHistory], headToHead] = await Promise.all([
     runResilient(() =>
       Promise.all([
         getRatingHistoryByPublicId(params.publicId),
         listAwardsForPlayer(params.publicId),
         getRecentMatchesForPlayer(params.publicId),
+        getFrontierHistory(params.publicId),
       ]),
-    ).catch((): [RatingPoint[], PublicAward[], PublicRecentMatch[]] => [[], [], []]),
+    ).catch((): [RatingPoint[], PublicAward[], PublicRecentMatch[], FrontierHistoryEntry[]] => [[], [], [], []]),
     headToHeadPromise,
   ]);
 
@@ -240,17 +243,17 @@ export default async function PublicProfilePage({ params }: Props) {
           </div>
         )}
 
-        {player.bio && (
-          <p style={{
-            margin: 0,
-            fontFamily: FONT_B,
-            fontSize: 14,
-            color: T.dim,
-            lineHeight: 1.6,
-            whiteSpace: 'pre-wrap',
-          }}>
-            {player.bio}
-          </p>
+        {/* Frontier history — the tournament record */}
+        {frontierHistory.length > 0 && (
+          <div style={{ margin: '0 0 16px' }}>
+            <div style={{
+              fontFamily: FONT_M, fontSize: 10, color: T.faint,
+              letterSpacing: 1, marginBottom: 8,
+            }}>
+              FRONTIER HISTORY
+            </div>
+            <FrontierHistoryCard history={frontierHistory} accent={accent} />
+          </div>
         )}
 
         {/* Tier badge */}

@@ -69,6 +69,65 @@ export async function getRecentMatchesForPlayer(
   }));
 }
 
+// ── Frontier history: every tournament a player took part in ──────────────────
+
+export type FrontierHistoryEntry = {
+  tournamentId: string;
+  name: string;
+  season: number;
+  startDate: string | null;
+  /** True when the player's team won the tournament. */
+  champion: boolean;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goals: number;
+  assists: number;
+};
+
+/** One row per Frontier the player appeared in (newest first), with their
+ *  per-tournament record. Mirrors getPlayerMilestones' counting (all recorded
+ *  participant rows — not gated on the weekly reveal). */
+export async function getFrontierHistory(publicId: string): Promise<FrontierHistoryEntry[]> {
+  const rows = await getDb().execute(sql`
+    with me as (
+      select discord_id from users where public_id = ${publicId} and is_blacklisted = false
+    )
+    select t.id                                             as tournament_id,
+           t.name                                           as name,
+           t.season                                         as season,
+           t.start_date                                     as start_date,
+           bool_or(mp.team_id = t.winner_team_id)           as champion,
+           count(*)::int                                    as played,
+           (count(*) filter (where mp.result = 'win'))::int  as wins,
+           (count(*) filter (where mp.result = 'draw'))::int as draws,
+           (count(*) filter (where mp.result = 'loss'))::int as losses,
+           coalesce(sum(mp.goals), 0)::int                  as goals,
+           coalesce(sum(mp.assists), 0)::int                as assists
+      from match_participants mp
+      join matches m on m.id = mp.match_id
+      join tournaments t on t.id = m.tournament_id
+     where mp.user_id in (select discord_id from me)
+     group by t.id, t.name, t.season, t.start_date
+     order by t.season desc, t.created_at desc
+  `);
+
+  return (rows as unknown as Record<string, unknown>[]).map(r => ({
+    tournamentId: String(r.tournament_id),
+    name: String(r.name),
+    season: Number(r.season),
+    startDate: r.start_date != null ? String(r.start_date) : null,
+    champion: Boolean(r.champion),
+    played: Number(r.played ?? 0),
+    wins: Number(r.wins ?? 0),
+    draws: Number(r.draws ?? 0),
+    losses: Number(r.losses ?? 0),
+    goals: Number(r.goals ?? 0),
+    assists: Number(r.assists ?? 0),
+  }));
+}
+
 // ── Head-to-head: "you vs them" between two players ───────────────────────────
 
 export type HeadToHead = {

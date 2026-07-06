@@ -192,18 +192,6 @@ export default function SettingsForm({ action, user }: Props) {
               />
             </div>
 
-            <div>
-              <label style={labelStyle}>Bio</label>
-              <textarea
-                name="bio"
-                defaultValue={user.bio ?? ''}
-                maxLength={300}
-                rows={3}
-                placeholder="Tell the league about yourself..."
-                style={{ ...inputBase, resize: 'vertical', lineHeight: 1.5 }}
-              />
-            </div>
-
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
               <input
                 type="checkbox"

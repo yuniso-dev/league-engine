@@ -97,11 +97,6 @@ export default function AdminPlayerIdentityForm({ player }: { player: AdminPlaye
           <input name="quote" maxLength={100} defaultValue={player.quote ?? ''} style={inputBase} />
         </div>
 
-        <div style={{ marginTop: 12 }}>
-          <label style={labelStyle}>Bio</label>
-          <textarea name="bio" maxLength={300} rows={3} defaultValue={player.bio ?? ''} style={{ ...inputBase, resize: 'vertical', lineHeight: 1.5 }} />
-        </div>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 16 }}>
           <SaveButton />
           {state.error && <span style={{ fontFamily: FONT_B, color: T.loss, fontSize: 13 }}>{state.error}</span>}
