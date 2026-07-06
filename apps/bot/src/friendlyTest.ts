@@ -24,16 +24,31 @@ type Watch = {
 
 let watch: Watch | null = null;
 
-/** Digits → treat as a club ID; anything else → search EA by name. */
-export async function resolveClub(
-  input: string,
-  platform: string,
-): Promise<{ id: string; name: string } | null> {
+export type ResolveClubResult =
+  | { ok: true; id: string; name: string }
+  | { ok: false; error: string };
+
+/** Digits → treat as a club ID; anything else → search EA by name.
+ *  Failures come back with the REAL reason so admins aren't guessing. */
+export async function resolveClub(input: string, platform: string): Promise<ResolveClubResult> {
   const trimmed = input.trim();
-  if (/^\d{1,12}$/.test(trimmed)) return { id: trimmed, name: `club ${trimmed}` };
-  const results = await searchClubs(trimmed, platform).catch(() => []);
-  if (results.length === 0) return null;
-  return { id: results[0].clubId, name: results[0].name };
+  if (/^\d{1,12}$/.test(trimmed)) return { ok: true, id: trimmed, name: `club ${trimmed}` };
+
+  try {
+    const results = await searchClubs(trimmed, platform);
+    if (results.length === 0) {
+      return {
+        ok: false,
+        error: `EA found no club named “${trimmed}”. The search needs the EXACT in-game name (spelling and spaces matter; case doesn't) — or paste the numeric club ID instead.`,
+      };
+    }
+    return { ok: true, id: results[0].clubId, name: results[0].name };
+  } catch (e) {
+    return {
+      ok: false,
+      error: `EA club search failed (${e instanceof Error ? e.message : e}). You can paste the numeric club ID instead — it skips the search entirely.`,
+    };
+  }
 }
 
 export type ProbeLine = { matchType: EaMatchType; ok: boolean; count: number; error?: string };

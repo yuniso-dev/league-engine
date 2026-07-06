@@ -41,6 +41,15 @@ export type EaRawMatch = {
   }>>;
 };
 
+/** HTTP-status-carrying error so callers can tell "no results" (EA answers
+ *  404 for an empty club search) from "blocked/down". */
+export class EaApiError extends Error {
+  constructor(public readonly status: number, url: string) {
+    super(`EA API ${status} for ${url}`);
+    this.name = 'EaApiError';
+  }
+}
+
 async function getJson(url: string): Promise<unknown> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 10_000);
@@ -49,7 +58,7 @@ async function getJson(url: string): Promise<unknown> {
       signal: ctrl.signal,
       headers: { 'User-Agent': UA, Accept: 'application/json' },
     });
-    if (!res.ok) throw new Error(`EA API ${res.status} for ${url}`);
+    if (!res.ok) throw new EaApiError(res.status, url);
     return await res.json();
   } finally {
     clearTimeout(timer);
@@ -80,10 +89,18 @@ export type EaClubSummary = {
 
 /** Search clubs by name — how admins find a captain's fresh club ID. EA has
  *  returned both array and keyed-object shapes for this endpoint over the
- *  years, so accept either. */
+ *  years, so accept either. EA's search matches the EXACT in-game name (not
+ *  fuzzy) and answers 404 when nothing matches — that's "no results", not an
+ *  outage, so it returns []. */
 export async function searchClubs(name: string, platform: string): Promise<EaClubSummary[]> {
   const url = `${BASE}/clubs/search?clubName=${encodeURIComponent(name)}&platform=${encodeURIComponent(platform)}`;
-  const data = await getJson(url);
+  let data: unknown;
+  try {
+    data = await getJson(url);
+  } catch (e) {
+    if (e instanceof EaApiError && e.status === 404) return [];
+    throw e;
+  }
   const list: unknown[] = Array.isArray(data)
     ? data
     : typeof data === 'object' && data !== null

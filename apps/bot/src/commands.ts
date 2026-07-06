@@ -172,11 +172,24 @@ async function handleFindClub(interaction: ChatInputCommandInteraction): Promise
 
   const name = interaction.options.getString('name', true).trim();
   const cfg = await getConfig();
-  const clubs = await searchClubs(name, cfg.eaPlatform || 'common-gen5');
+
+  let clubs;
+  try {
+    clubs = await searchClubs(name, cfg.eaPlatform || 'common-gen5');
+  } catch (e) {
+    // Surface the REAL failure (status code etc.) instead of the generic error.
+    await interaction.editReply(
+      `EA club search failed: \`${e instanceof Error ? e.message : e}\`\n` +
+      `If this keeps happening EA may be rate-limiting or blocking the host — ` +
+      `you can always use the numeric club ID directly (it's in the club page URL on EA's Pro Clubs site).`,
+    );
+    return;
+  }
 
   if (clubs.length === 0) {
     await interaction.editReply(
-      `No EA clubs found matching **${name}**. Check the exact in-game club name — EA's search is picky about spelling.`,
+      `No EA club named **${name}** on \`${cfg.eaPlatform || 'common-gen5'}\`. EA's search needs the **exact in-game name** — ` +
+      `spelling and spaces matter (case doesn't). Copy it letter-for-letter from the club screen in game.`,
     );
     return;
   }
@@ -218,16 +231,20 @@ async function handleTestFriendly(interaction: ChatInputCommandInteraction): Pro
   const cfg = await getConfig();
   const platform = cfg.eaPlatform || 'common-gen5';
 
-  const [clubA, clubB] = await Promise.all([
+  const [resA, resB] = await Promise.all([
     resolveClub(interaction.options.getString('club1', true), platform),
     resolveClub(interaction.options.getString('club2', true), platform),
   ]);
-  if (!clubA || !clubB) {
-    await interaction.editReply(
-      `Couldn't resolve ${!clubA ? '**club1**' : '**club2**'} — pass the exact club name, or the numeric ID from \`/findclub\`.`,
-    );
+  if (!resA.ok || !resB.ok) {
+    const problems = [
+      !resA.ok ? `**club1**: ${resA.error}` : null,
+      !resB.ok ? `**club2**: ${resB.error}` : null,
+    ].filter(Boolean);
+    await interaction.editReply(problems.join('\n'));
     return;
   }
+  const clubA = { id: resA.id, name: resA.name };
+  const clubB = { id: resB.id, name: resB.name };
   if (clubA.id === clubB.id) {
     await interaction.editReply('Those are the same club — pass two different clubs.');
     return;
