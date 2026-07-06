@@ -1,6 +1,6 @@
 import { EmbedBuilder, type Client } from 'discord.js';
 import { getConfig, listLinkedCasualPlayers } from '@inazuma/db';
-import { eaNum, fetchClubMatches, searchClubs, type EaMatchType, type EaRawMatch } from './eaClient.js';
+import { eaNum, fetchClubMatches, fetchClubsInfo, searchClubs, type EaMatchType, type EaRawMatch } from './eaClient.js';
 
 // /testfriendly — the dress-rehearsal probe for Frontier auto-ingest.
 // Watches two EA clubs and posts a full stat report to Discord the moment a
@@ -32,7 +32,11 @@ export type ResolveClubResult =
  *  Failures come back with the REAL reason so admins aren't guessing. */
 export async function resolveClub(input: string, platform: string): Promise<ResolveClubResult> {
   const trimmed = input.trim();
-  if (/^\d{1,12}$/.test(trimmed)) return { ok: true, id: trimmed, name: `club ${trimmed}` };
+  if (/^\d{1,12}$/.test(trimmed)) {
+    // Look up the real name so reports don't say "club 118660".
+    const info = await fetchClubsInfo([trimmed], platform);
+    return { ok: true, id: trimmed, name: info.get(trimmed)?.name ?? `club ${trimmed}` };
+  }
 
   try {
     const results = await searchClubs(trimmed, platform);

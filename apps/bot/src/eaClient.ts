@@ -85,22 +85,11 @@ export type EaClubSummary = {
   clubId: string;
   name: string;
   members: number | null;
+  /** All-time record when the endpoint provides it (W/D/L). */
+  record: { wins: number; ties: number; losses: number } | null;
 };
 
-/** Search clubs by name — how admins find a captain's fresh club ID. EA has
- *  returned both array and keyed-object shapes for this endpoint over the
- *  years, so accept either. EA's search matches the EXACT in-game name (not
- *  fuzzy) and answers 404 when nothing matches — that's "no results", not an
- *  outage, so it returns []. */
-export async function searchClubs(name: string, platform: string): Promise<EaClubSummary[]> {
-  const url = `${BASE}/clubs/search?clubName=${encodeURIComponent(name)}&platform=${encodeURIComponent(platform)}`;
-  let data: unknown;
-  try {
-    data = await getJson(url);
-  } catch (e) {
-    if (e instanceof EaApiError && e.status === 404) return [];
-    throw e;
-  }
+function parseClubList(data: unknown): EaClubSummary[] {
   const list: unknown[] = Array.isArray(data)
     ? data
     : typeof data === 'object' && data !== null
@@ -116,11 +105,67 @@ export async function searchClubs(name: string, platform: string): Promise<EaClu
       const clubName = e.name ?? info.name;
       if (clubId == null || clubName == null) return null;
       const members = e.membersCount ?? e.memberCount ?? null;
+      const hasRecord = e.wins != null || e.ties != null || e.losses != null;
       return {
         clubId: String(clubId),
         name: String(clubName),
         members: members != null ? eaNum(members as string | number) : null,
+        record: hasRecord
+          ? {
+              wins: eaNum(e.wins as string | number),
+              ties: eaNum(e.ties as string | number),
+              losses: eaNum(e.losses as string | number),
+            }
+          : null,
       };
     })
     .filter((c): c is EaClubSummary => c !== null);
+}
+
+/** Search clubs by (partial) name. EA has moved this between endpoints across
+ *  title years — clubs/search and allTimeLeaderboard/search — so try both.
+ *  404 means "no results" on these endpoints, not an outage. */
+export async function searchClubs(name: string, platform: string): Promise<EaClubSummary[]> {
+  const urls = [
+    `${BASE}/clubs/search?clubName=${encodeURIComponent(name)}&platform=${encodeURIComponent(platform)}`,
+    `${BASE}/allTimeLeaderboard/search?clubName=${encodeURIComponent(name)}&platform=${encodeURIComponent(platform)}`,
+  ];
+
+  let lastError: unknown = null;
+  for (const url of urls) {
+    try {
+      const clubs = parseClubList(await getJson(url));
+      if (clubs.length > 0) return clubs;
+      // Endpoint answered but found nothing — try the other endpoint too.
+    } catch (e) {
+      if (e instanceof EaApiError && e.status === 404) continue; // no results here
+      lastError = e; // blocked/down — remember, but still try the fallback
+    }
+  }
+  if (lastError) throw lastError;
+  return [];
+}
+
+/** Look up clubs by ID (name + record) — validates pasted IDs and puts real
+ *  names on reports instead of "club 118660". */
+export async function fetchClubsInfo(
+  clubIds: string[],
+  platform: string,
+): Promise<Map<string, { name: string }>> {
+  const out = new Map<string, { name: string }>();
+  if (clubIds.length === 0) return out;
+  const url = `${BASE}/clubs/info?platform=${encodeURIComponent(platform)}&clubIds=${encodeURIComponent(clubIds.join(','))}`;
+  let data: unknown;
+  try {
+    data = await getJson(url);
+  } catch {
+    return out; // enrichment only — callers fall back to the raw ID
+  }
+  if (typeof data !== 'object' || data === null) return out;
+  for (const [id, value] of Object.entries(data as Record<string, unknown>)) {
+    if (typeof value === 'object' && value !== null && 'name' in value && (value as { name?: unknown }).name != null) {
+      out.set(String(id), { name: String((value as { name: unknown }).name) });
+    }
+  }
+  return out;
 }

@@ -14,6 +14,7 @@ import { resetAllNicknames, syncNicknames } from './nicknameSync.js';
 import { snapshotVoiceChannel } from './voicePresence.js';
 import { searchClubs } from './eaClient.js';
 import { armFriendlyTest, disarmFriendlyTest, friendlyTestStatus, resolveClub } from './friendlyTest.js';
+import { CLUB_PICK_ID, buildClubMenu, cancelClubSession, clubSessionStatus, handleClubPick, startClubSession } from './clubSetup.js';
 
 const definitions = [
   new SlashCommandBuilder()
@@ -41,11 +42,28 @@ const definitions = [
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder()
     .setName('findclub')
-    .setDescription("Admin: search EA clubs by name — find a captain's fresh club ID for team linking")
+    .setDescription('Admin: search EA clubs by name and pick from a menu')
     .addStringOption(o =>
       o.setName('name')
         .setDescription('Club name (or part of it) to search for')
         .setRequired(true))
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+  new SlashCommandBuilder()
+    .setName('frontierclubstart')
+    .setDescription('Admin: set up the Frontier — pick each team’s club and linked teams are created')
+    .addSubcommand(s =>
+      s.setName('begin')
+        .setDescription('Start collecting clubs for the current Frontier')
+        .addIntegerOption(o =>
+          o.setName('teams')
+            .setDescription('How many teams are playing (2–8)')
+            .setRequired(true)
+            .setMinValue(2)
+            .setMaxValue(8)))
+    .addSubcommand(s =>
+      s.setName('status').setDescription('Show the club-setup progress'))
+    .addSubcommand(s =>
+      s.setName('cancel').setDescription('Cancel the club-setup session'))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder()
     .setName('testfriendly')
@@ -188,19 +206,38 @@ async function handleFindClub(interaction: ChatInputCommandInteraction): Promise
 
   if (clubs.length === 0) {
     await interaction.editReply(
-      `No EA club named **${name}** on \`${cfg.eaPlatform || 'common-gen5'}\`. EA's search needs the **exact in-game name** — ` +
-      `spelling and spaces matter (case doesn't). Copy it letter-for-letter from the club screen in game.`,
+      `No EA club matching **${name}** on \`${cfg.eaPlatform || 'common-gen5'}\`. ` +
+      `Try more (or fewer) letters of the club's in-game name.`,
     );
     return;
   }
 
-  const lines = clubs.slice(0, 10).map(c =>
-    `**${c.name}** — ID: \`${c.clubId}\`${c.members != null ? ` · ${c.members} member${c.members === 1 ? '' : 's'}` : ''}`,
-  );
-  await interaction.editReply(
-    `🔎 Clubs matching **${name}**:\n${lines.join('\n')}\n\n` +
-    `Paste the ID into the team's **EA Club ID** field (Admin → tournament → team) and results auto-record while the Frontier is live.`,
-  );
+  await interaction.editReply({
+    content: `🔎 ${clubs.length} club${clubs.length === 1 ? '' : 's'} matching **${name}** — select the right one:`,
+    components: [buildClubMenu(clubs)],
+  });
+}
+
+async function handleFrontierClubStart(interaction: ChatInputCommandInteraction): Promise<void> {
+  const sub = interaction.options.getSubcommand();
+
+  if (sub === 'status') {
+    await interaction.reply({ content: clubSessionStatus(), flags: MessageFlags.Ephemeral });
+    return;
+  }
+  if (sub === 'cancel') {
+    const was = cancelClubSession();
+    await interaction.reply({
+      content: was ? 'Club setup cancelled.' : 'No session was running.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  // begin
+  await interaction.deferReply();
+  const teams = interaction.options.getInteger('teams', true);
+  await interaction.editReply(await startClubSession(teams, interaction.user.id));
 }
 
 async function handleTestFriendly(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -270,6 +307,17 @@ export async function dispatch(
   interaction: Interaction,
   ctx: { siteUrl: string; readOnly: boolean },
 ): Promise<void> {
+  // Component interactions: the club-pick select menu.
+  if (interaction.isStringSelectMenu() && interaction.customId === CLUB_PICK_ID) {
+    try {
+      await handleClubPick(interaction, ctx.readOnly);
+    } catch (e) {
+      console.error('[commands] club pick failed —', e);
+      await interaction.update({ content: 'Something went wrong — run /findclub again.', components: [] }).catch(() => {});
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
   if (!interaction.inGuild()) return;
 
@@ -289,6 +337,9 @@ export async function dispatch(
         break;
       case 'findclub':
         await handleFindClub(interaction);
+        break;
+      case 'frontierclubstart':
+        await handleFrontierClubStart(interaction);
         break;
       case 'testfriendly':
         await handleTestFriendly(interaction);
