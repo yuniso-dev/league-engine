@@ -11,10 +11,11 @@ import { adminActions, matches, matchParticipants, teams, tournaments, users } f
 
 export type LinkedLiveTournament = {
   tournamentId: string;
+  tournamentName: string;
   /** Teams with an EA club bound (clubId → team). */
   clubs: { clubId: string; teamId: string; teamName: string }[];
   /** Fixtures still waiting for a result, oldest first. */
-  unscoredFixtures: { matchId: string; homeTeamId: string; awayTeamId: string }[];
+  unscoredFixtures: { matchId: string; homeTeamId: string; awayTeamId: string; createdAt: Date }[];
 };
 
 /** Live tournaments with ≥2 linked clubs — the only time polling makes sense. */
@@ -22,11 +23,12 @@ export async function getLinkedLiveTournaments(): Promise<LinkedLiveTournament[]
   const db = getDb();
 
   const liveTournaments = await db
-    .select({ id: tournaments.id })
+    .select({ id: tournaments.id, name: tournaments.name })
     .from(tournaments)
     .where(eq(tournaments.status, 'live'));
   if (liveTournaments.length === 0) return [];
   const ids = liveTournaments.map(t => t.id);
+  const nameOf = new Map(liveTournaments.map(t => [t.id, t.name]));
 
   const [teamRows, fixtureRows] = await Promise.all([
     db
@@ -44,6 +46,7 @@ export async function getLinkedLiveTournaments(): Promise<LinkedLiveTournament[]
         tournamentId: matches.tournamentId,
         homeTeamId: matches.homeTeamId,
         awayTeamId: matches.awayTeamId,
+        createdAt: matches.createdAt,
       })
       .from(matches)
       .where(and(inArray(matches.tournamentId, ids), isNull(matches.homeScore)))
@@ -53,12 +56,13 @@ export async function getLinkedLiveTournaments(): Promise<LinkedLiveTournament[]
   return ids
     .map(tournamentId => ({
       tournamentId,
+      tournamentName: nameOf.get(tournamentId) ?? '?',
       clubs: teamRows
         .filter(t => t.tournamentId === tournamentId && t.eaClubId != null)
         .map(t => ({ clubId: t.eaClubId!, teamId: t.teamId, teamName: t.name })),
       unscoredFixtures: fixtureRows
         .filter(f => f.tournamentId === tournamentId)
-        .map(f => ({ matchId: f.matchId, homeTeamId: f.homeTeamId, awayTeamId: f.awayTeamId })),
+        .map(f => ({ matchId: f.matchId, homeTeamId: f.homeTeamId, awayTeamId: f.awayTeamId, createdAt: f.createdAt })),
     }))
     .filter(t => t.clubs.length >= 2);
 }
