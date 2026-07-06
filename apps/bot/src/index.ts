@@ -17,6 +17,7 @@ import { syncNicknames } from './nicknameSync.js';
 import { updateRankingsMessage } from './leaderboard.js';
 import { syncCasualMatches } from './casualSync.js';
 import { syncFrontierMatches } from './frontierSync.js';
+import { pollFriendlyTest } from './friendlyTest.js';
 
 // ── env ───────────────────────────────────────────────────────────────────────
 const token = process.env.DISCORD_BOT_TOKEN;
@@ -148,6 +149,10 @@ client.once(Events.ClientReady, async ready => {
   if (!READ_ONLY) {
     every(FRONTIER_POLL_MS, 'frontier sync', syncFrontierMatches);
   }
+
+  // /testfriendly watch tick — strictly read-only, a free no-op unless armed,
+  // so it runs even in READ_ONLY test mode.
+  every(60_000, 'friendly test', () => pollFriendlyTest(ready));
 });
 
 client.on(Events.GuildMemberAdd, member => {
