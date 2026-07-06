@@ -1,0 +1,260 @@
+'use client';
+import { useMemo, useState } from 'react';
+import { useFormState, useFormStatus } from 'react-dom';
+import { HONOURS, isRomanNumeral } from '@inazuma/core';
+import type { CeremonySheet } from '@inazuma/db';
+import { FONT_B, FONT_D, FONT_M, T, glass, rgba } from '@/lib/realm-colors';
+import { ADMIN_ACCENT } from '@/components/admin/ui';
+import { buildCeremonyAnnouncement } from '@/lib/announcementDraft';
+import { runCeremonyAction, type AdminFormState } from '@/app/admin/actions';
+
+// The ceremony sheet: computed winners per honour, the GK rating table, the
+// champion roster, two pickers for the VOTED honours, one GRANT ALL button,
+// and a live announcement draft that always mirrors the current inputs.
+
+const label: React.CSSProperties = {
+  fontFamily: FONT_D, fontSize: 12, letterSpacing: 1.5, color: ADMIN_ACCENT,
+};
+const inputBase: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.06)',
+  border: '1px solid rgba(255,255,255,0.16)',
+  borderRadius: 8,
+  color: T.text,
+  fontFamily: FONT_B,
+  fontSize: 14,
+  padding: '8px 12px',
+};
+
+function GrantButton({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending || disabled}
+      style={{
+        fontFamily: FONT_D, fontSize: 14, letterSpacing: 1.5,
+        background: disabled ? 'rgba(255,255,255,0.06)' : rgba(T.gold, 0.16),
+        border: `1px solid ${disabled ? 'rgba(255,255,255,0.15)' : rgba(T.gold, 0.55)}`,
+        color: disabled ? T.faint : T.gold,
+        borderRadius: 10, padding: '12px 24px',
+        cursor: pending || disabled ? 'default' : 'pointer',
+        opacity: pending ? 0.6 : 1,
+      }}
+    >
+      {pending ? 'GRANTING…' : '🏆 GRANT ALL HONOURS'}
+    </button>
+  );
+}
+
+export default function CeremonyBoard({
+  sheet,
+  defaultNumeral,
+}: {
+  sheet: CeremonySheet;
+  defaultNumeral: string;
+}) {
+  const [state, action] = useFormState<AdminFormState, FormData>(runCeremonyAction, {});
+  const [numeral, setNumeral] = useState(defaultNumeral);
+  const [defenderId, setDefenderId] = useState(''); // publicId or ''
+  const [pottId, setPottId] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const numeralOk = isRomanNumeral(numeral);
+  const byPublicId = (publicId: string) => sheet.voterPool.find(p => p.publicId === publicId) ?? null;
+  const glove = sheet.gkTable[0] ?? null;
+
+  // The grant preview + announcement recompute from CURRENT inputs — what you
+  // see is exactly what GRANT ALL mints.
+  const willGrant = useMemo(() => {
+    const n = numeral.trim().toUpperCase();
+    const rows: { icon: string; award: string; names: string }[] = [];
+    const add = (key: (typeof HONOURS)[number]['key'], names: string[]) => {
+      if (names.length === 0) return;
+      const h = HONOURS.find(x => x.key === key)!;
+      rows.push({ icon: h.icon, award: `${h.base} ${n}`, names: names.join(', ') });
+    };
+    add('topScorer', sheet.topScorers.map(w => w.displayName));
+    add('topAssister', sheet.topAssisters.map(w => w.displayName));
+    add('goldenGlove', glove ? [glove.displayName] : []);
+    add('bestDefender', defenderId ? [byPublicId(defenderId)?.displayName ?? ''] : []);
+    add('pott', pottId ? [byPublicId(pottId)?.displayName ?? ''] : []);
+    add('champion', sheet.championTeam?.members.map(m => m.displayName) ?? []);
+    add('mrInazuma', sheet.championTeam?.captain ? [sheet.championTeam.captain.displayName] : []);
+    return rows;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numeral, defenderId, pottId, sheet]);
+
+  const draft = useMemo(() => buildCeremonyAnnouncement({
+    tournamentName: sheet.tournament.name,
+    season: sheet.tournament.season,
+    numeral,
+    topScorers: sheet.topScorers.map(w => ({ discordId: w.discordId, value: w.value })),
+    topAssisters: sheet.topAssisters.map(w => ({ discordId: w.discordId, value: w.value })),
+    goldenGlove: glove ? { discordId: glove.discordId, value: glove.value } : null,
+    bestDefender: defenderId ? { discordId: byPublicId(defenderId)?.discordId ?? '' } : null,
+    pott: pottId ? { discordId: byPublicId(pottId)?.discordId ?? '' } : null,
+    champion: sheet.championTeam
+      ? {
+          teamName: sheet.championTeam.name,
+          memberDiscordIds: sheet.championTeam.members.map(m => m.discordId),
+          captainDiscordId: sheet.championTeam.captain?.discordId ?? null,
+        }
+      : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [numeral, defenderId, pottId, sheet]);
+
+  const votedPicker = (
+    title: string, hint: string, value: string, onChange: (v: string) => void, name: string,
+  ) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 220 }}>
+      <span style={label}>{title}</span>
+      <select name={name} value={value} onChange={e => onChange(e.target.value)} style={inputBase}>
+        <option value="">— not decided —</option>
+        {sheet.voterPool.map(p => (
+          <option key={p.publicId} value={p.publicId}>{p.displayName}</option>
+        ))}
+      </select>
+      <span style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint }}>{hint}</span>
+    </div>
+  );
+
+  const statRow = (icon: string, title: string, winners: string, warn?: string) => (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+      <span style={{ fontSize: 16 }}>{icon}</span>
+      <span style={{ fontFamily: FONT_D, fontSize: 13, letterSpacing: 1, color: T.text, minWidth: 170 }}>{title}</span>
+      <span style={{ fontFamily: FONT_B, fontSize: 14, color: winners ? T.gold : T.faint, flex: 1 }}>
+        {winners || warn || '—'}
+      </span>
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {/* ── Computed stat winners ── */}
+      <div style={glass({ padding: 18 })}>
+        <div style={{ ...label, marginBottom: 8 }}>STAT HONOURS — COMPUTED FROM RESULTS</div>
+        {statRow('🥇', "Blaze's Boot",
+          sheet.topScorers.map(w => `${w.displayName} (${w.value})`).join(', '),
+          'no goals recorded yet')}
+        {statRow('👑', "Sharp's Award",
+          sheet.topAssisters.map(w => `${w.displayName} (${w.value})`).join(', '),
+          'no assists recorded yet')}
+        {statRow('🧤', "Evan's Golden Glove",
+          glove ? `${glove.displayName} (${glove.value.toFixed(2)} avg, ${glove.appearances} apps)` : '',
+          'no goalkeeper with 2+ rated appearances — EA auto-ingest fills this')}
+        {sheet.gkTable.length > 1 && (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, marginBottom: 4 }}>GK TABLE</div>
+            {sheet.gkTable.map((g, i) => (
+              <div key={g.publicId} style={{
+                display: 'flex', gap: 10, fontFamily: FONT_B, fontSize: 13, padding: '3px 0',
+                color: i === 0 ? T.gold : T.dim,
+              }}>
+                <span style={{ fontFamily: FONT_M, minWidth: 18 }}>{i + 1}</span>
+                <span style={{ flex: 1 }}>{g.displayName}</span>
+                <span>{g.value.toFixed(2)} avg</span>
+                <span style={{ color: T.faint }}>{g.appearances} apps</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Champion ── */}
+      <div style={glass({ padding: 18 })}>
+        <div style={{ ...label, marginBottom: 8 }}>CHAMPIONS</div>
+        {sheet.championTeam ? (
+          <>
+            {statRow('🏆', 'Inazuma Frontier',
+              `${sheet.championTeam.name} — ${sheet.championTeam.members.map(m => m.displayName).join(', ')}`)}
+            {statRow('🎖️', 'Mr Inazuma',
+              sheet.championTeam.captain?.displayName ?? '',
+              'team has no captain set — assign one on the draft board')}
+          </>
+        ) : (
+          <p style={{ fontFamily: FONT_B, fontSize: 13.5, color: T.faint, margin: 0 }}>
+            No winner set yet — pick the champion team in the tournament&apos;s status controls first.
+          </p>
+        )}
+      </div>
+
+      {/* ── The form: numeral + voted honours + GRANT ALL ── */}
+      <form action={action} style={glass({ padding: 18, display: 'flex', flexDirection: 'column', gap: 16 })}>
+        <input type="hidden" name="tournamentId" value={sheet.tournament.id} />
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 140 }}>
+            <span style={label}>EDITION NUMERAL</span>
+            <input
+              name="numeral"
+              value={numeral}
+              onChange={e => setNumeral(e.target.value.toUpperCase())}
+              placeholder="e.g. XVII"
+              style={{ ...inputBase, width: 120, borderColor: numeral && !numeralOk ? rgba(T.loss, 0.6) : undefined }}
+            />
+            <span style={{ fontFamily: FONT_M, fontSize: 11, color: numeral && !numeralOk ? T.loss : T.faint }}>
+              {numeral && !numeralOk ? 'not a valid roman numeral' : 'awards mint as “Blaze’s Boot XVII”'}
+            </span>
+          </div>
+          {votedPicker("🧱 WALLSIDE'S AWARD", 'winner of the defender poll', defenderId, setDefenderId, 'defenderPublicId')}
+          {votedPicker('❄️ XAVIER FROST', 'winner of the POTT poll', pottId, setPottId, 'pottPublicId')}
+        </div>
+
+        {willGrant.length > 0 && (
+          <div>
+            <div style={{ ...label, marginBottom: 6 }}>WILL GRANT</div>
+            {willGrant.map(r => (
+              <div key={r.award} style={{ fontFamily: FONT_B, fontSize: 13, color: T.dim, padding: '2px 0' }}>
+                {r.icon} <span style={{ color: T.text }}>{r.award}</span> → {r.names}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <GrantButton disabled={!numeralOk || willGrant.length === 0} />
+          {state.error && <span style={{ fontFamily: FONT_B, fontSize: 13, color: T.loss }}>{state.error}</span>}
+          {state.ok && <span style={{ fontFamily: FONT_B, fontSize: 13, color: T.win }}>{state.message ?? 'Done.'}</span>}
+        </div>
+        <p style={{ fontFamily: FONT_M, fontSize: 11.5, color: T.faint, margin: 0 }}>
+          Safe to re-run — players already holding an honour for this Frontier are skipped, never duplicated.
+        </p>
+      </form>
+
+      {/* ── Announcement draft ── */}
+      <div style={glass({ padding: 18 })}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <span style={label}>ANNOUNCEMENT DRAFT — COPY, PUNCH UP, POST</span>
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard.writeText(draft).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              });
+            }}
+            style={{
+              fontFamily: FONT_M, fontSize: 11, letterSpacing: 1,
+              background: copied ? rgba(T.win, 0.15) : 'rgba(255,255,255,0.06)',
+              border: `1px solid ${copied ? rgba(T.win, 0.5) : 'rgba(255,255,255,0.18)'}`,
+              color: copied ? T.win : T.dim,
+              borderRadius: 7, padding: '5px 12px', cursor: 'pointer',
+            }}
+          >
+            {copied ? 'COPIED ✓' : 'COPY'}
+          </button>
+        </div>
+        <pre style={{
+          fontFamily: FONT_M, fontSize: 12.5, lineHeight: 1.7, color: T.dim,
+          whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0,
+          background: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: 14,
+        }}>
+          {draft}
+        </pre>
+        <p style={{ fontFamily: FONT_M, fontSize: 11.5, color: T.faint, margin: '10px 0 0' }}>
+          Mentions appear as raw &lt;@id&gt; here but render as @names when posted in Discord.
+          The @everyone is spoilered so it only fires when you choose to reveal it.
+        </p>
+      </div>
+    </div>
+  );
+}

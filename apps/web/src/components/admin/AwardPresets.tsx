@@ -1,21 +1,16 @@
 'use client';
 import { useFormState, useFormStatus } from 'react-dom';
+import { HONOURS } from '@inazuma/core';
 import { FONT_B, FONT_D, T, glass, rgba } from '@/lib/realm-colors';
 import { ADMIN_ACCENT } from '@/components/admin/ui';
 import { createAwardAction, type AdminFormState } from '@/app/admin/actions';
 
-// One-click starters for the league's traditional awards. Create, then use
-// "Edit" on the award to add the edition (e.g. "Blaze's Golden Boot XV").
+// One-click starters for the league's standing honours (shared with the bot +
+// ceremony page via @inazuma/core). These are the UN-numbered base awards; the
+// per-edition ones ("Blaze's Boot XV") are minted by the tournament's ceremony
+// page, so the two never collide.
 
-const PRESETS = [
-  { icon: '🥇', name: 'Golden Boot', description: 'Top goal-scorer of the Frontier' },
-  { icon: '👑', name: 'Top Assister', description: 'Most assists in the Frontier' },
-  { icon: '🧱', name: 'Best Defender', description: 'Top voted defender — one nominee per team' },
-  { icon: '🧤', name: 'Golden Glove', description: 'Best goalkeeper — highest average match rating' },
-  { icon: '❄️', name: 'Player of the Tournament', description: 'Top voted player — one nominee per team' },
-  { icon: '🏆', name: 'Frontier Champion', description: 'Won the Inazuma Frontier' },
-  { icon: '🎖️', name: 'Mr Inazuma', description: 'Captain of the Frontier winners' },
-];
+const PRESETS = HONOURS.map(h => ({ icon: h.icon, name: h.base, description: h.description }));
 
 function PresetChip({ preset, exists }: { preset: (typeof PRESETS)[number]; exists: boolean }) {
   const [state, action] = useFormState<AdminFormState, FormData>(createAwardAction, {});
@@ -70,7 +65,8 @@ export default function AwardPresets({ existingNames = [] }: { existingNames?: s
         QUICK ADD — LEAGUE CLASSICS
       </div>
       <p style={{ fontFamily: FONT_B, fontSize: 12.5, color: T.faint, margin: '0 0 12px' }}>
-        Tap to create, then open the award to rename it with its edition (e.g. “Blaze&apos;s Golden Boot XV”).
+        Tap to create the base honours. Per-edition awards (e.g. “Blaze&apos;s Boot XV”) are minted
+        automatically by each tournament&apos;s 🏆 Ceremony page.
       </p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {PRESETS.map(p => (

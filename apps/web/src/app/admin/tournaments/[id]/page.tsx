@@ -95,6 +95,21 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
             🧢 DRAFT BOARD
           </Link>
           <Link
+            href={`/admin/tournaments/${tournament.id}/awards`}
+            style={{
+              fontFamily: FONT_D,
+              fontSize: 13,
+              letterSpacing: 1,
+              color: T.gold,
+              border: `1px solid ${rgba(T.gold, 0.5)}`,
+              borderRadius: 8,
+              padding: '6px 14px',
+              textDecoration: 'none',
+            }}
+          >
+            🏆 CEREMONY
+          </Link>
+          <Link
             href={`/admin/tournaments/${tournament.id}/edit`}
             style={{
               fontFamily: FONT_B,

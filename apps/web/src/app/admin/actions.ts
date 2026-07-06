@@ -16,13 +16,16 @@ import {
   deleteMatch,
   deleteTeam,
   deleteTournament,
+  findAwardByName,
   generateBracket,
   generateGroupStage,
   generateKnockoutFromTable,
   generateNextRound,
+  getCeremonySheet,
   getTournamentById,
   getTournamentDetail,
   grantAward,
+  grantAwardIfAbsent,
   recomputeRanks,
   recordMatchResult,
   removeFromDraftPool,
@@ -39,6 +42,7 @@ import {
   updateTournamentStatus,
   type MatchStage,
 } from '@inazuma/db';
+import { HONOURS, isRomanNumeral } from '@inazuma/core';
 import { requireAdminAction } from '@/lib/admin';
 import {
   announceAward,
@@ -419,6 +423,92 @@ export async function grantAwardAction(
     else revalidatePath(`/admin/awards/${awardId}`);
     revalidatePath('/admin/awards');
     return { ok: true };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+/** The ceremony's GRANT ALL: find-or-create each per-edition honour
+ *  ("Blaze's Boot XVII") and grant it to every computed/picked winner.
+ *  Winners are recomputed SERVER-SIDE — the client only supplies the numeral
+ *  and the two voted picks. Safe to re-run: existing holders are skipped. */
+export async function runCeremonyAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+
+    const tournamentId = str(formData, 'tournamentId');
+    if (!tournamentId) return { error: 'Missing tournament.' };
+
+    const numeral = str(formData, 'numeral').toUpperCase();
+    if (!isRomanNumeral(numeral)) return { error: 'Edition must be a valid roman numeral (e.g. XVII).' };
+
+    // Never trust computed winners from the client — rebuild the sheet here.
+    const sheet = await getCeremonySheet(tournamentId);
+    if (!sheet) return { error: 'Tournament not found.' };
+
+    const inPool = (publicId: string) => sheet.voterPool.some(p => p.publicId === publicId);
+    const defenderPublicId = str(formData, 'defenderPublicId');
+    const pottPublicId = str(formData, 'pottPublicId');
+    if (defenderPublicId && !inPool(defenderPublicId)) return { error: 'Defender pick is not on a roster.' };
+    if (pottPublicId && !inPool(pottPublicId)) return { error: 'POTT pick is not on a roster.' };
+
+    // Winners per honour key; empty honours are skipped, ties grant to all.
+    const glove = sheet.gkTable[0] ?? null;
+    const winners: Record<string, { publicId: string; displayName: string }[]> = {
+      topScorer: sheet.topScorers,
+      topAssister: sheet.topAssisters,
+      goldenGlove: glove ? [glove] : [],
+      bestDefender: defenderPublicId
+        ? sheet.voterPool.filter(p => p.publicId === defenderPublicId) : [],
+      pott: pottPublicId
+        ? sheet.voterPool.filter(p => p.publicId === pottPublicId) : [],
+      champion: sheet.championTeam?.members ?? [],
+      mrInazuma: sheet.championTeam?.captain ? [sheet.championTeam.captain] : [],
+    };
+
+    const season = sheet.tournament.season;
+    let granted = 0;
+    let skipped = 0;
+    for (const h of HONOURS) {
+      const list = winners[h.key];
+      if (!list || list.length === 0) continue;
+
+      const name = `${h.base} ${numeral}`;
+      const awardId = (await findAwardByName(name))?.id
+        ?? await createAward(admin.discordId, { name, icon: h.icon, imageUrl: null, description: h.description });
+
+      for (const winner of list) {
+        const result = await grantAwardIfAbsent(admin.discordId, {
+          awardId, publicId: winner.publicId, tournamentId, season,
+        });
+        if (!result) { skipped++; continue; }
+        granted++;
+        // Webhook the individual honours; the champion team's 5-8 grants would
+        // be embed spam — the copy-box announcement covers the team moment.
+        if (h.key !== 'champion') {
+          await announceAward({
+            awardName: result.awardName,
+            icon: result.awardIcon,
+            playerName: result.playerName,
+            publicId: winner.publicId,
+            season,
+          });
+        }
+      }
+    }
+
+    if (granted === 0 && skipped === 0) return { error: 'Nothing to grant yet — record results or pick winners first.' };
+
+    revalidatePath(`/admin/tournaments/${tournamentId}/awards`);
+    revalidatePath('/admin/awards');
+    revalidatePath('/hall-of-fame');
+    return {
+      ok: true,
+      message: `Granted ${granted} honour${granted === 1 ? '' : 's'}${skipped > 0 ? ` (${skipped} already held — skipped)` : ''}.`,
+    };
   } catch (e) {
     return { error: message(e) };
   }

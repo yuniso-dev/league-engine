@@ -15,6 +15,7 @@ import { snapshotVoiceChannel } from './voicePresence.js';
 import { fetchClubsInfo, searchClubs } from './eaClient.js';
 import { armFriendlyTest, disarmFriendlyTest, friendlyTestStatus, resolveClub } from './friendlyTest.js';
 import { CLUB_PICK_ID, armClubMenuTimeout, buildClubMenu, cancelClubSession, clubSessionStatus, handleClubPick, startClubSession } from './clubSetup.js';
+import { closeAwardPoll, startAwardPoll } from './awardPoll.js';
 
 const definitions = [
   new SlashCommandBuilder()
@@ -87,6 +88,32 @@ const definitions = [
       o.setName('confirm')
         .setDescription('This clears every member’s nickname, including ones people set themselves')
         .setRequired(true))
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+  new SlashCommandBuilder()
+    .setName('awardpoll')
+    .setDescription('Admin: run the voted-honour polls (Xavier Frost / Wallside’s Award)')
+    .addSubcommand(s =>
+      s.setName('start')
+        .setDescription('Post a 24h native poll for a voted honour in this channel')
+        .addStringOption(o =>
+          o.setName('kind').setDescription('Which honour').setRequired(true)
+            .addChoices(
+              { name: 'Xavier Frost — Player of the Tournament', value: 'pott' },
+              { name: "Wallside's Award — Best Defender", value: 'defender' },
+            ))
+        .addUserOption(o => o.setName('nominee1').setDescription('First nominee').setRequired(true))
+        .addUserOption(o => o.setName('nominee2').setDescription('Second nominee').setRequired(true))
+        .addUserOption(o => o.setName('nominee3').setDescription('Third nominee'))
+        .addUserOption(o => o.setName('nominee4').setDescription('Fourth nominee')))
+    .addSubcommand(s =>
+      s.setName('close')
+        .setDescription('End the poll and announce the winner')
+        .addStringOption(o =>
+          o.setName('kind').setDescription('Which honour').setRequired(true)
+            .addChoices(
+              { name: 'Xavier Frost — Player of the Tournament', value: 'pott' },
+              { name: "Wallside's Award — Best Defender", value: 'defender' },
+            )))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 ];
 
@@ -366,6 +393,10 @@ export async function dispatch(
         break;
       case 'testfriendly':
         await handleTestFriendly(interaction);
+        break;
+      case 'awardpoll':
+        if (interaction.options.getSubcommand() === 'start') await startAwardPoll(interaction);
+        else await closeAwardPoll(interaction, ctx.siteUrl);
         break;
       case 'syncnicks': {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
