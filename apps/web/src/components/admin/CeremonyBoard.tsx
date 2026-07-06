@@ -6,6 +6,7 @@ import type { CeremonySheet } from '@inazuma/db';
 import { FONT_B, FONT_D, FONT_M, T, glass, rgba } from '@/lib/realm-colors';
 import { ADMIN_ACCENT } from '@/components/admin/ui';
 import { buildCeremonyAnnouncement } from '@/lib/announcementDraft';
+import { pickTeamOfTournament } from '@/lib/tott';
 import { runCeremonyAction, type AdminFormState } from '@/app/admin/actions';
 
 // The ceremony sheet: computed winners per honour, the GK rating table, the
@@ -84,6 +85,8 @@ export default function CeremonyBoard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [numeral, defenderId, pottId, sheet]);
 
+  const tott = useMemo(() => pickTeamOfTournament(sheet.ratedPlayers), [sheet]);
+
   const draft = useMemo(() => buildCeremonyAnnouncement({
     tournamentName: sheet.tournament.name,
     season: sheet.tournament.season,
@@ -100,8 +103,13 @@ export default function CeremonyBoard({
           captainDiscordId: sheet.championTeam.captain?.discordId ?? null,
         }
       : null,
+    tott: tott.map(t => ({
+      emoji: t.emoji,
+      label: t.label,
+      players: t.players.map(p => ({ discordId: p.discordId, value: p.value })),
+    })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [numeral, defenderId, pottId, sheet]);
+  }), [numeral, defenderId, pottId, sheet, tott]);
 
   const votedPicker = (
     title: string, hint: string, value: string, onChange: (v: string) => void, name: string,
@@ -175,6 +183,32 @@ export default function CeremonyBoard({
           <p style={{ fontFamily: FONT_B, fontSize: 13.5, color: T.faint, margin: 0 }}>
             No winner set yet — pick the champion team in the tournament&apos;s status controls first.
           </p>
+        )}
+      </div>
+
+      {/* ── Team of the Tournament (informational — included in the draft) ── */}
+      <div style={glass({ padding: 18 })}>
+        <div style={{ ...label, marginBottom: 8 }}>⭐ TEAM OF THE TOURNAMENT — BEST AVG RATING PER POSITION</div>
+        {tott.length === 0 ? (
+          <p style={{ fontFamily: FONT_B, fontSize: 13.5, color: T.faint, margin: 0 }}>
+            No players with 2+ rated appearances yet — EA auto-ingest fills the ratings as games are played.
+          </p>
+        ) : (
+          <>
+            {tott.map(t => (
+              <div key={t.bucket} style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                <span style={{ fontSize: 15 }}>{t.emoji}</span>
+                <span style={{ fontFamily: FONT_M, fontSize: 11, letterSpacing: 1, color: T.dim, minWidth: 40 }}>{t.label}</span>
+                <span style={{ fontFamily: FONT_B, fontSize: 14, color: T.gold, flex: 1 }}>
+                  {t.players.map(p => `${p.displayName} (${p.value.toFixed(2)} · ${p.appearances} apps)`).join('  ·  ')}
+                </span>
+              </div>
+            ))}
+            <p style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, margin: '10px 0 0' }}>
+              Slots follow each player&apos;s most-played EA position (fix a wrong one via the match&apos;s ⚽ STATS editor).
+              This block is informational and goes into the announcement draft — no award is granted for it.
+            </p>
+          </>
         )}
       </div>
 

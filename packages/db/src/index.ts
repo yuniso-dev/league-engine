@@ -149,6 +149,8 @@ export type {
 export { getConfig, updateConfig } from './queries/config';
 export type { ConfigRow } from './queries/config';
 export { getTournamentDetail } from './queries/frontier';
+export { getMatchDetail } from './queries/matchDetail';
+export type { MatchDetail, MatchDetailPlayer } from './queries/matchDetail';
 export type {
   PublicTournamentDetail,
   PublicBracketTeam,

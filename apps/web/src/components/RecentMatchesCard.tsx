@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { PublicRecentMatch } from '@inazuma/db';
 import { T, FONT_B, FONT_D, FONT_M, glass, rgba } from '@/lib/realm-colors';
 
@@ -37,8 +38,10 @@ export function RecentMatchesCard({ matches, accent, emptyText }: Props) {
         {matches.map(m => {
           const r = m.result ? RESULT_STYLE[m.result] : null;
           return (
-            <div
+            // Each row opens the match centre — full lineups + stats.
+            <Link
               key={m.matchId}
+              href={`/frontier/match/${m.matchId}`}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -46,6 +49,7 @@ export function RecentMatchesCard({ matches, accent, emptyText }: Props) {
                 padding: '8px 10px',
                 background: 'rgba(255,255,255,0.03)',
                 borderRadius: 10,
+                textDecoration: 'none',
               }}
             >
               <span style={{
@@ -93,7 +97,7 @@ export function RecentMatchesCard({ matches, accent, emptyText }: Props) {
                   {m.playedAt.slice(0, 10)}
                 </span>
               )}
-            </div>
+            </Link>
           );
         })}
       </div>
