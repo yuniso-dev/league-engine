@@ -1,4 +1,5 @@
 import {
+  getConfig,
   getCurrentSeason,
   getFrontierStatBoards,
   getRankings,
@@ -82,7 +83,8 @@ export default async function HomePage() {
     settle('tournaments', getTournaments(), 14_000),
     settle('voice', getVoiceNow(), 8000),
     settle('auth', auth(), 8000),
-    settle('season', getCurrentSeason(), 8000),
+    // Full config row — season for the banner, placementGames for profiles.
+    settle('config', getConfig(), 8000),
     settle('allTimeStats', getFrontierStatBoards(null), 9000),
     // Season-scoped boards need the season number first — one chained trip.
     settle('liveStats', getCurrentSeason().then(sn => getFrontierStatBoards(sn)), 9000),
@@ -92,7 +94,8 @@ export default async function HomePage() {
   const tournaments: PublicTournament[] = t.ok ? t.value : [];
   const voice: VoiceNowEntry[] = v.ok ? v.value : [];
   const session = s.ok ? s.value : null;
-  const season = se.ok ? se.value : 1;
+  const season = se.ok ? se.value.currentSeason : 1;
+  const placementGames = se.ok ? se.value.placementGames : 3;
   const liveStats: FrontierStatBoards = li.ok ? li.value : NO_BOARDS;
   const realBoards: FrontierStatBoards = re.ok ? re.value : NO_BOARDS;
   const boardsEmpty = Object.values(realBoards).every(list => list.length === 0);
@@ -127,6 +130,7 @@ export default async function HomePage() {
       tournaments={tournaments}
       voice={voice}
       season={season}
+      placementGames={placementGames}
       liveStats={liveStats}
       allTimeStats={allTimeStats}
       statsPreview={statsPreview}

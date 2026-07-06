@@ -127,8 +127,8 @@ export default function GuidePage() {
             <Card icon="⚡" title="ELO — YOUR RATING" accent={RANKINGS}>
               Everyone starts at 1000, tied at #1. Ranked matches move it: beating
               stronger teams earns more, and winning by a bigger margin counts extra.
-              Your first 5 games are <b style={{ color: T.text }}>placement games</b> —
-              you&apos;re &ldquo;provisional&rdquo; until they&apos;re done.
+              Your first 3 games are <b style={{ color: T.text }}>placement games</b> —
+              one Frontier&apos;s worth — so playing a single tournament gets you ranked.
             </Card>
             <Card icon="🌩️" title="THE REVEAL" accent={RANKINGS}>
               Results bank up during the week, then the Elo drop happens all at once:

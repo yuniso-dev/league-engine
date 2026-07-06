@@ -19,6 +19,7 @@ type Props = {
   tournaments: PublicTournament[];
   voice: VoiceNowEntry[];
   season?: number;
+  placementGames?: number;
   liveStats?: FrontierStatBoards;
   allTimeStats?: FrontierStatBoards;
   statsPreview?: boolean;
@@ -43,7 +44,7 @@ const N = REALMS.length;
 const LAST = N - 1;
 const PANE = 100 / N;
 
-export default function StormShell({ rankings, tournaments, voice, season, liveStats, allTimeStats, statsPreview, dataOffline, isLoggedIn, isAdmin, currentUser }: Props) {
+export default function StormShell({ rankings, tournaments, voice, season, placementGames, liveStats, allTimeStats, statsPreview, dataOffline, isLoggedIn, isAdmin, currentUser }: Props) {
   const [index,  setIndex]  = useState(1);  // 0=Frontier, 1=Rankings, 2=Profile, 3=Casual
   const [viewed, setViewed] = useState<PublicPlayer | null>(currentUser);
 
@@ -339,6 +340,7 @@ export default function StormShell({ rankings, tournaments, voice, season, liveS
               isOwn={viewed !== null && currentUser !== null && viewed.publicId === currentUser.publicId}
               isLoggedIn={isLoggedIn}
               currentUser={currentUser}
+              placementGames={placementGames}
             />
           </div>
           <div className="ina-scroll" style={{ width: `${PANE}%`, height: '100%', overflowY: 'auto', touchAction: 'pan-y' }}>

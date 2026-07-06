@@ -55,12 +55,16 @@ describe('movMultiplier', () => {
 describe('kFor', () => {
   test('placement K below the threshold', () => {
     expect(kFor(0, cfg)).toBe(cfg.kPlacement);
-    expect(kFor(4, cfg)).toBe(cfg.kPlacement);
+    expect(kFor(cfg.placementGames - 1, cfg)).toBe(cfg.kPlacement);
   });
 
   test('established K at and beyond the threshold', () => {
-    expect(kFor(5, cfg)).toBe(cfg.kEstablished);
+    expect(kFor(cfg.placementGames, cfg)).toBe(cfg.kEstablished);
     expect(kFor(100, cfg)).toBe(cfg.kEstablished);
+  });
+
+  test('default placement is one Frontier — 3 games', () => {
+    expect(cfg.placementGames).toBe(3);
   });
 });
 

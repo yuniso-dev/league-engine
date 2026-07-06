@@ -19,6 +19,8 @@ type Props = {
   isOwn?: boolean;
   isLoggedIn?: boolean;
   currentUser?: PublicPlayer | null;
+  /** config.placementGames — how many ranked games end placement. */
+  placementGames?: number;
 };
 
 function initials(name: string): string {
@@ -62,7 +64,7 @@ const MILESTONES: {
   { emoji: '🎖️', name: 'DECORATED', detail: 'Earn a league award', earned: (_m, awards) => awards >= 1 },
 ];
 
-export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, isLoggedIn = false, currentUser = null }: Props) {
+export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, isLoggedIn = false, currentUser = null, placementGames = 3 }: Props) {
   // Player accent subtly tints the page; falls back to the profile realm's orange.
   const accent = player?.accentColor ?? REALMS[2].accent;
   const aGlow  = lighten(accent, 0.35);
@@ -187,7 +189,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
 
   const rankLabel = showRank
     ? `#${player.rank}`
-    : `Provisional — ${player.gamesPlayed}/5 placement games`;
+    : `Provisional — ${player.gamesPlayed}/${placementGames} placement games`;
 
   const stats: { l: string; v: number; s: string; c: string }[] = [
     { l: 'RANK',   v: player.rank ?? 0,   s: '',  c: showRank ? rc : T.faint },

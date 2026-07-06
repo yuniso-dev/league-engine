@@ -151,7 +151,7 @@ async function handleProfile(
 
   const awards = await listAwardsForPlayer(row.publicId);
   const rankLine = row.provisional
-    ? `Provisional — ${row.gamesPlayed}/5 placement games`
+    ? `Provisional — ${row.gamesPlayed}/${(await getConfig()).placementGames} placement games`
     : row.rank != null ? `Rank **#${row.rank}**` : 'Unranked';
 
   const accent = row.accentColor && /^#[0-9a-f]{6}$/i.test(row.accentColor)

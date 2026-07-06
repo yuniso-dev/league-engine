@@ -15,7 +15,9 @@ export type EloConfig = {
 export const DEFAULT_ELO_CONFIG: EloConfig = {
   kPlacement: 60,
   kEstablished: 24,
-  placementGames: 5,
+  // One Frontier's worth — every team plays at least 3 games, so a single
+  // tournament completes placement and gets a player ranked.
+  placementGames: 3,
   movMultiplierCap: 1.75,
 };
 

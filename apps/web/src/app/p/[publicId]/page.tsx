@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import {
+  getConfig,
   getFrontierHistory,
   getHeadToHead,
   getUserByDiscordId,
@@ -32,6 +33,9 @@ export default async function PublicProfilePage({ params }: Props) {
   const player = await runResilient(() => getUserByPublicId(params.publicId));
   if (!player) notFound();
 
+  // Placement length is league-configurable (Admin → Settings) — never hardcode it.
+  const placementGames = await getConfig().then(c => c.placementGames).catch(() => 3);
+
   // Head-to-head vs the signed-in viewer (share links opened logged-out — or
   // by the player themselves — simply skip it). Never lets the page fail.
   const headToHeadPromise: Promise<HeadToHead | null> = auth()
@@ -60,7 +64,7 @@ export default async function PublicProfilePage({ params }: Props) {
   const initials = player.displayName.slice(0, 2).toUpperCase();
   // Ranks are tie-aware and assigned to everyone — show one whenever it exists.
   const showRank = player.rank !== null;
-  const rankLabel = showRank ? `#${player.rank}` : player.provisional ? `${player.gamesPlayed}/5` : '—';
+  const rankLabel = showRank ? `#${player.rank}` : player.provisional ? `${player.gamesPlayed}/${placementGames}` : '—';
   const rankCaption = showRank ? 'RANK' : player.provisional ? 'PLACEMENT' : 'RANK';
 
   const positions = !player.hidePositions
@@ -157,7 +161,7 @@ export default async function PublicProfilePage({ params }: Props) {
             color: accent,
             marginBottom: 20,
           }}>
-            Provisional — {player.gamesPlayed}/5 placement games
+            Provisional — {player.gamesPlayed}/{placementGames} placement games
           </div>
         )}
 

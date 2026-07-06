@@ -223,7 +223,7 @@ create table config (
     elo_base            numeric(7,2) not null default 1000,
     k_placement         integer not null default 60,
     k_established       integer not null default 24,
-    placement_games     integer not null default 5,
+    placement_games     integer not null default 3,
     decay_weeks         integer not null default 4,
     mov_multiplier_cap  numeric(4,2) not null default 1.75,
     last_reveal_at      timestamptz,
