@@ -9,7 +9,7 @@ export {
 export type { NicknamePlayer } from './queries/bot';
 export * from './schema';
 export { getRankings, searchRankings, recomputeRanks } from './queries/rankings';
-export { getTournaments } from './queries/tournaments';
+export { getTournaments, getLatestOpenTournament } from './queries/tournaments';
 export {
   signUpForTournament,
   withdrawSignup,

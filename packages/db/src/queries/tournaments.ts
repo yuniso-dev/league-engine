@@ -1,7 +1,30 @@
 import { getDb } from '../client';
 import { tournaments, teams } from '../schema';
-import { desc, eq, sql } from 'drizzle-orm';
+import { desc, eq, ne, sql } from 'drizzle-orm';
 import { toPublicTournament, type PublicTournament } from '../dto';
+
+/** The Frontier currently being set up or played — newest non-completed.
+ *  Used by the bot's /frontierclubstart to know where linked teams belong. */
+export async function getLatestOpenTournament(): Promise<{
+  id: string;
+  name: string;
+  season: number;
+  status: 'upcoming' | 'live';
+} | null> {
+  const [row] = await getDb()
+    .select({
+      id: tournaments.id,
+      name: tournaments.name,
+      season: tournaments.season,
+      status: tournaments.status,
+    })
+    .from(tournaments)
+    .where(ne(tournaments.status, 'completed'))
+    .orderBy(desc(tournaments.createdAt))
+    .limit(1);
+  if (!row) return null;
+  return { ...row, status: row.status as 'upcoming' | 'live' };
+}
 
 export async function getTournaments(): Promise<PublicTournament[]> {
   const rows = await getDb()
