@@ -8,10 +8,11 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
 } from 'discord.js';
-import { getUserByDiscordId, listAwardsForPlayer } from '@inazuma/db';
+import { getConfig, getUserByDiscordId, listAwardsForPlayer } from '@inazuma/db';
 import { handleLeaderboard, handlePostLeaderboard } from './leaderboard.js';
 import { resetAllNicknames, syncNicknames } from './nicknameSync.js';
 import { snapshotVoiceChannel } from './voicePresence.js';
+import { searchClubs } from './eaClient.js';
 
 const definitions = [
   new SlashCommandBuilder()
@@ -36,6 +37,14 @@ const definitions = [
       o.setName('channel')
         .setDescription('Voice channel to check (defaults to the one you are in)')
         .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice))
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+  new SlashCommandBuilder()
+    .setName('findclub')
+    .setDescription("Admin: search EA clubs by name — find a captain's fresh club ID for team linking")
+    .addStringOption(o =>
+      o.setName('name')
+        .setDescription('Club name (or part of it) to search for')
+        .setRequired(true))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder()
     .setName('resetnicknames')
@@ -142,6 +151,29 @@ async function handleCheckVc(
   await interaction.editReply(lines.join('\n'));
 }
 
+async function handleFindClub(interaction: ChatInputCommandInteraction): Promise<void> {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  const name = interaction.options.getString('name', true).trim();
+  const cfg = await getConfig();
+  const clubs = await searchClubs(name, cfg.eaPlatform || 'common-gen5');
+
+  if (clubs.length === 0) {
+    await interaction.editReply(
+      `No EA clubs found matching **${name}**. Check the exact in-game club name — EA's search is picky about spelling.`,
+    );
+    return;
+  }
+
+  const lines = clubs.slice(0, 10).map(c =>
+    `**${c.name}** — ID: \`${c.clubId}\`${c.members != null ? ` · ${c.members} member${c.members === 1 ? '' : 's'}` : ''}`,
+  );
+  await interaction.editReply(
+    `🔎 Clubs matching **${name}**:\n${lines.join('\n')}\n\n` +
+    `Paste the ID into the team's **EA Club ID** field (Admin → tournament → team) and results auto-record while the Frontier is live.`,
+  );
+}
+
 export async function dispatch(
   interaction: Interaction,
   ctx: { siteUrl: string; readOnly: boolean },
@@ -162,6 +194,9 @@ export async function dispatch(
         break;
       case 'checkvc':
         await handleCheckVc(interaction, ctx);
+        break;
+      case 'findclub':
+        await handleFindClub(interaction);
         break;
       case 'syncnicks': {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });

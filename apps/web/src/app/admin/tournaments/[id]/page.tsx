@@ -6,6 +6,7 @@ import { FONT_B, FONT_D, FONT_M, T, glass, rgba } from '@/lib/realm-colors';
 import { ADMIN_ACCENT, STAGE_LABELS, STATUS_COLORS } from '@/components/admin/ui';
 import StatusControls from '@/components/admin/StatusControls';
 import TeamForm from '@/components/admin/TeamForm';
+import TeamClubLink from '@/components/admin/TeamClubLink';
 import MatchEntryForm from '@/components/admin/MatchEntryForm';
 import DeleteButton from '@/components/admin/DeleteButton';
 import BracketControls from '@/components/admin/BracketControls';
@@ -174,6 +175,7 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
                   {team.matchCount} match{team.matchCount === 1 ? '' : 'es'}
                 </div>
               )}
+              <TeamClubLink teamId={team.id} tournamentId={tournament.id} eaClubId={team.eaClubId} />
             </div>
           ))}
         </div>

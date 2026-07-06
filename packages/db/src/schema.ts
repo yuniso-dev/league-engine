@@ -101,6 +101,7 @@ export const teams = pgTable('teams', {
   tournamentId: uuid('tournament_id').notNull().references(() => tournaments.id, { onDelete: 'cascade' }),
   name:         text('name').notNull(),
   captainId:    text('captain_id').references(() => users.discordId),
+  eaClubId:     text('ea_club_id'), // the captain's fresh EA club — enables auto result ingestion
   placement:    integer('placement'),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -124,6 +125,7 @@ export const matches = pgTable('matches', {
   playedAt:     timestamp('played_at', { withTimezone: true }),
   processed:    boolean('processed').notNull().default(false),
   processedAt:  timestamp('processed_at', { withTimezone: true }),
+  eaMatchId:    text('ea_match_id').unique(), // set when auto-ingested from the EA API
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -138,6 +140,9 @@ export const matchParticipants = pgTable('match_participants', {
   cleanSheet:  boolean('clean_sheet').notNull().default(false),
   tackles:     integer('tackles').notNull().default(0),
   mom:         boolean('mom').notNull().default(false),
+  rating:      numeric('rating', { precision: 4, scale: 2 }), // EA match rating (auto-ingest)
+  saves:       integer('saves').notNull().default(0),
+  position:    text('position'), // position played per EA (GK detection for the Glove)
   eloBefore:   numeric('elo_before', { precision: 7, scale: 2 }),
   eloAfter:    numeric('elo_after', { precision: 7, scale: 2 }),
   eloChange:   numeric('elo_change', { precision: 6, scale: 2 }),
@@ -187,6 +192,7 @@ export const config = pgTable('config', {
   lastRevealAt:       timestamp('last_reveal_at', { withTimezone: true }),
   eaClubIds:          text('ea_club_ids'),   // comma-separated EA club IDs the bot polls
   eaPlatform:         text('ea_platform').notNull().default('common-gen5'),
+  frontierRules:      text('frontier_rules'), // standing rules block for /frontierintro
   updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

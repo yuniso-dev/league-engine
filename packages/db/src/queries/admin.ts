@@ -35,6 +35,7 @@ export type AdminTeam = {
   id: string;
   name: string;
   captainPublicId: string | null;
+  eaClubId: string | null;
   members: AdminPlayerOption[];
   matchCount: number;
 };
@@ -245,6 +246,7 @@ export async function getAdminTournament(tournamentId: string): Promise<AdminTou
       name: t.name,
       captainPublicId:
         memberRows.find(m => m.teamId === t.id && m.userId === t.captainId)?.publicId ?? null,
+      eaClubId: t.eaClubId,
       matchCount: matchCounts.get(t.id) ?? 0,
       members: memberRows
         .filter(m => m.teamId === t.id && m.publicId != null)
@@ -289,7 +291,7 @@ async function resolvePlayers(publicIds: string[]): Promise<Map<string, string>>
 
 export async function createTeam(
   adminId: string,
-  data: { tournamentId: string; name: string; memberPublicIds: string[] },
+  data: { tournamentId: string; name: string; memberPublicIds: string[]; eaClubId?: string | null },
 ): Promise<string> {
   const resolved = await resolvePlayers(data.memberPublicIds);
   const db = getDb();
@@ -297,7 +299,7 @@ export async function createTeam(
   const teamId = await db.transaction(async tx => {
     const [team] = await tx
       .insert(teams)
-      .values({ tournamentId: data.tournamentId, name: data.name })
+      .values({ tournamentId: data.tournamentId, name: data.name, eaClubId: data.eaClubId ?? null })
       .returning({ id: teams.id });
 
     if (resolved.size > 0) {
