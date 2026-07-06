@@ -136,8 +136,8 @@ export type {
   PublicTeamMember,
   PublicBracketMatch,
 } from './queries/frontier';
-export { getRecentMatchesForPlayer } from './queries/profile';
-export type { PublicRecentMatch } from './queries/profile';
+export { getRecentMatchesForPlayer, getHeadToHead } from './queries/profile';
+export type { PublicRecentMatch, HeadToHead } from './queries/profile';
 export {
   listPlayersDirectory,
   getAdminPlayer,
