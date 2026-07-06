@@ -52,6 +52,8 @@ export type AdminMatch = {
   ranked: boolean;
   playedAt: Date | null;
   processed: boolean;
+  /** Decided by a side quitting — the score may be an EA forfeit. */
+  dnf: boolean;
 };
 
 export type AdminTournamentDetail = {
@@ -270,6 +272,7 @@ export async function getAdminTournament(tournamentId: string): Promise<AdminTou
       ranked: m.ranked,
       playedAt: m.playedAt,
       processed: m.processed,
+      dnf: m.dnf,
     })),
   };
 }

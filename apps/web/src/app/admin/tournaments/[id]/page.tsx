@@ -308,6 +308,14 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
               {!m.ranked && (
                 <span style={{ fontFamily: FONT_M, fontSize: 10, color: T.faint }}>UNRANKED</span>
               )}
+              {m.dnf && (
+                <span
+                  title="Decided by a side quitting — EA's score may be a forfeit. Delete + re-enter to correct."
+                  style={{ fontFamily: FONT_M, fontSize: 10, color: T.loss }}
+                >
+                  DNF
+                </span>
+              )}
               {m.playedAt && (
                 <span style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint }}>
                   {m.playedAt.toISOString().slice(0, 10)}

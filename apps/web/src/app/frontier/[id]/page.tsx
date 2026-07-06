@@ -68,6 +68,14 @@ export default async function FrontierDetailPage({ params }: Props) {
               minWidth: 64, textAlign: 'center',
             }}>
               {m.homeScore != null ? `${m.homeScore} – ${m.awayScore}` : 'vs'}
+              {m.dnf && (
+                <span
+                  title="Decided by a side quitting — score may be a forfeit"
+                  style={{ display: 'block', fontSize: 9, letterSpacing: 1, color: T.loss }}
+                >
+                  DNF
+                </span>
+              )}
             </span>
             <span style={{ fontFamily: FONT_B, fontSize: 14, color: T.text, flex: 1 }}>
               {m.awayTeamName}

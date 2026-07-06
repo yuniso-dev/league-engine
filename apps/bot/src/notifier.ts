@@ -13,12 +13,13 @@ let signupsSince = new Date();
  *  first pass after boot or a new tournament never DMs the whole roster. */
 let teamKeys: Set<string> | null = null;
 
-async function dm(client: Client<true>, discordId: string, text: string): Promise<void> {
+/** Fire-and-forget DM — closed DMs are common and fine, so failures only log.
+ *  Shared by the notifier ticks and the frontier sync's admin alerts. */
+export async function sendDm(client: Client<true>, discordId: string, text: string): Promise<void> {
   try {
     const user = await client.users.fetch(discordId);
     await user.send(text);
   } catch (e) {
-    // Closed DMs are common and fine — log and move on.
     console.log(`[notifier] DM to ${discordId} failed — ${e instanceof Error ? e.message : e}`);
   }
 }
@@ -32,7 +33,7 @@ export async function pollNotifier(client: Client<true>, siteUrl: string): Promi
     awardsSince = grants[grants.length - 1].awardedAt;
     for (const grant of grants) {
       const cabinet = grant.publicId ? `\nYour trophy cabinet: ${siteUrl}/p/${grant.publicId}` : '';
-      await dm(
+      await sendDm(
         client,
         grant.discordId,
         `🏆 You've won **${grant.awardName}**${grant.awardIcon ? ` ${grant.awardIcon}` : ''} — congratulations!${cabinet}`,
@@ -52,7 +53,7 @@ export async function pollNotifier(client: Client<true>, siteUrl: string): Promi
   if (signups.length > 0) {
     signupsSince = signups[signups.length - 1].signedUpAt;
     for (const s of signups) {
-      await dm(client, s.discordId, `✅ You're signed up for **${s.tournamentName}** — see you on the Frontier!`);
+      await sendDm(client, s.discordId, `✅ You're signed up for **${s.tournamentName}** — see you on the Frontier!`);
     }
     console.log(`[notifier] sent ${signups.length} signup DM${signups.length === 1 ? '' : 's'}`);
   }
@@ -69,7 +70,7 @@ export async function pollNotifier(client: Client<true>, siteUrl: string): Promi
   for (const r of roster) {
     if (teamKeys.has(`${r.teamId}:${r.userId}`)) continue;
     drafted++;
-    await dm(
+    await sendDm(
       client,
       r.userId,
       `⚡ You're on **${r.teamName}**! Head to the **${r.teamName}** voice channel when your team plays.`,

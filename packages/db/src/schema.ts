@@ -126,6 +126,7 @@ export const matches = pgTable('matches', {
   processed:    boolean('processed').notNull().default(false),
   processedAt:  timestamp('processed_at', { withTimezone: true }),
   eaMatchId:    text('ea_match_id').unique(), // set when auto-ingested from the EA API
+  dnf:          boolean('dnf').notNull().default(false), // decided by a side quitting — score may be a forfeit
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -143,6 +144,7 @@ export const matchParticipants = pgTable('match_participants', {
   rating:      numeric('rating', { precision: 4, scale: 2 }), // EA match rating (auto-ingest)
   saves:       integer('saves').notNull().default(0),
   position:    text('position'), // position played per EA (GK detection for the Glove)
+  redCards:    integer('red_cards').notNull().default(0),
   eloBefore:   numeric('elo_before', { precision: 7, scale: 2 }),
   eloAfter:    numeric('elo_after', { precision: 7, scale: 2 }),
   eloChange:   numeric('elo_change', { precision: 6, scale: 2 }),

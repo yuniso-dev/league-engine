@@ -22,6 +22,8 @@ export type EaRawMatch = {
   clubs: Record<string, {
     goals?: string | number;
     goalsAgainst?: string | number;
+    /** "1" on the club whose opponent quit — the score may be a forfeit. */
+    winnerByDnf?: string | number;
     details?: { name?: string } | null;
     name?: string;
   }>;
@@ -37,6 +39,7 @@ export type EaRawMatch = {
     shots?: string | number;
     passesmade?: string | number;
     passattempts?: string | number;
+    redcards?: string | number;
     mom?: string | number;
   }>>;
 };

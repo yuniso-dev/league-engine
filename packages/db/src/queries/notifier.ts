@@ -1,6 +1,16 @@
-import { asc, eq, gt, ne, and } from 'drizzle-orm';
+import { asc, eq, gt, inArray, ne, and } from 'drizzle-orm';
 import { getDb } from '../client';
 import { awards, eventSignups, teamMembers, teams, tournaments, userAwards, users } from '../schema';
+
+/** Site owners/admins — the alert targets for anything needing a human call
+ *  (DNF forfeits, stale fixtures). */
+export async function getAdminDiscordIds(): Promise<string[]> {
+  const rows = await getDb()
+    .select({ discordId: users.discordId })
+    .from(users)
+    .where(and(inArray(users.role, ['owner', 'admin']), eq(users.isBlacklisted, false)));
+  return rows.map(r => r.discordId);
+}
 
 // Feed queries for the bot's DM notifier. Each returns rows AFTER a watermark
 // the bot holds in memory (seeded to boot time, so restarts never replay
