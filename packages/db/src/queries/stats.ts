@@ -24,6 +24,12 @@ export type MatchStatsEntry = {
   cleanSheet: boolean;
   tackles: number;
   mom: boolean;
+  /** EA match rating (auto-ingest) — null when never rated. */
+  rating: number | null;
+  saves: number;
+  /** EA position bucket: goalkeeper | defender | midfielder | forward. */
+  position: string | null;
+  redCards: number;
 };
 
 export type MatchStatsSheet = {
@@ -57,6 +63,10 @@ export async function getMatchStatsEntries(matchId: string): Promise<MatchStatsS
       cleanSheet: matchParticipants.cleanSheet,
       tackles: matchParticipants.tackles,
       mom: matchParticipants.mom,
+      rating: matchParticipants.rating,
+      saves: matchParticipants.saves,
+      position: matchParticipants.position,
+      redCards: matchParticipants.redCards,
     })
     .from(matchParticipants)
     .innerJoin(users, eq(matchParticipants.userId, users.discordId))
@@ -80,15 +90,32 @@ export async function getMatchStatsEntries(matchId: string): Promise<MatchStatsS
         cleanSheet: r.cleanSheet,
         tackles: r.tackles,
         mom: r.mom,
+        rating: r.rating != null ? parseFloat(r.rating) : null, // numeric → string from postgres.js
+        saves: r.saves,
+        position: r.position,
+        redCards: r.redCards,
       })),
   };
 }
 
 /** Write goals/assists/clean-sheet/tackles/MOTM for a match's participants. */
+const POSITION_BUCKETS = ['goalkeeper', 'defender', 'midfielder', 'forward'];
+
 export async function updateMatchStats(
   adminId: string,
   matchId: string,
-  stats: { publicId: string; goals: number; assists: number; cleanSheet: boolean; tackles: number; mom: boolean }[],
+  stats: {
+    publicId: string;
+    goals: number;
+    assists: number;
+    cleanSheet: boolean;
+    tackles: number;
+    mom: boolean;
+    rating: number | null;
+    saves: number;
+    position: string | null;
+    redCards: number;
+  }[],
 ): Promise<void> {
   const db = getDb();
   const [match] = await db
@@ -102,6 +129,14 @@ export async function updateMatchStats(
     if (!Number.isInteger(s.goals) || s.goals < 0 || s.goals > 99) throw new Error('Goals must be 0–99.');
     if (!Number.isInteger(s.assists) || s.assists < 0 || s.assists > 99) throw new Error('Assists must be 0–99.');
     if (!Number.isInteger(s.tackles) || s.tackles < 0 || s.tackles > 99) throw new Error('Tackles must be 0–99.');
+    if (!Number.isInteger(s.saves) || s.saves < 0 || s.saves > 99) throw new Error('Saves must be 0–99.');
+    if (!Number.isInteger(s.redCards) || s.redCards < 0 || s.redCards > 1) throw new Error('Red cards must be 0 or 1.');
+    if (s.rating != null && (!Number.isFinite(s.rating) || s.rating < 0 || s.rating > 10)) {
+      throw new Error('Rating must be between 0 and 10 (or blank).');
+    }
+    if (s.position != null && !POSITION_BUCKETS.includes(s.position)) {
+      throw new Error('Position must be goalkeeper, defender, midfielder or forward.');
+    }
   }
 
   const publicIds = stats.map(s => s.publicId);
@@ -119,7 +154,17 @@ export async function updateMatchStats(
       if (!userId) continue; // unknown player rows are skipped, not fatal
       await tx
         .update(matchParticipants)
-        .set({ goals: s.goals, assists: s.assists, cleanSheet: s.cleanSheet, tackles: s.tackles, mom: s.mom })
+        .set({
+          goals: s.goals,
+          assists: s.assists,
+          cleanSheet: s.cleanSheet,
+          tackles: s.tackles,
+          mom: s.mom,
+          rating: s.rating != null ? s.rating.toFixed(2) : null,
+          saves: s.saves,
+          position: s.position,
+          redCards: s.redCards,
+        })
         .where(and(eq(matchParticipants.matchId, matchId), eq(matchParticipants.userId, userId)));
     }
   });

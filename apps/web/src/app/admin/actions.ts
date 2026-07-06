@@ -830,17 +830,29 @@ export async function updateMatchStatsAction(
     const tournamentId = str(formData, 'tournamentId');
     if (!matchId) return { error: 'Missing match.' };
 
-    // One set of g_/a_/t_/cs_/m_ inputs per participant, keyed by publicId.
-    const stats: { publicId: string; goals: number; assists: number; cleanSheet: boolean; tackles: number; mom: boolean }[] = [];
+    // One set of g_/a_/t_/cs_/m_/r_/s_/p_/rc_ inputs per participant, keyed by publicId.
+    const POSITIONS = ['goalkeeper', 'defender', 'midfielder', 'forward'];
+    const stats: {
+      publicId: string; goals: number; assists: number; cleanSheet: boolean; tackles: number;
+      mom: boolean; rating: number | null; saves: number; position: string | null; redCards: number;
+    }[] = [];
     for (const key of Array.from(formData.keys())) {
       if (!key.startsWith('g_')) continue;
       const publicId = key.slice(2);
       const goals = parseInt(str(formData, `g_${publicId}`) || '0', 10);
       const assists = parseInt(str(formData, `a_${publicId}`) || '0', 10);
       const tackles = parseInt(str(formData, `t_${publicId}`) || '0', 10);
-      if (!Number.isInteger(goals) || goals < 0 || !Number.isInteger(assists) || assists < 0 || !Number.isInteger(tackles) || tackles < 0) {
-        return { error: 'Goals, assists and tackles must be whole numbers.' };
+      const saves = parseInt(str(formData, `s_${publicId}`) || '0', 10);
+      if ([goals, assists, tackles, saves].some(n => !Number.isInteger(n) || n < 0)) {
+        return { error: 'Goals, assists, tackles and saves must be whole numbers.' };
       }
+      const ratingRaw = str(formData, `r_${publicId}`);
+      const rating = ratingRaw === '' ? null : parseFloat(ratingRaw);
+      if (rating !== null && (!Number.isFinite(rating) || rating < 0 || rating > 10)) {
+        return { error: 'Rating must be between 0 and 10, or blank.' };
+      }
+      const positionRaw = str(formData, `p_${publicId}`);
+      const position = POSITIONS.includes(positionRaw) ? positionRaw : null;
       stats.push({
         publicId,
         goals,
@@ -848,6 +860,10 @@ export async function updateMatchStatsAction(
         tackles,
         cleanSheet: formData.get(`cs_${publicId}`) === 'on',
         mom: formData.get(`m_${publicId}`) === 'on',
+        rating,
+        saves,
+        position,
+        redCards: formData.get(`rc_${publicId}`) === 'on' ? 1 : 0,
       });
     }
     if (stats.length === 0) return { error: 'No players to save stats for.' };

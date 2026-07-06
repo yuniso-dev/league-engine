@@ -105,7 +105,7 @@ export default function MatchStatsForm({ matchId, tournamentId }: Props) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <span style={{ fontFamily: FONT_D, fontSize: 12, letterSpacing: 1.5, color: ADMIN_ACCENT }}>
-          MATCH STATS — G · A · TKL · CS · MOTM
+          MATCH STATS — G · A · TKL · CS · MOTM · RTG · SV · POS · 🟥
         </span>
         <button
           type="button"
@@ -132,22 +132,26 @@ export default function MatchStatsForm({ matchId, tournamentId }: Props) {
           <input type="hidden" name="matchId" value={matchId} />
           <input type="hidden" name="tournamentId" value={tournamentId} />
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 14, overflowX: 'auto' }}>
             {sides.map(({ label, side }) => (
               <div key={side}>
                 <div style={{ ...labelStyle, marginBottom: 8 }}>{label}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {/* column headers */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ flex: 1 }} />
                     <span style={{ width: 44, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>⚽ G</span>
                     <span style={{ width: 44, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>🎯 A</span>
                     <span style={{ width: 44, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>🛡 TKL</span>
-                    <span style={{ width: 34, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>🧤 CS</span>
-                    <span style={{ width: 34, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>⭐ MOTM</span>
+                    <span style={{ width: 30, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>🧤 CS</span>
+                    <span style={{ width: 30, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>⭐ MOTM</span>
+                    <span style={{ width: 54, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }} title="EA match rating (blank = none)">RTG</span>
+                    <span style={{ width: 44, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>SV</span>
+                    <span style={{ width: 58, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }} title="Position played (GK detection for the Golden Glove)">POS</span>
+                    <span style={{ width: 30, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }} title="Red card">🟥</span>
                   </div>
                   {sheet.entries.filter(e => e.side === side).map(e => (
-                    <div key={e.publicId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div key={e.publicId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{
                         flex: 1, fontFamily: FONT_B, fontSize: 13, color: T.text,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -157,11 +161,34 @@ export default function MatchStatsForm({ matchId, tournamentId }: Props) {
                       <input name={`g_${e.publicId}`} type="number" min={0} max={99} defaultValue={e.goals} style={numInput} />
                       <input name={`a_${e.publicId}`} type="number" min={0} max={99} defaultValue={e.assists} style={numInput} />
                       <input name={`t_${e.publicId}`} type="number" min={0} max={99} defaultValue={e.tackles} style={numInput} />
-                      <span style={{ width: 34, textAlign: 'center' }}>
+                      <span style={{ width: 30, textAlign: 'center' }}>
                         <input name={`cs_${e.publicId}`} type="checkbox" defaultChecked={e.cleanSheet} style={{ accentColor: ADMIN_ACCENT, width: 15, height: 15 }} />
                       </span>
-                      <span style={{ width: 34, textAlign: 'center' }} title="Man of the Match">
+                      <span style={{ width: 30, textAlign: 'center' }} title="Man of the Match">
                         <input name={`m_${e.publicId}`} type="checkbox" defaultChecked={e.mom} style={{ accentColor: '#FFD24A', width: 15, height: 15 }} />
+                      </span>
+                      <input
+                        name={`r_${e.publicId}`}
+                        type="number" min={0} max={10} step={0.01}
+                        defaultValue={e.rating ?? ''}
+                        placeholder="—"
+                        title="EA match rating — blank means no rating"
+                        style={{ ...numInput, width: 54 }}
+                      />
+                      <input name={`s_${e.publicId}`} type="number" min={0} max={99} defaultValue={e.saves} style={numInput} />
+                      <select
+                        name={`p_${e.publicId}`}
+                        defaultValue={e.position ?? ''}
+                        style={{ ...numInput, width: 58, textAlign: 'left', padding: '6px 2px' }}
+                      >
+                        <option value="">—</option>
+                        <option value="goalkeeper">GK</option>
+                        <option value="defender">DEF</option>
+                        <option value="midfielder">MID</option>
+                        <option value="forward">FWD</option>
+                      </select>
+                      <span style={{ width: 30, textAlign: 'center' }} title="Red card">
+                        <input name={`rc_${e.publicId}`} type="checkbox" defaultChecked={e.redCards > 0} style={{ accentColor: '#E5484D', width: 15, height: 15 }} />
                       </span>
                     </div>
                   ))}
