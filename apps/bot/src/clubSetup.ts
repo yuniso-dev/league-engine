@@ -77,7 +77,7 @@ export function clubSessionStatus(): string {
 export function buildClubMenu(clubs: EaClubSummary[]): ActionRowBuilder<StringSelectMenuBuilder> {
   const options = clubs.slice(0, 25).map(c => {
     const record = c.record ? `${c.record.wins}W/${c.record.ties}D/${c.record.losses}L` : null;
-    const detailBits = [record, c.members != null ? `${c.members} members` : null, `ID ${c.clubId}`]
+    const detailBits = [record, c.members != null ? `${c.members} members` : null, c.stadium, `ID ${c.clubId}`]
       .filter(Boolean)
       .join(' · ');
     return new StringSelectMenuOptionBuilder()
