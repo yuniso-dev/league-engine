@@ -43,7 +43,7 @@ export async function resolveClub(input: string, platform: string): Promise<Reso
     if (results.length === 0) {
       return {
         ok: false,
-        error: `EA found no club named “${trimmed}”. The search needs the EXACT in-game name (spelling and spaces matter; case doesn't) — or paste the numeric club ID instead.`,
+        error: `EA found no club matching “${trimmed}”. Try more (or fewer) letters of the in-game name — or paste the numeric club ID instead.`,
       };
     }
     return { ok: true, id: results[0].clubId, name: results[0].name };

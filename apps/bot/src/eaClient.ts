@@ -87,6 +87,8 @@ export type EaClubSummary = {
   members: number | null;
   /** All-time record when the endpoint provides it (W/D/L). */
   record: { wins: number; ties: number; losses: number } | null;
+  /** Home stadium name when the endpoint provides it. */
+  stadium: string | null;
 };
 
 function parseClubList(data: unknown): EaClubSummary[] {
@@ -106,6 +108,7 @@ function parseClubList(data: unknown): EaClubSummary[] {
       if (clubId == null || clubName == null) return null;
       const members = e.membersCount ?? e.memberCount ?? null;
       const hasRecord = e.wins != null || e.ties != null || e.losses != null;
+      const stadium = e.stadName ?? info.stadName ?? e.stadiumName ?? info.stadiumName ?? null;
       return {
         clubId: String(clubId),
         name: String(clubName),
@@ -117,33 +120,61 @@ function parseClubList(data: unknown): EaClubSummary[] {
               losses: eaNum(e.losses as string | number),
             }
           : null,
+        stadium: stadium != null && String(stadium).trim() !== '' ? String(stadium).trim() : null,
       };
     })
     .filter((c): c is EaClubSummary => c !== null);
 }
 
-/** Search clubs by (partial) name. EA has moved this between endpoints across
- *  title years — clubs/search and allTimeLeaderboard/search — so try both.
- *  404 means "no results" on these endpoints, not an outage. */
+/** Sort key vs the query: exact name → prefix → substring → the rest. */
+function relevance(clubName: string, query: string): number {
+  const n = clubName.toLowerCase();
+  const q = query.toLowerCase();
+  if (n === q) return 0;
+  if (n.startsWith(q)) return 1;
+  if (n.includes(q)) return 2;
+  return 3;
+}
+
+/** Search clubs by name. EA splits search across two endpoints — clubs/search
+ *  (exact-ish) and allTimeLeaderboard/search (partial) — and neither is a
+ *  superset of the other, so query BOTH and merge, or "VFL LILLE" hides
+ *  "VFL Lille X". 404 means "no results" on these endpoints, not an outage. */
 export async function searchClubs(name: string, platform: string): Promise<EaClubSummary[]> {
   const urls = [
     `${BASE}/clubs/search?clubName=${encodeURIComponent(name)}&platform=${encodeURIComponent(platform)}`,
     `${BASE}/allTimeLeaderboard/search?clubName=${encodeURIComponent(name)}&platform=${encodeURIComponent(platform)}`,
   ];
 
+  const settled = await Promise.allSettled(urls.map(async url => parseClubList(await getJson(url))));
+
+  const byId = new Map<string, EaClubSummary>();
   let lastError: unknown = null;
-  for (const url of urls) {
-    try {
-      const clubs = parseClubList(await getJson(url));
-      if (clubs.length > 0) return clubs;
-      // Endpoint answered but found nothing — try the other endpoint too.
-    } catch (e) {
-      if (e instanceof EaApiError && e.status === 404) continue; // no results here
-      lastError = e; // blocked/down — remember, but still try the fallback
+  for (const result of settled) {
+    if (result.status === 'rejected') {
+      if (result.reason instanceof EaApiError && result.reason.status === 404) continue; // no results here
+      lastError = result.reason; // blocked/down — the other endpoint may still answer
+      continue;
+    }
+    for (const club of result.value) {
+      const prev = byId.get(club.clubId);
+      byId.set(club.clubId, prev
+        ? {
+            ...prev,
+            members: prev.members ?? club.members,
+            record: prev.record ?? club.record,
+            stadium: prev.stadium ?? club.stadium,
+          }
+        : club);
     }
   }
-  if (lastError) throw lastError;
-  return [];
+
+  // A hard failure only matters if it left us empty-handed.
+  if (byId.size === 0 && lastError) throw lastError;
+
+  return [...byId.values()]
+    .sort((a, b) => relevance(a.name, name) - relevance(b.name, name) || a.name.localeCompare(b.name))
+    .slice(0, 25);
 }
 
 /** Look up clubs by ID (name + record) — validates pasted IDs and puts real
