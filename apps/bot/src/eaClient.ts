@@ -127,7 +127,7 @@ function parseClubList(data: unknown): EaClubSummary[] {
 }
 
 /** Sort key vs the query: exact name → prefix → substring → the rest. */
-function relevance(clubName: string, query: string): number {
+export function relevance(clubName: string, query: string): number {
   const n = clubName.toLowerCase();
   const q = query.toLowerCase();
   if (n === q) return 0;
@@ -136,15 +136,43 @@ function relevance(clubName: string, query: string): number {
   return 3;
 }
 
+/** EA's search is finicky about the exact query string, so we probe a few
+ *  bounded variants of the name and merge the results. Returns { queries,
+ *  broad }: `queries` are what to send EA (deduped, ≤3); `broad` is the
+ *  distinctive token used to keep the wider net's results relevant. */
+export function buildSearchVariants(name: string): { queries: string[]; broad: string | null } {
+  const raw = name.trim();
+  const collapsed = raw.replace(/\s+/g, ' ');
+  const tokens = collapsed.split(' ').filter(Boolean);
+  // The longest word is the most distinctive ("lille" beats "VFL"); searching
+  // it alone pulls every club containing it, which we then filter locally.
+  const longest = tokens.reduce((a, b) => (b.length > a.length ? b : a), '');
+  const broad = tokens.length > 1 && longest.length >= 3 && longest.toLowerCase() !== collapsed.toLowerCase()
+    ? longest
+    : null;
+
+  const queries: string[] = [];
+  for (const q of [raw, collapsed, broad]) {
+    if (q && !queries.some(existing => existing.toLowerCase() === q.toLowerCase())) queries.push(q);
+  }
+  return { queries, broad };
+}
+
 /** Search clubs by name. EA splits search across two endpoints — clubs/search
  *  (exact-ish) and allTimeLeaderboard/search (partial) — and neither is a
- *  superset of the other, so query BOTH and merge, or "VFL LILLE" hides
- *  "VFL Lille X". 404 means "no results" on these endpoints, not an outage. */
+ *  superset of the other, AND both are picky about the exact query string. So
+ *  we fan out a few query variants across BOTH endpoints and merge, or e.g.
+ *  "VFL LILLE" hides "VFL Lille X". 404 means "no results", not an outage.
+ *
+ *  Hard ceiling: this can only return clubs EA actually indexes — a brand-new
+ *  club with ~zero games isn't searchable by ANY tool; use its numeric ID. */
 export async function searchClubs(name: string, platform: string): Promise<EaClubSummary[]> {
-  const urls = [
-    `${BASE}/clubs/search?clubName=${encodeURIComponent(name)}&platform=${encodeURIComponent(platform)}`,
-    `${BASE}/allTimeLeaderboard/search?clubName=${encodeURIComponent(name)}&platform=${encodeURIComponent(platform)}`,
-  ];
+  const { queries, broad } = buildSearchVariants(name);
+
+  const urls = queries.flatMap(q => [
+    `${BASE}/clubs/search?clubName=${encodeURIComponent(q)}&platform=${encodeURIComponent(platform)}`,
+    `${BASE}/allTimeLeaderboard/search?clubName=${encodeURIComponent(q)}&platform=${encodeURIComponent(platform)}`,
+  ]);
 
   const settled = await Promise.allSettled(urls.map(async url => parseClubList(await getJson(url))));
 
@@ -153,7 +181,7 @@ export async function searchClubs(name: string, platform: string): Promise<EaClu
   for (const result of settled) {
     if (result.status === 'rejected') {
       if (result.reason instanceof EaApiError && result.reason.status === 404) continue; // no results here
-      lastError = result.reason; // blocked/down — the other endpoint may still answer
+      lastError = result.reason; // blocked/down — another variant/endpoint may still answer
       continue;
     }
     for (const club of result.value) {
@@ -172,7 +200,16 @@ export async function searchClubs(name: string, platform: string): Promise<EaClu
   // A hard failure only matters if it left us empty-handed.
   if (byId.size === 0 && lastError) throw lastError;
 
-  return [...byId.values()]
+  // The broad-token query casts a wide net; keep only clubs that actually
+  // relate to what was typed (contain the full query OR the distinctive token).
+  const q = name.trim().toLowerCase();
+  const b = broad?.toLowerCase() ?? null;
+  const relevant = [...byId.values()].filter(c => {
+    const n = c.name.toLowerCase();
+    return n.includes(q) || (b !== null && n.includes(b));
+  });
+
+  return relevant
     .sort((a, b) => relevance(a.name, name) - relevance(b.name, name) || a.name.localeCompare(b.name))
     .slice(0, 25);
 }
