@@ -1,12 +1,16 @@
 import { notFound } from 'next/navigation';
 import {
+  getHeadToHead,
+  getUserByDiscordId,
   getUserByPublicId,
   getRatingHistoryByPublicId,
   getRecentMatchesForPlayer,
   listAwardsForPlayer,
   runResilient,
 } from '@inazuma/db';
-import type { PublicAward, PublicRecentMatch, RatingPoint } from '@inazuma/db';
+import type { HeadToHead, PublicAward, PublicRecentMatch, RatingPoint } from '@inazuma/db';
+import { auth } from '@/auth';
+import { HeadToHeadCard } from '@/components/HeadToHeadCard';
 import { Avatar } from '@/components/ui/Avatar';
 import { BackPill } from '@/components/ui/BackPill';
 import { RatingGraph } from '@/components/RatingGraph';
@@ -25,14 +29,29 @@ export default async function PublicProfilePage({ params }: Props) {
   // socket surfaces as a beat of latency instead of the error page.
   const player = await runResilient(() => getUserByPublicId(params.publicId));
   if (!player) notFound();
+
+  // Head-to-head vs the signed-in viewer (share links opened logged-out — or
+  // by the player themselves — simply skip it). Never lets the page fail.
+  const headToHeadPromise: Promise<HeadToHead | null> = auth()
+    .then(async session => {
+      if (!session?.user?.discordId) return null;
+      const viewer = await runResilient(() => getUserByDiscordId(session.user.discordId!));
+      if (!viewer?.publicId || viewer.publicId === params.publicId) return null;
+      return runResilient(() => getHeadToHead(viewer.publicId!, params.publicId));
+    })
+    .catch(() => null);
+
   // Extras degrade gracefully — the card itself always renders.
-  const [history, playerAwards, recentMatches] = await runResilient(() =>
-    Promise.all([
-      getRatingHistoryByPublicId(params.publicId),
-      listAwardsForPlayer(params.publicId),
-      getRecentMatchesForPlayer(params.publicId),
-    ]),
-  ).catch((): [RatingPoint[], PublicAward[], PublicRecentMatch[]] => [[], [], []]);
+  const [[history, playerAwards, recentMatches], headToHead] = await Promise.all([
+    runResilient(() =>
+      Promise.all([
+        getRatingHistoryByPublicId(params.publicId),
+        listAwardsForPlayer(params.publicId),
+        getRecentMatchesForPlayer(params.publicId),
+      ]),
+    ).catch((): [RatingPoint[], PublicAward[], PublicRecentMatch[]] => [[], [], []]),
+    headToHeadPromise,
+  ]);
 
   const accent = player.accentColor ?? '#FF7A1A';
   const initials = player.displayName.slice(0, 2).toUpperCase();
@@ -252,6 +271,13 @@ export default async function PublicProfilePage({ params }: Props) {
           </div>
         )}
       </div>
+
+      {/* Head-to-head vs the signed-in viewer — absent when logged out or on your own page */}
+      {headToHead && (
+        <div style={{ width: '100%', maxWidth: 460, marginTop: 12 }}>
+          <HeadToHeadCard h2h={headToHead} targetName={player.displayName} accent={accent} />
+        </div>
+      )}
 
       {/* Recent matches — its own card below the profile card */}
       {recentMatches.length > 0 && (

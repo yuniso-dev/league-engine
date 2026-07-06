@@ -87,6 +87,14 @@ export type HeadToHead = {
     theirGoals: number;
     tournamentName: string;
   } | null;
+  /** Matches where the two were on the SAME team — the other half of the story. */
+  teammates: {
+    meetings: number;
+    wins: number;
+    draws: number;
+    losses: number;
+    goalsTogether: number;
+  };
 };
 
 /**
@@ -126,6 +134,19 @@ export async function getHeadToHead(
          and theirs.user_id in (select discord_id from them)
          and m.processed = true
          and m.ranked = true
+    ),
+    together as (
+      select mine.result                as my_result,
+             mine.goals + theirs.goals  as combined_goals
+        from match_participants mine
+        join match_participants theirs
+          on theirs.match_id = mine.match_id
+         and theirs.team_id = mine.team_id
+        join matches m on m.id = mine.match_id
+       where mine.user_id   in (select discord_id from me)
+         and theirs.user_id in (select discord_id from them)
+         and m.processed = true
+         and m.ranked = true
     )
     select
       (select count(*)::int                              from meetings)                        as meetings,
@@ -136,6 +157,11 @@ export async function getHeadToHead(
       (select coalesce(sum(their_goals), 0)::int         from meetings)                        as goals_against,
       (select coalesce(sum(my_assists), 0)::int          from meetings)                        as assists_for,
       (select coalesce(sum(their_assists), 0)::int       from meetings)                        as assists_against,
+      (select count(*)::int                              from together)                        as t_meetings,
+      (select count(*)::int  from together where my_result = 'win')                            as t_wins,
+      (select count(*)::int  from together where my_result = 'draw')                           as t_draws,
+      (select count(*)::int  from together where my_result = 'loss')                           as t_losses,
+      (select coalesce(sum(combined_goals), 0)::int      from together)                        as t_goals,
       (select row_to_json(x) from (
          select mt.played_at, mt.my_result as result, mt.my_goals as our_goals,
                 mt.their_goals as their_goals, t.name as tournament_name
@@ -167,6 +193,13 @@ export async function getHeadToHead(
     goalsAgainst: Number(row.goals_against ?? 0),
     assistsFor: Number(row.assists_for ?? 0),
     assistsAgainst: Number(row.assists_against ?? 0),
+    teammates: {
+      meetings: Number(row.t_meetings ?? 0),
+      wins: Number(row.t_wins ?? 0),
+      draws: Number(row.t_draws ?? 0),
+      losses: Number(row.t_losses ?? 0),
+      goalsTogether: Number(row.t_goals ?? 0),
+    },
     lastMeeting: lm
       ? {
           playedAt: new Date(lm.played_at).toISOString(),

@@ -69,8 +69,9 @@ export function HeadToHeadCard({ h2h, targetName, accent }: {
 
       {meetings === 0 ? (
         <p style={{ fontFamily: FONT_B, fontSize: 13, color: T.faint, margin: '10px 0 0', lineHeight: 1.6 }}>
-          You haven&apos;t faced {targetName} on opposing teams yet — get drafted against them to
-          start the rivalry.
+          {h2h.teammates.meetings > 0
+            ? <>You haven&apos;t faced {targetName} on opposing teams yet — so far you&apos;ve only fought side by side.</>
+            : <>You haven&apos;t faced {targetName} on opposing teams yet — get drafted against them to start the rivalry.</>}
         </p>
       ) : (
         <>
@@ -127,6 +128,29 @@ export function HeadToHeadCard({ h2h, targetName, accent }: {
             </div>
           )}
         </>
+      )}
+
+      {/* the other half of the story — matches fought side by side */}
+      {h2h.teammates.meetings > 0 && (
+        <div style={{
+          marginTop: 14, paddingTop: 11, borderTop: '1px solid rgba(255,255,255,0.07)',
+          display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontFamily: FONT_M, fontSize: 9, letterSpacing: 1, color: T.faint }}>🤝 AS TEAMMATES</span>
+          <span style={{ fontFamily: FONT_D, fontSize: 13 }}>
+            <span style={{ color: T.win }}>{h2h.teammates.wins}W</span>
+            <span style={{ color: T.faint }}> · </span>
+            <span style={{ color: T.dim }}>{h2h.teammates.draws}D</span>
+            <span style={{ color: T.faint }}> · </span>
+            <span style={{ color: T.loss }}>{h2h.teammates.losses}L</span>
+          </span>
+          <span style={{ flex: 1, minWidth: 0, fontFamily: FONT_B, fontSize: 12, color: T.dim }}>
+            {h2h.teammates.goalsTogether} goal{h2h.teammates.goalsTogether === 1 ? '' : 's'} together
+          </span>
+          <span style={{ fontFamily: FONT_M, fontSize: 10, color: T.faint }}>
+            {h2h.teammates.meetings} MATCH{h2h.teammates.meetings === 1 ? '' : 'ES'}
+          </span>
+        </div>
       )}
     </div>
   );
