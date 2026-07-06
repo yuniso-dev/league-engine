@@ -24,10 +24,57 @@ const MATCH_TYPES: EaMatchType[] = (process.env.EA_FRONTIER_MATCH_TYPES ?? 'frie
   .map(s => s.trim())
   .filter((s): s is EaMatchType => s === 'friendlyMatch' || s === 'leagueMatch' || s === 'playoffMatch');
 
+// ── Watchdog state (in-memory; resets on restart) ─────────────────────────────
+// EA has real multi-day outages, and it only serves the last ~5-10 games per
+// club — an unnoticed outage during a live Frontier can lose results forever.
+// Track pass health here; /frontierstatus reads it, and sustained failure
+// during a live tournament DMs the admins once (with a recovery all-clear).
+
+const DOWN_PASSES_BEFORE_ALERT = 3; // ≈6 minutes of solid failures
+
+export type FrontierWatchState = {
+  lastPassAt: Date | null;
+  lastEaSuccessAt: Date | null;
+  lastIngest: { line: string; at: Date } | null;
+  consecutiveDownPasses: number;
+  eaDownAlerted: boolean;
+  matchTypes: EaMatchType[];
+};
+
+const watch: FrontierWatchState = {
+  lastPassAt: null,
+  lastEaSuccessAt: null,
+  lastIngest: null,
+  consecutiveDownPasses: 0,
+  eaDownAlerted: false,
+  matchTypes: MATCH_TYPES,
+};
+
+export function frontierWatchState(): FrontierWatchState {
+  return watch;
+}
+
+export type FrontierSyncSummary = {
+  liveTournaments: number;
+  clubsPolled: number;
+  fetchAttempts: number;
+  fetchFailures: number;
+  ingested: number;
+};
+
 /** One poll pass. Failures log and wait for the next tick — never fatal. */
-export async function syncFrontierMatches(client: Client<true>): Promise<void> {
+export async function syncFrontierMatches(client: Client<true>): Promise<FrontierSyncSummary> {
+  watch.lastPassAt = new Date();
+
   const tournaments = await getLinkedLiveTournaments();
-  if (tournaments.length === 0) return; // nothing live & linked — free no-op
+  const summary: FrontierSyncSummary = {
+    liveTournaments: tournaments.length,
+    clubsPolled: 0,
+    fetchAttempts: 0,
+    fetchFailures: 0,
+    ingested: 0,
+  };
+  if (tournaments.length === 0) return summary; // nothing live & linked — free no-op
 
   const cfg = await getConfig();
   const platform = cfg.eaPlatform || 'common-gen5';
@@ -37,11 +84,14 @@ export async function syncFrontierMatches(client: Client<true>): Promise<void> {
     const teamOfClub = new Map(t.clubs.map(c => [c.clubId, c]));
 
     for (const { clubId } of t.clubs) {
+      summary.clubsPolled += 1;
       for (const matchType of MATCH_TYPES) {
+        summary.fetchAttempts += 1;
         let raw: EaRawMatch[];
         try {
           raw = await fetchClubMatches(clubId, platform, matchType);
         } catch (e) {
+          summary.fetchFailures += 1;
           console.error(`[frontier] ${matchType} fetch failed for club ${clubId} —`, e instanceof Error ? e.message : e);
           continue;
         }
@@ -119,6 +169,11 @@ export async function syncFrontierMatches(client: Client<true>): Promise<void> {
           if (outcome.ok) {
             // Fixture is filled — stop matching further EA games onto it this pass.
             t.unscoredFixtures.splice(t.unscoredFixtures.indexOf(fixture), 1);
+            summary.ingested += 1;
+            watch.lastIngest = {
+              line: `${ourTeam.teamName} ${ourGoals}–${oppGoals} ${oppTeam.teamName}${dnf ? ' (DNF)' : ''}`,
+              at: new Date(),
+            };
             console.log(
               `[frontier] ✔ auto-recorded ${ourTeam.teamName} ${ourGoals}–${oppGoals} ${oppTeam.teamName}` +
               (dnf ? ' (DNF)' : '') +
@@ -134,6 +189,46 @@ export async function syncFrontierMatches(client: Client<true>): Promise<void> {
         }
       }
     }
+  }
+
+  await trackEaHealth(client, summary);
+  return summary;
+}
+
+/** The watchdog: sustained all-fetches-failing during a live Frontier alerts
+ *  the admins ONCE; the first healthy pass afterwards sends the all-clear. */
+async function trackEaHealth(client: Client<true>, summary: FrontierSyncSummary): Promise<void> {
+  if (summary.fetchAttempts === 0) return;
+
+  if (summary.fetchFailures === summary.fetchAttempts) {
+    watch.consecutiveDownPasses += 1;
+    if (watch.consecutiveDownPasses >= DOWN_PASSES_BEFORE_ALERT && !watch.eaDownAlerted) {
+      watch.eaDownAlerted = true;
+      await alertAdmins(
+        client,
+        `🔌 **EA API unreachable while a Frontier is live** — every poll for the last ~${watch.consecutiveDownPasses * 2} minutes failed. ` +
+        `Results backfill automatically when EA recovers, but EA only keeps the last ~5–10 games per club — ` +
+        `if the outage outlasts the games being played, record those scores manually. ` +
+        `Check \`/frontierstatus\` for live state; I'll DM again when EA recovers.`,
+      );
+    }
+    return;
+  }
+
+  // At least one fetch worked — EA is (at least partly) up.
+  watch.lastEaSuccessAt = new Date();
+  if (watch.eaDownAlerted) {
+    await alertAdmins(client, '✅ **EA API recovered** — polling is healthy again; games still inside EA\'s history window backfill now.');
+  }
+  watch.consecutiveDownPasses = 0;
+  watch.eaDownAlerted = false;
+}
+
+/** DM every site owner/admin. */
+async function alertAdmins(client: Client<true>, text: string): Promise<void> {
+  const admins = await getAdminDiscordIds().catch(() => [] as string[]);
+  for (const discordId of admins) {
+    await sendDm(client, discordId, text);
   }
 }
 
@@ -156,15 +251,12 @@ async function alertAdminsDnf(
   const statOpp = statGoals(oppClubId);
   const differs = statOur !== ourGoals || statOpp !== oppGoals;
 
-  const text =
+  await alertAdmins(
+    client,
     `⚠️ **DNF result auto-recorded**: **${ourName} ${ourGoals}–${oppGoals} ${oppName}** — a side quit, ` +
     `so EA's score may be a forfeit (a 90'-quit draw becomes 3–0).` +
     (differs ? `\nPlayer goals suggest the real score was **${statOur}–${statOpp}**.` : '') +
     `\nIf the score is wrong: delete the result on the admin tournament page and re-enter it manually — ` +
-    `manual entries are never touched by the auto-ingest. The result is tagged DNF on the site either way.`;
-
-  const admins = await getAdminDiscordIds().catch(() => [] as string[]);
-  for (const discordId of admins) {
-    await sendDm(client, discordId, text);
-  }
+    `manual entries are never touched by the auto-ingest. The result is tagged DNF on the site either way.`,
+  );
 }

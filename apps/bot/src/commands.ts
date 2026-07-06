@@ -8,7 +8,7 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
 } from 'discord.js';
-import { getConfig, getUserByDiscordId, listAwardsForPlayer } from '@inazuma/db';
+import { getConfig, getLinkedLiveTournaments, getUserByDiscordId, listAwardsForPlayer } from '@inazuma/db';
 import { handleLeaderboard, handlePostLeaderboard } from './leaderboard.js';
 import { resetAllNicknames, syncNicknames } from './nicknameSync.js';
 import { snapshotVoiceChannel } from './voicePresence.js';
@@ -18,6 +18,7 @@ import { CLUB_PICK_ID, armClubMenuTimeout, buildClubMenu, cancelClubSession, clu
 import { closeAwardPoll, startAwardPoll } from './awardPoll.js';
 import { handleSpinOrder } from './spinOrder.js';
 import { handleFrontierIntro } from './frontierIntro.js';
+import { frontierWatchState, syncFrontierMatches } from './frontierSync.js';
 
 const definitions = [
   new SlashCommandBuilder()
@@ -122,6 +123,14 @@ const definitions = [
     .setDescription('Admin: spin the wheel — random captain order + the snake draft sequence')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder()
+    .setName('frontierstatus')
+    .setDescription('Admin: health check — EA polling state, linked clubs, unscored fixtures')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+  new SlashCommandBuilder()
+    .setName('frontiersync')
+    .setDescription('Admin: force an EA poll pass right now (e.g. after a bot restart)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+  new SlashCommandBuilder()
     .setName('frontierintro')
     .setDescription('Admin: draft the Frontier intro post (captains, honours, rules, signup link)')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
@@ -220,6 +229,69 @@ async function handleCheckVc(
     `Open the tournament's **Draft Board** on the site to build teams.`,
   ];
   await interaction.editReply(lines.join('\n'));
+}
+
+const rel = (d: Date | null): string => (d ? `<t:${Math.floor(d.getTime() / 1000)}:R>` : '—');
+
+async function handleFrontierStatus(interaction: ChatInputCommandInteraction): Promise<void> {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  const [tournaments, cfg] = await Promise.all([getLinkedLiveTournaments(), getConfig()]);
+  const w = frontierWatchState();
+
+  const eaLine = w.eaDownAlerted
+    ? `🔌 **DOWN** — ${w.consecutiveDownPasses} failing passes (admins alerted)`
+    : w.consecutiveDownPasses > 0
+      ? `⚠️ shaky — ${w.consecutiveDownPasses} failing pass${w.consecutiveDownPasses === 1 ? '' : 'es'}`
+      : '✅ healthy';
+
+  const lines = [
+    '🩺 **FRONTIER SYNC STATUS**',
+    `Polling every 2 min on \`${w.matchTypes.join(', ')}\` · platform \`${cfg.eaPlatform || 'common-gen5'}\``,
+    `Last pass: ${rel(w.lastPassAt)} · last EA success: ${rel(w.lastEaSuccessAt)}`,
+    `EA API: ${eaLine}`,
+    `Last auto-record: ${w.lastIngest ? `**${w.lastIngest.line}** ${rel(w.lastIngest.at)}` : 'none since the bot started'}`,
+    '',
+    tournaments.length === 0
+      ? 'No live tournament with ≥2 linked clubs — polling is idle. (Counters reset when the bot restarts.)'
+      : tournaments
+          .map(t => {
+            const oldest = t.unscoredFixtures[0];
+            return (
+              `⚡ **${t.tournamentName}** — ${t.clubs.length} linked clubs · ` +
+              `${t.unscoredFixtures.length} unscored fixture${t.unscoredFixtures.length === 1 ? '' : 's'}` +
+              (oldest ? ` (oldest created ${rel(oldest.createdAt)})` : '')
+            );
+          })
+          .join('\n'),
+  ];
+
+  await interaction.editReply(lines.join('\n'));
+}
+
+async function handleFrontierSyncNow(
+  interaction: ChatInputCommandInteraction,
+  readOnly: boolean,
+): Promise<void> {
+  if (readOnly) {
+    await interaction.reply({
+      content: '⚠ Bot is in read-only test mode — a forced sync would write results. Unset BOT_READ_ONLY for the real run.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  const s = await syncFrontierMatches(interaction.client);
+  await interaction.editReply(
+    s.liveTournaments === 0
+      ? 'Nothing to poll — no live tournament has ≥2 EA-linked clubs. (Link clubs on the teams, set the Frontier live.)'
+      : `Forced a pass: ${s.liveTournaments} live tournament${s.liveTournaments === 1 ? '' : 's'}, ` +
+        `${s.clubsPolled} clubs polled, ${s.fetchAttempts} EA fetches` +
+        `${s.fetchFailures > 0 ? ` (⚠ ${s.fetchFailures} failed)` : ''}, ` +
+        `**${s.ingested} result${s.ingested === 1 ? '' : 's'} ingested**.` +
+        (s.ingested === 0 && s.fetchFailures === 0 ? ' No new games between linked clubs since the last pass.' : ''),
+  );
 }
 
 async function handleFindClub(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -413,6 +485,12 @@ export async function dispatch(
         break;
       case 'frontierintro':
         await handleFrontierIntro(interaction, ctx.siteUrl);
+        break;
+      case 'frontierstatus':
+        await handleFrontierStatus(interaction);
+        break;
+      case 'frontiersync':
+        await handleFrontierSyncNow(interaction, ctx.readOnly);
         break;
       case 'syncnicks': {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
