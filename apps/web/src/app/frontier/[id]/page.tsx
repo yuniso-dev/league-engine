@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTournamentDetail, isSignedUp, runResilient } from '@inazuma/db';
 import { auth } from '@/auth';
@@ -53,35 +54,42 @@ export default async function FrontierDetailPage({ params }: Props) {
         {STAGE_LABELS[stage.stage]}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {stage.matches.map(m => (
-          <div key={m.id} style={glass({
-            padding: '12px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-          })}>
-            <span style={{ fontFamily: FONT_B, fontSize: 14, color: T.text, flex: 1, textAlign: 'right' }}>
-              {m.homeTeamName}
-            </span>
-            <span style={{
-              fontFamily: FONT_M, fontSize: 15, color: m.homeScore != null ? T.gold : T.faint,
-              minWidth: 64, textAlign: 'center',
-            }}>
-              {m.homeScore != null ? `${m.homeScore} – ${m.awayScore}` : 'vs'}
-              {m.dnf && (
-                <span
-                  title="Decided by a side quitting — score may be a forfeit"
-                  style={{ display: 'block', fontSize: 9, letterSpacing: 1, color: T.loss }}
-                >
-                  DNF
-                </span>
-              )}
-            </span>
-            <span style={{ fontFamily: FONT_B, fontSize: 14, color: T.text, flex: 1 }}>
-              {m.awayTeamName}
-            </span>
-          </div>
-        ))}
+        {stage.matches.map(m => {
+          const row = (
+            <>
+              <span style={{ fontFamily: FONT_B, fontSize: 14, color: T.text, flex: 1, textAlign: 'right' }}>
+                {m.homeTeamName}
+              </span>
+              <span style={{
+                fontFamily: FONT_M, fontSize: 15, color: m.homeScore != null ? T.gold : T.faint,
+                minWidth: 64, textAlign: 'center',
+              }}>
+                {m.homeScore != null ? `${m.homeScore} – ${m.awayScore}` : 'vs'}
+                {m.dnf && (
+                  <span
+                    title="Decided by a side quitting — score may be a forfeit"
+                    style={{ display: 'block', fontSize: 9, letterSpacing: 1, color: T.loss }}
+                  >
+                    DNF
+                  </span>
+                )}
+              </span>
+              <span style={{ fontFamily: FONT_B, fontSize: 14, color: T.text, flex: 1 }}>
+                {m.awayTeamName}
+              </span>
+            </>
+          );
+          const rowStyle = glass({ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 });
+          // Recorded games open the match centre (lineups + full stats).
+          return m.homeScore != null ? (
+            <Link key={m.id} href={`/frontier/match/${m.id}`} title="Match centre — lineups & stats"
+              style={{ ...rowStyle, textDecoration: 'none' }}>
+              {row}
+            </Link>
+          ) : (
+            <div key={m.id} style={rowStyle}>{row}</div>
+          );
+        })}
       </div>
     </div>
   );
@@ -169,16 +177,17 @@ export default async function FrontierDetailPage({ params }: Props) {
 
             {hasLeaders && (
               <>
-                <div style={sectionHead}>LEADERS</div>
+                {/* The honours races — same stats, framed as what's at stake. */}
+                <div style={sectionHead}>THE RACES</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {stats.topScorers.length > 0 && (
                     <div style={glass({ padding: 16 })}>
-                      <StatLeaderList title="TOP SCORERS" emoji="⚽" leaders={stats.topScorers} unit="G" accent={accent} maxVisible={5} />
+                      <StatLeaderList title="BLAZE'S BOOT RACE" emoji="🥇" leaders={stats.topScorers} unit="G" accent={accent} maxVisible={5} />
                     </div>
                   )}
                   {stats.topAssisters.length > 0 && (
                     <div style={glass({ padding: 16 })}>
-                      <StatLeaderList title="TOP ASSISTS" emoji="🎯" leaders={stats.topAssisters} unit="A" accent={accent} maxVisible={5} />
+                      <StatLeaderList title="SHARP'S AWARD RACE" emoji="👑" leaders={stats.topAssisters} unit="A" accent={accent} maxVisible={5} />
                     </div>
                   )}
                   {stats.topCleanSheets.length > 0 && (

@@ -20,6 +20,8 @@ export type CeremonyDraftInput = {
     memberDiscordIds: string[];
     captainDiscordId: string | null;
   } | null;
+  /** Team of the Tournament lines (from pickTeamOfTournament); empty = omit. */
+  tott: { emoji: string; label: string; players: { discordId: string; value: number }[] }[];
 };
 
 const honour = (key: (typeof HONOURS)[number]['key']) => HONOURS.find(h => h.key === key)!;
@@ -62,6 +64,13 @@ export function buildCeremonyAnnouncement(input: CeremonyDraftInput): string {
       `**${input.champion.teamName}** — ${input.champion.memberDiscordIds.map(mention).join(' ')}`));
     if (input.champion.captainDiscordId) {
       lines.push(line('mrInazuma', n, mention(input.champion.captainDiscordId)));
+    }
+  }
+
+  if (input.tott.length > 0) {
+    lines.push('', '⭐ **Team of the Tournament**');
+    for (const t of input.tott) {
+      lines.push(`${t.emoji} ${t.label} — ${t.players.map(p => `${mention(p.discordId)} (${p.value.toFixed(2)})`).join(' · ')}`);
     }
   }
 

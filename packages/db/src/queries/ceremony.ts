@@ -23,6 +23,9 @@ export type CeremonySheet = {
   topAssisters: CeremonyPlayer[];
   /** Goalkeepers by average match rating, best first (min 2 appearances). */
   gkTable: (CeremonyPlayer & { appearances: number })[];
+  /** Everyone with ≥2 rated appearances, best avg rating first, with their
+   *  most-played EA position bucket — the Team of the Tournament pool. */
+  ratedPlayers: (CeremonyPlayer & { appearances: number; bucket: string | null })[];
   championTeam: {
     id: string;
     name: string;
@@ -95,6 +98,28 @@ export async function getCeremonySheet(tournamentId: string): Promise<CeremonySh
     .having(sql`count(*) >= 2`)
     .orderBy(desc(sql`avg(${matchParticipants.rating})`));
 
+  // ── Rating table with position buckets (Team of the Tournament pool) ───────
+  const ratedRows = await db
+    .select({
+      publicId: users.publicId,
+      discordId: users.discordId,
+      displayName: users.displayName,
+      avgRating: sql<number>`avg(${matchParticipants.rating})::float`,
+      appearances: sql<number>`count(*)::int`,
+      // Most-played position this tournament decides the player's TOTT slot.
+      bucket: sql<string | null>`mode() within group (order by lower(${matchParticipants.position}))`,
+    })
+    .from(matchParticipants)
+    .innerJoin(matches, eq(matchParticipants.matchId, matches.id))
+    .innerJoin(users, eq(matchParticipants.userId, users.discordId))
+    .where(and(
+      eq(matches.tournamentId, tournamentId),
+      isNotNull(matchParticipants.rating),
+    ))
+    .groupBy(users.publicId, users.discordId, users.displayName)
+    .having(sql`count(*) >= 2`)
+    .orderBy(desc(sql`avg(${matchParticipants.rating})`));
+
   // ── Champion roster (null until the admin sets a winner) ───────────────────
   let championTeam: CeremonySheet['championTeam'] = null;
   if (tournament.winnerTeamId) {
@@ -145,6 +170,16 @@ export async function getCeremonySheet(tournamentId: string): Promise<CeremonySh
         displayName: r.displayName,
         value: r.avgRating,
         appearances: r.appearances,
+      })),
+    ratedPlayers: ratedRows
+      .filter((r): r is typeof r & { publicId: string } => r.publicId != null)
+      .map(r => ({
+        publicId: r.publicId,
+        discordId: r.discordId,
+        displayName: r.displayName,
+        value: r.avgRating,
+        appearances: r.appearances,
+        bucket: r.bucket,
       })),
     championTeam,
     voterPool: poolRows.filter((p): p is typeof p & { publicId: string } => p.publicId != null),
