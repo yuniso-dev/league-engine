@@ -8,7 +8,13 @@ const BASE = process.env.EA_API_BASE ?? 'https://proclubs.ea.com/api/fc';
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
-export type EaMatchType = 'leagueMatch' | 'playoffMatch';
+export type EaMatchType = 'leagueMatch' | 'playoffMatch' | 'friendlyMatch';
+
+/** Coerce EA's stringly-typed numbers. Shared by the casual + frontier parsers. */
+export const eaNum = (v: string | number | undefined | null): number => {
+  const n = typeof v === 'string' ? parseFloat(v) : v ?? 0;
+  return Number.isFinite(n) ? (n as number) : 0;
+};
 
 export type EaRawMatch = {
   matchId: string;
@@ -64,4 +70,40 @@ export async function fetchClubMatches(
       typeof m === 'object' && m !== null &&
       'matchId' in m && 'clubs' in m && 'players' in m,
   );
+}
+
+export type EaClubSummary = {
+  clubId: string;
+  name: string;
+  members: number | null;
+};
+
+/** Search clubs by name — how admins find a captain's fresh club ID. EA has
+ *  returned both array and keyed-object shapes for this endpoint over the
+ *  years, so accept either. */
+export async function searchClubs(name: string, platform: string): Promise<EaClubSummary[]> {
+  const url = `${BASE}/clubs/search?clubName=${encodeURIComponent(name)}&platform=${encodeURIComponent(platform)}`;
+  const data = await getJson(url);
+  const list: unknown[] = Array.isArray(data)
+    ? data
+    : typeof data === 'object' && data !== null
+      ? Object.values(data)
+      : [];
+
+  return list
+    .map(entry => {
+      if (typeof entry !== 'object' || entry === null) return null;
+      const e = entry as Record<string, unknown>;
+      const info = (typeof e.clubInfo === 'object' && e.clubInfo !== null ? e.clubInfo : {}) as Record<string, unknown>;
+      const clubId = e.clubId ?? info.clubId;
+      const clubName = e.name ?? info.name;
+      if (clubId == null || clubName == null) return null;
+      const members = e.membersCount ?? e.memberCount ?? null;
+      return {
+        clubId: String(clubId),
+        name: String(clubName),
+        members: members != null ? eaNum(members as string | number) : null,
+      };
+    })
+    .filter((c): c is EaClubSummary => c !== null);
 }

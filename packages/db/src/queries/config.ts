@@ -22,6 +22,7 @@ const DEFAULT_CONFIG: ConfigRow = {
   lastRevealAt: null,
   eaClubIds: null,
   eaPlatform: 'common-gen5',
+  frontierRules: null,
   updatedAt: new Date(),
 };
 

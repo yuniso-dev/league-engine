@@ -48,6 +48,18 @@ export {
   getCasualCareer,
   listLinkedCasualPlayers,
 } from './queries/casual';
+export {
+  getLinkedLiveTournaments,
+  isEaMatchIngested,
+  ingestFrontierResult,
+  setTeamEaClub,
+} from './queries/frontierAuto';
+export type {
+  LinkedLiveTournament,
+  FrontierIngestInput,
+  FrontierIngestPlayer,
+  FrontierIngestOutcome,
+} from './queries/frontierAuto';
 export type {
   CasualMatchInput,
   CasualPlayerLine,

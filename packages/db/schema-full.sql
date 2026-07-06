@@ -113,6 +113,7 @@ create table teams (
     tournament_id   uuid not null references tournaments(id) on delete cascade,
     name            text not null,
     captain_id      text references users(discord_id),
+    ea_club_id      text,            -- the captain's fresh EA club (auto result ingestion)
     placement       integer,
     created_at      timestamptz not null default now()
 );
@@ -143,6 +144,7 @@ create table matches (
     played_at       timestamptz,
     processed       boolean not null default false,
     processed_at    timestamptz,
+    ea_match_id     text unique,     -- set when auto-ingested from the EA API
     created_at      timestamptz not null default now()
 );
 
@@ -161,6 +163,9 @@ create table match_participants (
     clean_sheet     boolean not null default false,
     tackles         integer not null default 0,
     mom             boolean not null default false,
+    rating          numeric(4,2),    -- EA match rating (auto-ingest)
+    saves           integer not null default 0,
+    position        text,            -- position played per EA (GK detection)
     elo_before      numeric(7,2),
     elo_after       numeric(7,2),
     elo_change      numeric(6,2),
@@ -224,6 +229,7 @@ create table config (
     last_reveal_at      timestamptz,
     ea_club_ids         text,
     ea_platform         text not null default 'common-gen5',
+    frontier_rules      text,
     updated_at          timestamptz not null default now(),
     check (id = 1)
 );

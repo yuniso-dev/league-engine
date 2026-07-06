@@ -85,6 +85,22 @@ export default function TeamForm({ tournamentId, takenPublicIds }: Props) {
           />
         </div>
 
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>EA Club ID <span style={{ color: T.dim, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
+          <input
+            name="eaClubId"
+            maxLength={12}
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="e.g. 123456"
+            style={inputBase}
+          />
+          <p style={{ fontFamily: FONT_B, fontSize: 11.5, color: T.dim, margin: '6px 0 0', lineHeight: 1.5 }}>
+            The captain&apos;s fresh club — find the ID with <b>/findclub</b> in Discord.
+            Linked teams get their results auto-recorded from EA while the Frontier is live.
+          </p>
+        </div>
+
         <PlayerPicker
           key={resetKey}
           mode="multi"

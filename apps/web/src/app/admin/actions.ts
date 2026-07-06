@@ -30,6 +30,7 @@ import {
   removeTeamMember,
   revokeAward,
   setTeamCaptain,
+  setTeamEaClub,
   updateAward,
   updateConfig,
   updatePlayerIdentityByAdmin,
@@ -185,9 +186,37 @@ export async function createTeamAction(
     const name = str(formData, 'name').slice(0, 50);
     if (!tournamentId || !name) return { error: 'Team name is required.' };
 
-    const memberPublicIds = formData.getAll('members').map(String);
-    await createTeam(admin.discordId, { tournamentId, name, memberPublicIds });
+    const eaClubIdRaw = str(formData, 'eaClubId');
+    if (eaClubIdRaw && !/^\d{1,12}$/.test(eaClubIdRaw)) {
+      return { error: 'EA Club ID must be a number — find it with /findclub in Discord.' };
+    }
 
+    const memberPublicIds = formData.getAll('members').map(String);
+    await createTeam(admin.discordId, { tournamentId, name, memberPublicIds, eaClubId: eaClubIdRaw || null });
+
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return { ok: true };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function setTeamClubAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const teamId = str(formData, 'teamId');
+    const tournamentId = str(formData, 'tournamentId');
+    if (!teamId) return { error: 'Missing team.' };
+
+    const eaClubIdRaw = str(formData, 'eaClubId');
+    if (eaClubIdRaw && !/^\d{1,12}$/.test(eaClubIdRaw)) {
+      return { error: 'EA Club ID must be a number — find it with /findclub in Discord.' };
+    }
+
+    await setTeamEaClub(admin.discordId, teamId, eaClubIdRaw || null);
     revalidatePath(`/admin/tournaments/${tournamentId}`);
     return { ok: true };
   } catch (e) {
