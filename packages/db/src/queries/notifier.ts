@@ -1,6 +1,6 @@
-import { asc, eq, gt } from 'drizzle-orm';
+import { asc, eq, gt, ne, and } from 'drizzle-orm';
 import { getDb } from '../client';
-import { awards, userAwards, users } from '../schema';
+import { awards, eventSignups, teamMembers, teams, tournaments, userAwards, users } from '../schema';
 
 // Feed queries for the bot's DM notifier. Each returns rows AFTER a watermark
 // the bot holds in memory (seeded to boot time, so restarts never replay
@@ -31,4 +31,47 @@ export async function getNewAwardGrants(since: Date): Promise<NewAwardGrant[]> {
     .innerJoin(users, eq(userAwards.userId, users.discordId))
     .where(gt(userAwards.awardedAt, since))
     .orderBy(asc(userAwards.awardedAt));
+}
+
+export type NewSignup = {
+  /** event_signups.user_id IS the discordId. */
+  discordId: string;
+  tournamentName: string;
+  signedUpAt: Date;
+};
+
+/** Signups after `since` on any non-completed tournament, oldest first. */
+export async function getNewSignups(since: Date): Promise<NewSignup[]> {
+  return getDb()
+    .select({
+      discordId: eventSignups.userId,
+      tournamentName: tournaments.name,
+      signedUpAt: eventSignups.signedUpAt,
+    })
+    .from(eventSignups)
+    .innerJoin(tournaments, eq(eventSignups.tournamentId, tournaments.id))
+    .where(and(gt(eventSignups.signedUpAt, since), ne(tournaments.status, 'completed')))
+    .orderBy(asc(eventSignups.signedUpAt));
+}
+
+export type TeamMemberKey = {
+  teamId: string;
+  userId: string; // discordId
+  teamName: string;
+};
+
+/** Full roster snapshot of every non-completed tournament. team_members has
+ *  no timestamp column, so the bot diffs consecutive snapshots to spot new
+ *  drafts (which also catches mid-tournament sub swaps). */
+export async function getTeamMemberKeys(): Promise<TeamMemberKey[]> {
+  return getDb()
+    .select({
+      teamId: teamMembers.teamId,
+      userId: teamMembers.userId,
+      teamName: teams.name,
+    })
+    .from(teamMembers)
+    .innerJoin(teams, eq(teamMembers.teamId, teams.id))
+    .innerJoin(tournaments, eq(teams.tournamentId, tournaments.id))
+    .where(ne(tournaments.status, 'completed'));
 }

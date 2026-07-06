@@ -630,9 +630,12 @@ export async function updateConfigAction(
       return { error: 'EA platform looks wrong — e.g. common-gen5.' };
     }
 
+    // FRONTIER: the standing rules block /frontierintro pastes into its draft.
+    const frontierRules = str(formData, 'frontierRules').slice(0, 4000) || null;
+
     await updateConfig(admin.discordId, {
       currentSeason, eloBase, kPlacement, kEstablished, placementGames, movMultiplierCap,
-      guildId, rankingsMessageId, eaClubIds, eaPlatform,
+      guildId, rankingsMessageId, eaClubIds, eaPlatform, frontierRules,
     });
 
     revalidatePath('/admin/settings');

@@ -125,6 +125,24 @@ export default function SettingsForm({ config }: Props) {
         </div>
       </div>
 
+      <div style={{ ...glass({ padding: 28 }), marginBottom: 20 }}>
+        <div style={{ fontFamily: FONT_D, fontSize: 14, letterSpacing: 1.5, color: T.dim, marginBottom: 18 }}>
+          FRONTIER — /FRONTIERINTRO
+        </div>
+        <Field
+          label="Standing rules block"
+          caption="Pasted verbatim into the bot's /frontierintro draft — waitlist ritual, no-show policy, similar-skill sub rule, whatever the league lives by. Discord markdown allowed."
+        >
+          <textarea
+            name="frontierRules"
+            rows={8}
+            defaultValue={config.frontierRules ?? ''}
+            placeholder={'e.g.\n• React 🇧 to join the waitlist\n• Leavers are replaced by a similar-skill sub\n• No-shows sit out the next Frontier'}
+            style={{ ...inputBase, resize: 'vertical', minHeight: 140, lineHeight: 1.5 }}
+          />
+        </Field>
+      </div>
+
       {config.lastRevealAt && (
         <p style={{ fontFamily: FONT_B, fontSize: 13, color: T.faint, margin: '0 0 16px' }}>
           Last weekly reveal: {config.lastRevealAt.toISOString().slice(0, 16).replace('T', ' ')} UTC.

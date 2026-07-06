@@ -16,6 +16,8 @@ import { fetchClubsInfo, searchClubs } from './eaClient.js';
 import { armFriendlyTest, disarmFriendlyTest, friendlyTestStatus, resolveClub } from './friendlyTest.js';
 import { CLUB_PICK_ID, armClubMenuTimeout, buildClubMenu, cancelClubSession, clubSessionStatus, handleClubPick, startClubSession } from './clubSetup.js';
 import { closeAwardPoll, startAwardPoll } from './awardPoll.js';
+import { handleSpinOrder } from './spinOrder.js';
+import { handleFrontierIntro } from './frontierIntro.js';
 
 const definitions = [
   new SlashCommandBuilder()
@@ -114,6 +116,14 @@ const definitions = [
               { name: 'Xavier Frost — Player of the Tournament', value: 'pott' },
               { name: "Wallside's Award — Best Defender", value: 'defender' },
             )))
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+  new SlashCommandBuilder()
+    .setName('spinorder')
+    .setDescription('Admin: spin the wheel — random captain order + the snake draft sequence')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+  new SlashCommandBuilder()
+    .setName('frontierintro')
+    .setDescription('Admin: draft the Frontier intro post (captains, honours, rules, signup link)')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 ];
 
@@ -397,6 +407,12 @@ export async function dispatch(
       case 'awardpoll':
         if (interaction.options.getSubcommand() === 'start') await startAwardPoll(interaction);
         else await closeAwardPoll(interaction, ctx.siteUrl);
+        break;
+      case 'spinorder':
+        await handleSpinOrder(interaction);
+        break;
+      case 'frontierintro':
+        await handleFrontierIntro(interaction, ctx.siteUrl);
         break;
       case 'syncnicks': {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
