@@ -83,6 +83,7 @@ export type FrontierIngestPlayer = {
   tackles: number;
   cleanSheet: boolean;
   saves: number;
+  redCards: number;
   mom: boolean;
   rating: number | null;
   position: string | null;
@@ -94,6 +95,8 @@ export type FrontierIngestInput = {
   playedAt: Date;
   homeScore: number;
   awayScore: number;
+  /** Decided by a side quitting — the score may be an EA forfeit. */
+  dnf: boolean;
   players: FrontierIngestPlayer[];
 };
 
@@ -153,6 +156,7 @@ export async function ingestFrontierResult(input: FrontierIngestInput): Promise<
         awayScore: input.awayScore,
         playedAt: input.playedAt,
         eaMatchId: input.eaMatchId,
+        dnf: input.dnf,
       })
       .where(eq(matches.id, input.matchId));
 
@@ -168,6 +172,7 @@ export async function ingestFrontierResult(input: FrontierIngestInput): Promise<
           tackles: p.tackles,
           cleanSheet: p.cleanSheet,
           saves: p.saves,
+          redCards: p.redCards,
           mom: p.mom,
           rating: p.rating != null ? p.rating.toFixed(2) : null,
           position: p.position,

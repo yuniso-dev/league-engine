@@ -145,6 +145,7 @@ create table matches (
     processed       boolean not null default false,
     processed_at    timestamptz,
     ea_match_id     text unique,     -- set when auto-ingested from the EA API
+    dnf             boolean not null default false, -- decided by a side quitting
     created_at      timestamptz not null default now()
 );
 
@@ -166,6 +167,7 @@ create table match_participants (
     rating          numeric(4,2),    -- EA match rating (auto-ingest)
     saves           integer not null default 0,
     position        text,            -- position played per EA (GK detection)
+    red_cards       integer not null default 0,
     elo_before      numeric(7,2),
     elo_after       numeric(7,2),
     elo_change      numeric(6,2),

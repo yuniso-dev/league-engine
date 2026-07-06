@@ -153,7 +153,7 @@ client.once(Events.ClientReady, async ready => {
   // Frontier automation: while a LIVE tournament has teams with EA clubs
   // linked, fill unscored fixtures from the EA API every couple of minutes.
   if (!READ_ONLY) {
-    every(FRONTIER_POLL_MS, 'frontier sync', syncFrontierMatches);
+    every(FRONTIER_POLL_MS, 'frontier sync', () => syncFrontierMatches(ready));
   }
 
   // /testfriendly watch tick — strictly read-only, a free no-op unless armed,

@@ -40,6 +40,8 @@ export type PublicBracketMatch = {
   awayScore: number | null;
   stage: MatchStage;
   playedAt: Date | null;
+  /** Decided by a side quitting — the score may be an EA forfeit. */
+  dnf: boolean;
 };
 
 export type PublicTournamentDetail = {
@@ -107,6 +109,7 @@ export async function getTournamentDetail(tournamentId: string): Promise<PublicT
       awayScore: matches.awayScore,
       stage: matches.stage,
       playedAt: matches.playedAt,
+      dnf: matches.dnf,
       homeTeamName: homeTeam.name,
       awayTeamName: awayTeam.name,
     })
@@ -128,6 +131,7 @@ export async function getTournamentDetail(tournamentId: string): Promise<PublicT
       awayScore: m.awayScore,
       stage: m.stage,
       playedAt: m.playedAt,
+      dnf: m.dnf,
     });
     grouped.set(m.stage, list);
   }

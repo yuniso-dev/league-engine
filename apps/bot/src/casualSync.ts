@@ -32,7 +32,9 @@ export function parseEaMatch(raw: EaRawMatch, clubId: string, matchType: EaMatch
       goals: num(p.goals),
       assists: num(p.assists),
       tackles: num(p.tacklesmade),
-      cleanSheet: num(p.cleansheetsany) > 0,
+      // EA's cleansheetsany field is unreliable (often always 0) — derive it
+      // from the scoreline instead: shutout = clean sheet for the whole side.
+      cleanSheet: oppGoals === 0,
       saves: num(p.saves),
       shots: num(p.shots),
       passesMade: num(p.passesmade),
