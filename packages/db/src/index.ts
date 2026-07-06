@@ -54,7 +54,14 @@ export {
   isEaMatchIngested,
   ingestFrontierResult,
   setTeamEaClub,
+  voidMatchResult,
 } from './queries/frontierAuto';
+export {
+  listTournamentExclusions,
+  setTournamentExclusion,
+  removeTournamentExclusion,
+} from './queries/exclusions';
+export type { TournamentExclusion } from './queries/exclusions';
 export type {
   LinkedLiveTournament,
   FrontierIngestInput,

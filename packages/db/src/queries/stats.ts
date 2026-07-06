@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { getDb } from '../client';
+import { listTournamentExclusions } from './exclusions';
 import {
   adminActions,
   matches,
@@ -260,13 +261,19 @@ function top(totals: StatTotals[], key: StatKey, limit: number): StatLeader[] {
     }));
 }
 
-/** Per-tournament leaders (goals, assists, clean sheets). */
+/** Per-tournament leaders (goals, assists, clean sheets). Honours-excluded
+ *  players (rule violators) are filtered — the races show eligible players. */
 export async function getTournamentStats(tournamentId: string, limit = 10): Promise<StatLeaderboards> {
-  const totals = await aggregateStats({ tournamentId });
+  const [totals, exclusions] = await Promise.all([
+    aggregateStats({ tournamentId }),
+    listTournamentExclusions(tournamentId),
+  ]);
+  const excludedIds = new Set(exclusions.map(e => e.publicId));
+  const eligible = totals.filter(t => !excludedIds.has(t.publicId));
   return {
-    topScorers: top(totals, 'goals', limit),
-    topAssisters: top(totals, 'assists', limit),
-    topCleanSheets: top(totals, 'cleanSheets', limit),
+    topScorers: top(eligible, 'goals', limit),
+    topAssisters: top(eligible, 'assists', limit),
+    topCleanSheets: top(eligible, 'cleanSheets', limit),
   };
 }
 

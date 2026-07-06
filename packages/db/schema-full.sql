@@ -329,6 +329,27 @@ create index idx_signups_tournament   on event_signups (tournament_id);
 create index idx_signups_user         on event_signups (user_id);
 create index idx_matches_unprocessed  on matches (processed) where processed = false;
 create index idx_mp_user              on match_participants (user_id);
+-- ----------------------------------------------------------------------------
+--  DISRUPTOR HANDLING  -- voided junk results + honours exclusions (0011)
+-- ----------------------------------------------------------------------------
+create table voided_ea_matches (
+    ea_match_id  text primary key,
+    match_id     uuid,
+    voided_by    text not null,
+    voided_at    timestamptz not null default now(),
+    reason       text
+);
+
+create table tournament_exclusions (
+    tournament_id uuid not null references tournaments(id) on delete cascade,
+    user_id       text not null references users(discord_id) on delete cascade,
+    reason        text,
+    excluded_by   text not null,
+    excluded_at   timestamptz not null default now(),
+    primary key (tournament_id, user_id)
+);
+
+
 create index idx_mp_match             on match_participants (match_id);
 create index idx_history_user_week    on rating_history (user_id, week_of);
 create index idx_casual_matches_played on casual_matches (played_at desc);

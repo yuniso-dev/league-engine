@@ -27,6 +27,9 @@ import {
   grantAward,
   grantAwardIfAbsent,
   recomputeRanks,
+  removeTournamentExclusion,
+  setTournamentExclusion,
+  voidMatchResult,
   recordMatchResult,
   removeFromDraftPool,
   updateMatchStats,
@@ -814,6 +817,68 @@ export async function generateKnockoutAction(
         ? 'Semi-finals drawn from the table (1st v 4th, 2nd v 3rd).'
         : 'Final drawn from the table (1st v 2nd).',
     };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+/** VOID a bad auto-recorded result (back-out at kickoff, half-time glitch):
+ *  fixture reopens, junk EA match is blacklisted, the real replay auto-records. */
+export async function voidMatchAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const matchId = str(formData, 'matchId');
+    const tournamentId = str(formData, 'tournamentId');
+    if (!matchId) return { error: 'Missing match.' };
+
+    await voidMatchResult(admin.discordId, matchId, str(formData, 'reason') || null);
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return { ok: true, message: 'Result voided — the fixture is open again and the real game will auto-record.' };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function excludePlayerAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const tournamentId = str(formData, 'tournamentId');
+    const publicId = str(formData, 'publicId');
+    if (!tournamentId || !publicId) return { error: 'Pick a player.' };
+
+    await setTournamentExclusion(admin.discordId, {
+      tournamentId,
+      publicId,
+      reason: str(formData, 'reason').slice(0, 200) || null,
+    });
+    revalidatePath(`/admin/tournaments/${tournamentId}/awards`);
+    revalidatePath(`/frontier/${tournamentId}`);
+    return { ok: true, message: 'Excluded from this Frontier’s honours.' };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function removeExclusionAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const tournamentId = str(formData, 'tournamentId');
+    const publicId = str(formData, 'publicId');
+    if (!tournamentId || !publicId) return { error: 'Missing player.' };
+
+    await removeTournamentExclusion(admin.discordId, { tournamentId, publicId });
+    revalidatePath(`/admin/tournaments/${tournamentId}/awards`);
+    revalidatePath(`/frontier/${tournamentId}`);
+    return { ok: true, message: 'Exclusion lifted.' };
   } catch (e) {
     return { error: message(e) };
   }

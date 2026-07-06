@@ -256,7 +256,8 @@ async function alertAdminsDnf(
     `⚠️ **DNF result auto-recorded**: **${ourName} ${ourGoals}–${oppGoals} ${oppName}** — a side quit, ` +
     `so EA's score may be a forfeit (a 90'-quit draw becomes 3–0).` +
     (differs ? `\nPlayer goals suggest the real score was **${statOur}–${statOpp}**.` : '') +
-    `\nIf the score is wrong: delete the result on the admin tournament page and re-enter it manually — ` +
-    `manual entries are never touched by the auto-ingest. The result is tagged DNF on the site either way.`,
+    `\nIf they're replaying it: hit **VOID** on the result (admin tournament page) — the fixture reopens ` +
+    `and the replay auto-records. If the score just needs correcting: delete the result and re-enter it ` +
+    `manually. The result is tagged DNF on the site either way.`,
   );
 }
