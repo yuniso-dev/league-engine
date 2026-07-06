@@ -16,7 +16,7 @@ const DEFAULT_CONFIG: ConfigRow = {
   eloBase: '1000',
   kPlacement: 60,
   kEstablished: 24,
-  placementGames: 5,
+  placementGames: 3,
   decayWeeks: 4,
   movMultiplierCap: '1.75',
   lastRevealAt: null,

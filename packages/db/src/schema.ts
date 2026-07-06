@@ -186,7 +186,7 @@ export const config = pgTable('config', {
   eloBase:            numeric('elo_base', { precision: 7, scale: 2 }).notNull().default('1000'),
   kPlacement:         integer('k_placement').notNull().default(60),
   kEstablished:       integer('k_established').notNull().default(24),
-  placementGames:     integer('placement_games').notNull().default(5),
+  placementGames:     integer('placement_games').notNull().default(3), // one Frontier's worth of games
   decayWeeks:         integer('decay_weeks').notNull().default(4),
   movMultiplierCap:   numeric('mov_multiplier_cap', { precision: 4, scale: 2 }).notNull().default('1.75'),
   lastRevealAt:       timestamp('last_reveal_at', { withTimezone: true }),

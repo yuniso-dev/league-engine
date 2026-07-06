@@ -87,7 +87,7 @@ export default function SettingsForm({ config }: Props) {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <Field label="Placement games" caption="Number of ranked games before a player switches from the placement K-factor to the established one.">
+            <Field label="Placement games" caption="Ranked games before a player switches from the placement K-factor to the established one. 3 = one Frontier's worth, so a single tournament gets a player ranked.">
               <input name="placementGames" type="number" min={1} defaultValue={config.placementGames} required style={inputBase} />
             </Field>
             <Field label="Margin cap" caption="Caps how much a big scoreline can amplify a rating change. 1.0 = margin never matters; higher = blowouts swing rating more.">
