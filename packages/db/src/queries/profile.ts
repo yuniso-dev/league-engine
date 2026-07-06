@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { getDb } from '../client';
 import { matchParticipants, matches, teams, tournaments, users } from '../schema';
@@ -67,4 +67,114 @@ export async function getRecentMatchesForPlayer(
     eloChange: r.eloChange != null ? parseFloat(r.eloChange as string) : null,
     playedAt: r.playedAt ? r.playedAt.toISOString() : null,
   }));
+}
+
+// ── Head-to-head: "you vs them" between two players ───────────────────────────
+
+export type HeadToHead = {
+  meetings: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  assistsFor: number;
+  assistsAgainst: number;
+  lastMeeting: {
+    playedAt: string;
+    result: 'win' | 'loss' | 'draw' | null;
+    ourGoals: number;
+    theirGoals: number;
+    tournamentName: string;
+  } | null;
+};
+
+/**
+ * Frontier head-to-head from the VIEWER's perspective. Counts only matches
+ * where the two players were on OPPOSING teams (same match, different team) —
+ * over processed, ranked matches. Returns null for the same player; a real but
+ * never-met pair returns zeroed counts (the card shows a "never met" state).
+ * publicId → discordId is resolved server-side (discordId never leaves).
+ */
+export async function getHeadToHead(
+  viewerPublicId: string,
+  targetPublicId: string,
+): Promise<HeadToHead | null> {
+  if (viewerPublicId === targetPublicId) return null;
+
+  const rows = await getDb().execute(sql`
+    with me as (
+      select discord_id from users where public_id = ${viewerPublicId} and is_blacklisted = false
+    ),
+    them as (
+      select discord_id from users where public_id = ${targetPublicId} and is_blacklisted = false
+    ),
+    meetings as (
+      select mine.result       as my_result,
+             mine.goals         as my_goals,
+             mine.assists       as my_assists,
+             theirs.goals       as their_goals,
+             theirs.assists     as their_assists,
+             m.played_at        as played_at,
+             m.tournament_id    as tournament_id
+        from match_participants mine
+        join match_participants theirs
+          on theirs.match_id = mine.match_id
+         and theirs.team_id <> mine.team_id
+        join matches m on m.id = mine.match_id
+       where mine.user_id   in (select discord_id from me)
+         and theirs.user_id in (select discord_id from them)
+         and m.processed = true
+         and m.ranked = true
+    )
+    select
+      (select count(*)::int                              from meetings)                        as meetings,
+      (select count(*)::int  from meetings where my_result = 'win')                            as wins,
+      (select count(*)::int  from meetings where my_result = 'draw')                           as draws,
+      (select count(*)::int  from meetings where my_result = 'loss')                           as losses,
+      (select coalesce(sum(my_goals), 0)::int            from meetings)                        as goals_for,
+      (select coalesce(sum(their_goals), 0)::int         from meetings)                        as goals_against,
+      (select coalesce(sum(my_assists), 0)::int          from meetings)                        as assists_for,
+      (select coalesce(sum(their_assists), 0)::int       from meetings)                        as assists_against,
+      (select row_to_json(x) from (
+         select mt.played_at, mt.my_result as result, mt.my_goals as our_goals,
+                mt.their_goals as their_goals, t.name as tournament_name
+           from meetings mt
+           left join tournaments t on t.id = mt.tournament_id
+          where mt.played_at is not null
+          order by mt.played_at desc
+          limit 1
+       ) x)                                                                                    as last_meeting
+  `);
+
+  const row = (rows as unknown as Record<string, unknown>[])[0];
+  if (!row) return null;
+
+  const lm = row.last_meeting as {
+    played_at: string;
+    result: 'win' | 'loss' | 'draw' | null;
+    our_goals: number;
+    their_goals: number;
+    tournament_name: string | null;
+  } | null;
+
+  return {
+    meetings: Number(row.meetings ?? 0),
+    wins: Number(row.wins ?? 0),
+    draws: Number(row.draws ?? 0),
+    losses: Number(row.losses ?? 0),
+    goalsFor: Number(row.goals_for ?? 0),
+    goalsAgainst: Number(row.goals_against ?? 0),
+    assistsFor: Number(row.assists_for ?? 0),
+    assistsAgainst: Number(row.assists_against ?? 0),
+    lastMeeting: lm
+      ? {
+          playedAt: new Date(lm.played_at).toISOString(),
+          result: lm.result,
+          ourGoals: Number(lm.our_goals ?? 0),
+          theirGoals: Number(lm.their_goals ?? 0),
+          tournamentName: lm.tournament_name ?? 'Frontier',
+        }
+      : null,
+  };
 }

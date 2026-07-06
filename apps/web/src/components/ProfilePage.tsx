@@ -1,12 +1,13 @@
 'use client';
 import { memo, useEffect, useState } from 'react';
-import type { PlayerMilestones, PublicAward, PublicPlayer, PublicRecentMatch, RatingPoint } from '@inazuma/db';
+import type { HeadToHead, PlayerMilestones, PublicAward, PublicPlayer, PublicRecentMatch, RatingPoint } from '@inazuma/db';
 import { Bolt } from '@/components/ui/Bolt';
 import { Avatar } from '@/components/ui/Avatar';
 import { CountUp } from '@/components/ui/CountUp';
 import { RatingGraph } from '@/components/RatingGraph';
 import { AwardShowcase } from '@/components/AwardShowcase';
 import { RecentMatchesCard } from '@/components/RecentMatchesCard';
+import { HeadToHeadCard } from '@/components/HeadToHeadCard';
 import { AccentEditor, QuoteEditor } from '@/components/ProfileFlairEditor';
 import { REALMS, T, FONT_D, FONT_B, FONT_M, rankColor, lighten, rgba, glass } from '@/lib/realm-colors';
 import { FlagIcon } from '@/components/ui/FlagIcon';
@@ -30,9 +31,10 @@ type ProfileExtras = {
   awards: PublicAward[];
   matches: PublicRecentMatch[];
   milestones: PlayerMilestones | null;
+  headToHead?: HeadToHead | null;
 };
 
-const NO_EXTRAS: ProfileExtras = { history: [], awards: [], matches: [], milestones: null };
+const NO_EXTRAS: ProfileExtras = { history: [], awards: [], matches: [], milestones: null, headToHead: null };
 
 // Auto-earned career badges, computed from real match data — no admin input.
 // Locked ones render dimmed so every profile shows what it COULD become.
@@ -64,19 +66,23 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
   const aGlow  = lighten(accent, 0.35);
 
   const [extras, setExtras] = useState<ProfileExtras>(NO_EXTRAS);
-  const { history, awards, matches, milestones } = extras;
+  const { history, awards, matches, milestones, headToHead } = extras;
   const publicId = player?.publicId ?? null;
+  // "You vs them" only makes sense when a logged-in viewer opens someone else's
+  // profile — pass the viewer so the endpoint computes the head-to-head.
+  const viewerId = !isOwn ? currentUser?.publicId ?? null : null;
 
   useEffect(() => {
     setExtras(NO_EXTRAS);
     if (!publicId) return;
     let alive = true;
-    fetch(`/api/profile/${publicId}`)
+    const url = viewerId ? `/api/profile/${publicId}?vs=${viewerId}` : `/api/profile/${publicId}`;
+    fetch(url)
       .then(r => (r.ok ? r.json() : NO_EXTRAS))
       .then((data: ProfileExtras) => { if (alive) setExtras(data); })
       .catch(() => { /* graph/badges/matches are optional chrome — profile renders without them */ });
     return () => { alive = false; };
-  }, [publicId]);
+  }, [publicId, viewerId]);
 
   if (!player) {
     const header = (
@@ -304,6 +310,11 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
           )}
         </div>
       </div>
+
+      {/* Head-to-head — only when a logged-in viewer is looking at someone else. */}
+      {!isOwn && currentUser && headToHead && (
+        <HeadToHeadCard h2h={headToHead} targetName={player.displayName} accent={accent} />
+      )}
 
       {/* Two columns on desktop (stats left, trophies + report right);
           the `order` values give the single-column phone reading order. */}
