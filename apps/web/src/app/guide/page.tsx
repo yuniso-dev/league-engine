@@ -115,7 +115,7 @@ export default function GuidePage() {
               country. Flags show on the ladder next to your name.
             </Card>
             <Card icon="🎨" title="MAKE IT YOURS">
-              Hit ✎ EDIT PROFILE on your profile for your quote, bio and an accent
+              Hit ✎ EDIT PROFILE on your profile for your quote and an accent
               colour that re-tints the site just for you.
             </Card>
           </div>

@@ -854,7 +854,6 @@ export async function updatePlayerIdentityAction(
       position2: str(formData, 'position2') || null,
       country,
       quote: str(formData, 'quote').slice(0, 100) || null,
-      bio: str(formData, 'bio').slice(0, 300) || null,
     });
 
     revalidatePath(`/admin/players/${publicId}`);

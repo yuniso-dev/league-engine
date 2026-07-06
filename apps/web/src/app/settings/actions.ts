@@ -28,8 +28,8 @@ export async function saveOwnFlair(data: {
 
   try {
     // Timeout + rebuild-pool-and-retry-once: a save can't be stranded by a
-    // wedged connection pool (quote, accent and bio all come through here
-    // or saveSettings — same protection for both).
+    // wedged connection pool (quote and accent come through here or
+    // saveSettings — same protection for both).
     await runResilient(() => updateOwnProfileFields(session.user.discordId!, fields));
   } catch (e) {
     console.error('[saveOwnFlair] failed after retry:', e instanceof Error ? e.message : e);
@@ -54,7 +54,6 @@ export async function saveSettings(formData: FormData) {
   const countryRaw = ((formData.get('country') as string) || '').toUpperCase().slice(0, 8);
   const country = countryRaw && isValidCountryCode(countryRaw) ? countryRaw : null;
   const quote = ((formData.get('quote') as string) || '').trim().slice(0, 100) || null;
-  const bio   = ((formData.get('bio')   as string) || '').trim().slice(0, 300) || null;
   // EA Clubs persona — matched case-insensitively against ingested match data.
   const eaName = ((formData.get('eaName') as string) || '').trim().slice(0, 32) || null;
 
@@ -72,7 +71,6 @@ export async function saveSettings(formData: FormData) {
       hidePositions,
       country,
       quote,
-      bio,
       accentColor,
       eaName,
     }),

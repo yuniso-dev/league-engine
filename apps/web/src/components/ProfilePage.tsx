@@ -1,6 +1,6 @@
 'use client';
 import { memo, useEffect, useState } from 'react';
-import type { HeadToHead, PlayerMilestones, PublicAward, PublicPlayer, PublicRecentMatch, RatingPoint } from '@inazuma/db';
+import type { FrontierHistoryEntry, HeadToHead, PlayerMilestones, PublicAward, PublicPlayer, PublicRecentMatch, RatingPoint } from '@inazuma/db';
 import { Bolt } from '@/components/ui/Bolt';
 import { Avatar } from '@/components/ui/Avatar';
 import { CountUp } from '@/components/ui/CountUp';
@@ -8,6 +8,7 @@ import { RatingGraph } from '@/components/RatingGraph';
 import { AwardShowcase } from '@/components/AwardShowcase';
 import { RecentMatchesCard } from '@/components/RecentMatchesCard';
 import { HeadToHeadCard } from '@/components/HeadToHeadCard';
+import { FrontierHistoryCard } from '@/components/FrontierHistoryCard';
 import { AccentEditor, QuoteEditor } from '@/components/ProfileFlairEditor';
 import { REALMS, T, FONT_D, FONT_B, FONT_M, rankColor, lighten, rgba, glass } from '@/lib/realm-colors';
 import { FlagIcon } from '@/components/ui/FlagIcon';
@@ -31,10 +32,11 @@ type ProfileExtras = {
   awards: PublicAward[];
   matches: PublicRecentMatch[];
   milestones: PlayerMilestones | null;
+  frontierHistory?: FrontierHistoryEntry[];
   headToHead?: HeadToHead | null;
 };
 
-const NO_EXTRAS: ProfileExtras = { history: [], awards: [], matches: [], milestones: null, headToHead: null };
+const NO_EXTRAS: ProfileExtras = { history: [], awards: [], matches: [], milestones: null, frontierHistory: [], headToHead: null };
 
 // Auto-earned career badges, computed from real match data — no admin input.
 // Locked ones render dimmed so every profile shows what it COULD become.
@@ -66,7 +68,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
   const aGlow  = lighten(accent, 0.35);
 
   const [extras, setExtras] = useState<ProfileExtras>(NO_EXTRAS);
-  const { history, awards, matches, milestones, headToHead } = extras;
+  const { history, awards, matches, milestones, frontierHistory, headToHead } = extras;
   const publicId = player?.publicId ?? null;
   // "You vs them" only makes sense when a logged-in viewer opens someone else's
   // profile — pass the viewer so the endpoint computes the head-to-head.
@@ -493,25 +495,15 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
             )}
           </div>
 
-          {/* bio — the player's own words */}
+          {/* frontier history — the player's tournament record */}
           <div style={{ ...glass({ padding: 22, borderLeft: `3px solid ${accent}` }), order: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
-              <span style={{ fontSize: 13 }}>🔍</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 13 }}>
+              <span style={{ fontSize: 13 }}>🏟️</span>
               <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
-                SCOUTING REPORT
+                FRONTIER HISTORY
               </h3>
             </div>
-            {player.bio ? (
-              <p style={{ color: T.text, fontFamily: FONT_B, fontSize: 14.5, lineHeight: 1.75, margin: 0, opacity: 0.92 }}>
-                {player.bio}
-              </p>
-            ) : (
-              <p style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, margin: 0, letterSpacing: 0.5, lineHeight: 1.7 }}>
-                {isOwn
-                  ? 'Nothing in your own words yet — add a bio with ✎ Edit Profile.'
-                  : 'This player hasn’t written their own story yet.'}
-              </p>
-            )}
+            <FrontierHistoryCard history={frontierHistory ?? []} accent={accent} isOwn={isOwn} />
           </div>
         </div>
       </div>
