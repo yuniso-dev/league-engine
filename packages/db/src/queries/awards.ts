@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import type { InferSelectModel } from 'drizzle-orm';
 import { getDb } from '../client';
 import { adminActions, awards, tournaments, userAwards, users } from '../schema';
@@ -232,6 +232,46 @@ export async function grantAward(
 
   await logAdminAction(adminId, 'award.grant', { awardId: data.awardId, userAwardId: row.id });
   return { userAwardId: row.id, playerName: player.displayName, awardName: award.name, awardIcon: award.icon };
+}
+
+/** Case-insensitive exact-name lookup — the ceremony's find-or-create key
+ *  for per-edition awards like "Blaze's Boot XVII". */
+export async function findAwardByName(name: string): Promise<{ id: string } | null> {
+  const [row] = await getDb()
+    .select({ id: awards.id })
+    .from(awards)
+    .where(sql`lower(${awards.name}) = ${name.toLowerCase()}`)
+    .limit(1);
+  return row ?? null;
+}
+
+/** grantAward, but a no-op returning null when the player already holds this
+ *  award for this tournament — makes the ceremony's GRANT ALL safely
+ *  re-runnable after a partial failure. */
+export async function grantAwardIfAbsent(
+  adminId: string,
+  data: { awardId: string; publicId: string; tournamentId: string; season: number | null },
+): Promise<GrantResult | null> {
+  const db = getDb();
+  const [player] = await db
+    .select({ discordId: users.discordId })
+    .from(users)
+    .where(eq(users.publicId, data.publicId))
+    .limit(1);
+  if (!player) throw new Error('Unknown player.');
+
+  const [existing] = await db
+    .select({ id: userAwards.id })
+    .from(userAwards)
+    .where(and(
+      eq(userAwards.awardId, data.awardId),
+      eq(userAwards.userId, player.discordId),
+      eq(userAwards.tournamentId, data.tournamentId),
+    ))
+    .limit(1);
+  if (existing) return null;
+
+  return grantAward(adminId, data);
 }
 
 export async function revokeAward(adminId: string, userAwardId: string): Promise<void> {

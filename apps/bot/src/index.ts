@@ -18,6 +18,7 @@ import { updateRankingsMessage } from './leaderboard.js';
 import { syncCasualMatches } from './casualSync.js';
 import { syncFrontierMatches } from './frontierSync.js';
 import { pollFriendlyTest } from './friendlyTest.js';
+import { pollNotifier } from './notifier.js';
 import { fetchAllMembers } from './guildMembers.js';
 
 // ── env ───────────────────────────────────────────────────────────────────────
@@ -158,6 +159,12 @@ client.once(Events.ClientReady, async ready => {
   // /testfriendly watch tick — strictly read-only, a free no-op unless armed,
   // so it runs even in READ_ONLY test mode.
   every(60_000, 'friendly test', () => pollFriendlyTest(ready));
+
+  // DM notifier (award wins, later signups/drafts). Gated off in test mode —
+  // DMs to real members are a write we must never make from a dry run.
+  if (!READ_ONLY) {
+    every(60_000, 'notifier', () => pollNotifier(ready, SITE_URL));
+  }
 });
 
 client.on(Events.GuildMemberAdd, member => {

@@ -108,6 +108,8 @@ export {
   getAdminAward,
   deleteAward,
   grantAward,
+  findAwardByName,
+  grantAwardIfAbsent,
   revokeAward,
   listAwardsForPlayer,
 } from './queries/awards';
@@ -119,6 +121,10 @@ export type {
   AdminAwardDetail,
   PublicAward,
 } from './queries/awards';
+export { getCeremonySheet } from './queries/ceremony';
+export type { CeremonySheet, CeremonyPlayer } from './queries/ceremony';
+export { getNewAwardGrants } from './queries/notifier';
+export type { NewAwardGrant } from './queries/notifier';
 export { getAdminStats } from './queries/adminStats';
 export type { AdminStats } from './queries/adminStats';
 export {
