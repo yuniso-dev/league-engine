@@ -1,7 +1,33 @@
 import { getDb } from '../client';
-import { tournaments, teams } from '../schema';
-import { desc, eq, ne, sql } from 'drizzle-orm';
+import { tournaments, teams, users } from '../schema';
+import { asc, desc, eq, ne, sql } from 'drizzle-orm';
 import { toPublicTournament, type PublicTournament } from '../dto';
+
+export type TournamentCaptain = {
+  teamId: string;
+  teamName: string;
+  /** The captain's discordId — mention as <@id>. Null until one is assigned. */
+  captainId: string | null;
+  captainName: string | null;
+  memberCount: number;
+};
+
+/** Teams + captains of one tournament, in creation order — the raw material
+ *  for the bot's /spinorder wheel and /frontierintro captain list. */
+export async function getTournamentCaptains(tournamentId: string): Promise<TournamentCaptain[]> {
+  return getDb()
+    .select({
+      teamId: teams.id,
+      teamName: teams.name,
+      captainId: teams.captainId,
+      captainName: users.displayName,
+      memberCount: sql<number>`(select count(*)::int from team_members tm where tm.team_id = ${teams.id})`,
+    })
+    .from(teams)
+    .leftJoin(users, eq(teams.captainId, users.discordId))
+    .where(eq(teams.tournamentId, tournamentId))
+    .orderBy(asc(teams.createdAt));
+}
 
 /** The Frontier currently being set up or played — newest non-completed.
  *  Used by the bot's /frontierclubstart to know where linked teams belong. */

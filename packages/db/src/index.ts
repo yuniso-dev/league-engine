@@ -9,7 +9,8 @@ export {
 export type { NicknamePlayer } from './queries/bot';
 export * from './schema';
 export { getRankings, searchRankings, recomputeRanks } from './queries/rankings';
-export { getTournaments, getLatestOpenTournament } from './queries/tournaments';
+export { getTournaments, getLatestOpenTournament, getTournamentCaptains } from './queries/tournaments';
+export type { TournamentCaptain } from './queries/tournaments';
 export {
   signUpForTournament,
   withdrawSignup,
@@ -123,8 +124,8 @@ export type {
 } from './queries/awards';
 export { getCeremonySheet } from './queries/ceremony';
 export type { CeremonySheet, CeremonyPlayer } from './queries/ceremony';
-export { getNewAwardGrants } from './queries/notifier';
-export type { NewAwardGrant } from './queries/notifier';
+export { getNewAwardGrants, getNewSignups, getTeamMemberKeys } from './queries/notifier';
+export type { NewAwardGrant, NewSignup, TeamMemberKey } from './queries/notifier';
 export { getAdminStats } from './queries/adminStats';
 export type { AdminStats } from './queries/adminStats';
 export {

@@ -44,6 +44,7 @@ export async function updateConfig(
     rankingsMessageId: string | null;
     eaClubIds?: string | null;
     eaPlatform?: string;
+    frontierRules?: string | null;
   },
 ): Promise<void> {
   const now = new Date();
@@ -58,6 +59,7 @@ export async function updateConfig(
     rankingsMessageId: data.rankingsMessageId,
     ...(data.eaClubIds !== undefined && { eaClubIds: data.eaClubIds }),
     ...(data.eaPlatform !== undefined && { eaPlatform: data.eaPlatform }),
+    ...(data.frontierRules !== undefined && { frontierRules: data.frontierRules }),
     updatedAt: now,
   };
 
