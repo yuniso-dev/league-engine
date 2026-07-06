@@ -13,6 +13,7 @@ import { handleLeaderboard, handlePostLeaderboard } from './leaderboard.js';
 import { resetAllNicknames, syncNicknames } from './nicknameSync.js';
 import { snapshotVoiceChannel } from './voicePresence.js';
 import { searchClubs } from './eaClient.js';
+import { armFriendlyTest, disarmFriendlyTest, friendlyTestStatus, resolveClub } from './friendlyTest.js';
 
 const definitions = [
   new SlashCommandBuilder()
@@ -45,6 +46,21 @@ const definitions = [
       o.setName('name')
         .setDescription('Club name (or part of it) to search for')
         .setRequired(true))
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+  new SlashCommandBuilder()
+    .setName('testfriendly')
+    .setDescription('Admin: READ-ONLY test — watch two clubs and report their next friendly here')
+    .addSubcommand(s =>
+      s.setName('watch')
+        .setDescription('Arm the test: play one friendly between the two clubs and the stats appear here')
+        .addStringOption(o =>
+          o.setName('club1').setDescription('First club — EA club ID or club name').setRequired(true))
+        .addStringOption(o =>
+          o.setName('club2').setDescription('Second club — EA club ID or club name').setRequired(true)))
+    .addSubcommand(s =>
+      s.setName('status').setDescription('Is a friendly test armed right now?'))
+    .addSubcommand(s =>
+      s.setName('stop').setDescription('Disarm the friendly test'))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder()
     .setName('resetnicknames')
@@ -174,6 +190,65 @@ async function handleFindClub(interaction: ChatInputCommandInteraction): Promise
   );
 }
 
+async function handleTestFriendly(interaction: ChatInputCommandInteraction): Promise<void> {
+  const sub = interaction.options.getSubcommand();
+
+  if (sub === 'status') {
+    const w = friendlyTestStatus();
+    await interaction.reply({
+      content: w
+        ? `🧪 Armed: **${w.clubA.name}** vs **${w.clubB.name}** — watching since <t:${Math.floor(w.armedAt / 1000)}:R>, ${w.polls} poll${w.polls === 1 ? '' : 's'} so far. Play the friendly and the report lands in <#${w.channelId}>.`
+        : 'No friendly test armed. Start one with `/testfriendly watch`.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  if (sub === 'stop') {
+    const was = disarmFriendlyTest();
+    await interaction.reply({
+      content: was ? '🧪 Friendly test disarmed.' : 'Nothing was armed.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  // watch
+  await interaction.deferReply();
+  const cfg = await getConfig();
+  const platform = cfg.eaPlatform || 'common-gen5';
+
+  const [clubA, clubB] = await Promise.all([
+    resolveClub(interaction.options.getString('club1', true), platform),
+    resolveClub(interaction.options.getString('club2', true), platform),
+  ]);
+  if (!clubA || !clubB) {
+    await interaction.editReply(
+      `Couldn't resolve ${!clubA ? '**club1**' : '**club2**'} — pass the exact club name, or the numeric ID from \`/findclub\`.`,
+    );
+    return;
+  }
+  if (clubA.id === clubB.id) {
+    await interaction.editReply('Those are the same club — pass two different clubs.');
+    return;
+  }
+
+  const probe = await armFriendlyTest(clubA, clubB, interaction.channelId);
+  const probeLines = probe.map(p =>
+    p.ok
+      ? `\`${p.matchType}\` ✅ endpoint OK (${p.count} recent on record)`
+      : `\`${p.matchType}\` ❌ ${p.error ?? 'failed'}`,
+  );
+
+  await interaction.editReply(
+    `🧪 **Friendly test armed** — **${clubA.name}** (\`${clubA.id}\`) vs **${clubB.name}** (\`${clubB.id}\`)\n\n` +
+    `Endpoint probe (does EA serve each match type for ${clubA.name}?):\n${probeLines.join('\n')}\n\n` +
+    `Now **play one friendly between the two clubs and let it fully finish**. I check every 60 seconds — ` +
+    `when the game shows up, the full stat report appears in this channel. ` +
+    `**Read-only: nothing is written to the site.** Auto-expires in 2 hours; \`/testfriendly stop\` to cancel.`,
+  );
+}
+
 export async function dispatch(
   interaction: Interaction,
   ctx: { siteUrl: string; readOnly: boolean },
@@ -197,6 +272,9 @@ export async function dispatch(
         break;
       case 'findclub':
         await handleFindClub(interaction);
+        break;
+      case 'testfriendly':
+        await handleTestFriendly(interaction);
         break;
       case 'syncnicks': {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
