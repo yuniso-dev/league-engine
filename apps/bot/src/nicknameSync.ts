@@ -1,6 +1,7 @@
-import type { Guild } from 'discord.js';
+import type { Collection, Guild, GuildMember } from 'discord.js';
 import { formatNickname } from '@inazuma/core';
 import { listPlayersForNicknames } from '@inazuma/db';
+import { fetchAllMembers } from './guildMembers.js';
 
 const RENAME_DELAY_MS = 350; // polite pacing; discord.js also queues 429s
 
@@ -11,9 +12,12 @@ export type NicknameSyncResult = { renamed: number; skipped: number; failed: num
 /** Rename every ranked member to their formatNickname() form.
  *  Skips members the bot cannot manage (server owner, higher roles) and
  *  members whose nickname already matches. Never throws for a single failure. */
-export async function syncNicknames(guild: Guild): Promise<NicknameSyncResult> {
+export async function syncNicknames(
+  guild: Guild,
+  prefetched?: Collection<string, GuildMember>,
+): Promise<NicknameSyncResult> {
   const players = await listPlayersForNicknames();
-  const members = await guild.members.fetch();
+  const members = prefetched ?? await fetchAllMembers(guild);
 
   const result: NicknameSyncResult = { renamed: 0, skipped: 0, failed: 0 };
 
@@ -62,7 +66,7 @@ export type NicknameResetResult = { cleared: number; skipped: number; failed: nu
  *  people set themselves. Does NOT re-apply league ranks; run syncNicknames()
  *  afterwards for that. Never throws for a single failure. */
 export async function resetAllNicknames(guild: Guild): Promise<NicknameResetResult> {
-  const members = await guild.members.fetch();
+  const members = await fetchAllMembers(guild);
 
   const result: NicknameResetResult = { cleared: 0, skipped: 0, failed: 0 };
 

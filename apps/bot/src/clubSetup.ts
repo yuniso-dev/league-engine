@@ -2,6 +2,7 @@ import {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
+  type ChatInputCommandInteraction,
   type StringSelectMenuInteraction,
 } from 'discord.js';
 import { createTeam, getLatestOpenTournament } from '@inazuma/db';
@@ -73,6 +74,37 @@ export function clubSessionStatus(): string {
   );
 }
 
+// A /findclub menu that nobody picks from shouldn't linger clickable forever —
+// a stale menu could claim a slot in a LATER setup session. Expire it after a
+// couple of minutes (well within the 15-minute interaction-token window).
+const MENU_TTL_MS = 2 * 60_000;
+const menuTimers = new Map<string, NodeJS.Timeout>();
+
+export function armClubMenuTimeout(
+  interaction: ChatInputCommandInteraction,
+  messageId: string,
+  query: string,
+): void {
+  const timer = setTimeout(() => {
+    menuTimers.delete(messageId);
+    interaction
+      .editReply({
+        content: `⌛ Club search for **${query}** expired (no selection after 2 minutes) — run /findclub again.`,
+        components: [],
+      })
+      .catch(() => {}); // token already invalid — Discord discarded the reply anyway
+  }, MENU_TTL_MS);
+  menuTimers.set(messageId, timer);
+}
+
+function cancelClubMenuTimeout(messageId: string): void {
+  const timer = menuTimers.get(messageId);
+  if (timer) {
+    clearTimeout(timer);
+    menuTimers.delete(messageId);
+  }
+}
+
 /** The select menu shown under /findclub results. */
 export function buildClubMenu(clubs: EaClubSummary[]): ActionRowBuilder<StringSelectMenuBuilder> {
   const options = clubs.slice(0, 25).map(c => {
@@ -101,6 +133,7 @@ export async function handleClubPick(
   interaction: StringSelectMenuInteraction,
   readOnly: boolean,
 ): Promise<void> {
+  cancelClubMenuTimeout(interaction.message.id); // picked in time — don't expire it out from under them
   const [clubId, ...nameParts] = interaction.values[0].split('::');
   const name = nameParts.join('::') || `club ${clubId}`;
 

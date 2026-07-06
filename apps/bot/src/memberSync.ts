@@ -1,5 +1,6 @@
-import type { Guild, GuildMember, PartialGuildMember } from 'discord.js';
+import type { Collection, Guild, GuildMember, PartialGuildMember } from 'discord.js';
 import { listTrackedUsers, setUserInactive, syncGuildMember } from '@inazuma/db';
+import { fetchAllMembers } from './guildMembers.js';
 
 // IMPORTANT: displayName here must come from user.globalName ?? user.username,
 // NEVER from member.displayName — that is the guild nickname, which this bot
@@ -15,9 +16,14 @@ function toSyncData(member: GuildMember) {
 }
 
 /** Full sync: upsert every human member, then mark tracked-but-absent players
- *  inactive (hides them from rankings until they re-join). */
-export async function syncAllMembers(guild: Guild): Promise<{ synced: number; deactivated: number }> {
-  const members = await guild.members.fetch(); // needs the SERVER MEMBERS intent
+ *  inactive (hides them from rankings until they re-join). Pass a pre-fetched
+ *  member collection when running alongside another sync — each fetch is a
+ *  rate-limited gateway request. */
+export async function syncAllMembers(
+  guild: Guild,
+  prefetched?: Collection<string, GuildMember>,
+): Promise<{ synced: number; deactivated: number }> {
+  const members = prefetched ?? await fetchAllMembers(guild); // needs the SERVER MEMBERS intent
 
   let synced = 0;
   for (const member of members.values()) {

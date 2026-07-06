@@ -12,9 +12,9 @@ import { getConfig, getUserByDiscordId, listAwardsForPlayer } from '@inazuma/db'
 import { handleLeaderboard, handlePostLeaderboard } from './leaderboard.js';
 import { resetAllNicknames, syncNicknames } from './nicknameSync.js';
 import { snapshotVoiceChannel } from './voicePresence.js';
-import { searchClubs } from './eaClient.js';
+import { fetchClubsInfo, searchClubs } from './eaClient.js';
 import { armFriendlyTest, disarmFriendlyTest, friendlyTestStatus, resolveClub } from './friendlyTest.js';
-import { CLUB_PICK_ID, buildClubMenu, cancelClubSession, clubSessionStatus, handleClubPick, startClubSession } from './clubSetup.js';
+import { CLUB_PICK_ID, armClubMenuTimeout, buildClubMenu, cancelClubSession, clubSessionStatus, handleClubPick, startClubSession } from './clubSetup.js';
 
 const definitions = [
   new SlashCommandBuilder()
@@ -42,10 +42,10 @@ const definitions = [
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder()
     .setName('findclub')
-    .setDescription('Admin: search EA clubs by name and pick from a menu')
+    .setDescription('Admin: search EA clubs by name (or ID) and pick from a menu')
     .addStringOption(o =>
       o.setName('name')
-        .setDescription('Club name (or part of it) to search for')
+        .setDescription('Club name (or part of it) — or paste the numeric club ID')
         .setRequired(true))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder()
@@ -190,10 +190,31 @@ async function handleFindClub(interaction: ChatInputCommandInteraction): Promise
 
   const name = interaction.options.getString('name', true).trim();
   const cfg = await getConfig();
+  const platform = cfg.eaPlatform || 'common-gen5';
+
+  // A pasted numeric ID skips EA search entirely — EA's search index misses
+  // some clubs (usually small/new ones) that still fully exist by ID, and
+  // their own website has the same blind spot.
+  if (/^\d{1,12}$/.test(name)) {
+    const info = await fetchClubsInfo([name], platform);
+    const found = info.get(name);
+    if (!found) {
+      await interaction.editReply(
+        `EA returned no club for ID **${name}** on \`${platform}\` — double-check the ID (or EA may be temporarily unreachable).`,
+      );
+      return;
+    }
+    const reply = await interaction.editReply({
+      content: `🔎 Club ID **${name}** → **${found.name}** — select it to confirm:`,
+      components: [buildClubMenu([{ clubId: name, name: found.name, members: null, record: null, stadium: null }])],
+    });
+    armClubMenuTimeout(interaction, reply.id, name);
+    return;
+  }
 
   let clubs;
   try {
-    clubs = await searchClubs(name, cfg.eaPlatform || 'common-gen5');
+    clubs = await searchClubs(name, platform);
   } catch (e) {
     // Surface the REAL failure (status code etc.) instead of the generic error.
     await interaction.editReply(
@@ -206,16 +227,18 @@ async function handleFindClub(interaction: ChatInputCommandInteraction): Promise
 
   if (clubs.length === 0) {
     await interaction.editReply(
-      `No EA club matching **${name}** on \`${cfg.eaPlatform || 'common-gen5'}\`. ` +
-      `Try more (or fewer) letters of the club's in-game name.`,
+      `No EA club matching **${name}** on \`${platform}\`. ` +
+      `Try more (or fewer) letters of the club's in-game name — or paste the numeric club ID into /findclub. ` +
+      `(EA's search index misses some small/new clubs; their own site has the same gap.)`,
     );
     return;
   }
 
-  await interaction.editReply({
-    content: `🔎 ${clubs.length} club${clubs.length === 1 ? '' : 's'} matching **${name}** — select the right one:`,
+  const reply = await interaction.editReply({
+    content: `🔎 ${clubs.length} club${clubs.length === 1 ? '' : 's'} matching **${name}** — select the right one (menu expires in 2 minutes):`,
     components: [buildClubMenu(clubs)],
   });
+  armClubMenuTimeout(interaction, reply.id, name);
 }
 
 async function handleFrontierClubStart(interaction: ChatInputCommandInteraction): Promise<void> {
