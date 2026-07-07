@@ -1,11 +1,13 @@
 import type { Client } from 'discord.js';
 import {
   addPendingMatch,
+  autoProgressFrontier,
   getAdminDiscordIds,
   getConfig,
   getLinkedLiveTournaments,
   ingestFrontierResult,
   isEaMatchIngested,
+  listLiveTournamentIds,
   type PendingPlayer,
 } from '@inazuma/db';
 import { eaNum, fetchClubMatches, type EaMatchType, type EaRawMatch } from './eaClient.js';
@@ -75,7 +77,12 @@ export async function syncFrontierMatches(client: Client<true>): Promise<Frontie
     fetchFailures: 0,
     ingested: 0,
   };
-  if (tournaments.length === 0) return summary; // nothing live & linked — free no-op
+  if (tournaments.length === 0) {
+    // Nothing live & linked to ingest — but bracket progression still runs for
+    // manual-entry live Frontiers (draw the knockout once the group finishes).
+    await autoProgressLiveTournaments(client);
+    return summary;
+  }
 
   const cfg = await getConfig();
   const platform = cfg.eaPlatform || 'common-gen5';
@@ -227,7 +234,49 @@ export async function syncFrontierMatches(client: Client<true>): Promise<Frontie
   }
 
   await trackEaHealth(client, summary);
+
+  // Freshly-ingested scores may have completed a group or a round — advance the
+  // bracket now so nobody has to click "draw knockout" mid-tournament.
+  await autoProgressLiveTournaments(client);
   return summary;
+}
+
+/** Draw the next phase of every live Frontier that's ready — the knockout once
+ *  the group is complete, the final once the semis are, or the winner of a
+ *  best-of-5 series. Runs each pass; each step is idempotent and only fires when
+ *  due. Admins get one DM per advancement so they always know the state. */
+async function autoProgressLiveTournaments(client: Client<true>): Promise<void> {
+  let ids: string[];
+  try {
+    ids = await listLiveTournamentIds();
+  } catch (e) {
+    console.error('[frontier] could not list live tournaments —', e instanceof Error ? e.message : e);
+    return;
+  }
+  if (ids.length === 0) return;
+
+  // Bracket changes are audit-logged; attribute them to an admin/owner.
+  const admins = await getAdminDiscordIds().catch(() => [] as string[]);
+  const actor = admins[0];
+  if (!actor) return;
+
+  for (const id of ids) {
+    try {
+      const progress = await autoProgressFrontier(actor, id);
+      if (!progress) continue;
+      const lead =
+        progress.action === 'series_decided' ? '🏆 **Series decided**'
+        : progress.action === 'knockout_drawn' ? '🗺️ **Knockout drawn**'
+        : '🥇 **Final drawn**';
+      console.log(`[frontier] auto-progress (${progress.action}) — ${progress.detail}`);
+      await alertAdmins(
+        client,
+        `${lead} — ${progress.detail}.\nIt's live on the site. Adjust on the admin tournament page if a result needs correcting first.`,
+      );
+    } catch (e) {
+      console.error(`[frontier] auto-progress failed for ${id} —`, e instanceof Error ? e.message : e);
+    }
+  }
 }
 
 /** The watchdog: sustained all-fetches-failing during a live Frontier alerts

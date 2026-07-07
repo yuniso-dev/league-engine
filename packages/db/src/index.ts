@@ -131,10 +131,14 @@ export {
   setTeamCaptain,
   generateBracket,
   generateGroupStage,
+  generateFrontierFixtures,
   generateKnockoutFromTable,
   generateNextRound,
+  autoProgressFrontier,
+  listLiveTournamentIds,
   recordMatchResult,
 } from './queries/admin';
+export type { FrontierProgress } from './queries/admin';
 export type {
   TournamentRow,
   MatchStage,
