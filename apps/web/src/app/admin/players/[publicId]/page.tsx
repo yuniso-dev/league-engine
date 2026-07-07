@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
+  SANCTION_LABELS,
   getAdminPlayer,
   getCurrentSeason,
   listAdminTournaments,
   listAwardsForAdmin,
+  listSanctionsForPlayer,
 } from '@inazuma/db';
 import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, FONT_M, T, glass } from '@/lib/realm-colors';
@@ -14,8 +16,9 @@ import { FlagIcon } from '@/components/ui/FlagIcon';
 import AdminPlayerProfileForm from '@/components/admin/AdminPlayerProfileForm';
 import AdminPlayerIdentityForm from '@/components/admin/AdminPlayerIdentityForm';
 import PlayerAwardGrantForm from '@/components/admin/PlayerAwardGrantForm';
+import SanctionForm from '@/components/admin/SanctionForm';
 import DeleteButton from '@/components/admin/DeleteButton';
-import { revokeAwardAction } from '@/app/admin/actions';
+import { liftSanctionAction, revokeAwardAction } from '@/app/admin/actions';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -40,16 +43,18 @@ const chip: React.CSSProperties = {
 
 export default async function AdminPlayerPage({ params }: { params: { publicId: string } }) {
   // Role gate + all page data in one concurrent pass — no request waterfall.
-  const [, detail, awards, tournaments, season] = await Promise.all([
+  const [, detail, awards, tournaments, season, sanctions] = await Promise.all([
     requireAdmin(),
     getAdminPlayer(params.publicId),
     listAwardsForAdmin(),
     listAdminTournaments(),
     getCurrentSeason(),
+    listSanctionsForPlayer(params.publicId),
   ]);
   if (!detail) notFound();
 
   const { player, awards: grants } = detail;
+  const activeBans = sanctions.filter(s => s.active);
 
   return (
     <>
@@ -105,6 +110,57 @@ export default async function AdminPlayerPage({ params }: { params: { publicId: 
 
       <h2 style={sectionTitle}>IDENTITY</h2>
       <AdminPlayerIdentityForm player={player} />
+
+      <h2 style={sectionTitle}>
+        SUSPENSIONS
+        {activeBans.length > 0 && (
+          <span style={{ color: T.loss, fontSize: 13, marginLeft: 10 }}>
+            🚫 SUSPENDED — {activeBans[0].frontiersRemaining} FRONTIER{activeBans[0].frontiersRemaining === 1 ? '' : 'S'} LEFT
+          </span>
+        )}
+      </h2>
+      {sanctions.length === 0 ? (
+        <p style={{ fontFamily: FONT_B, color: T.faint, fontSize: 14, margin: '0 0 16px' }}>
+          Clean record — no sanctions.
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          {sanctions.map(s => (
+            <div
+              key={s.id}
+              style={glass({
+                padding: '10px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                flexWrap: 'wrap',
+                ...(s.active ? { border: '1px solid rgba(255,107,107,0.35)' } : { opacity: 0.65 }),
+              })}
+            >
+              <span style={{ fontFamily: FONT_B, fontSize: 14, color: s.active ? T.loss : T.dim, flex: 1, minWidth: 180 }}>
+                {s.active ? '🚫' : '·'} {SANCTION_LABELS[s.type]}
+                {s.reason && <span style={{ color: T.dim }}> — {s.reason}</span>}
+              </span>
+              <span style={{ fontFamily: FONT_B, fontSize: 12, color: T.faint }}>
+                {s.tournamentName && `${s.tournamentName} · `}
+                {s.active
+                  ? `${s.frontiersRemaining} Frontier${s.frontiersRemaining === 1 ? '' : 's'} left`
+                  : s.liftedAt ? 'PARDONED' : 'SERVED'}
+                {' · '}{s.issuedAt.toISOString().slice(0, 10)}
+              </span>
+              {s.active && (
+                <DeleteButton
+                  action={liftSanctionAction}
+                  hidden={{ sanctionId: s.id, playerPublicId: player.publicId }}
+                  confirmText={`Lift this suspension? ${player.displayName} can sign up again immediately.`}
+                  label="LIFT"
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <SanctionForm playerPublicId={player.publicId} />
 
       <h2 style={sectionTitle}>
         AWARDS

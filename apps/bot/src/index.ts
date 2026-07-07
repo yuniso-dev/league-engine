@@ -19,6 +19,7 @@ import { syncCasualMatches } from './casualSync.js';
 import { syncFrontierMatches } from './frontierSync.js';
 import { pollFriendlyTest } from './friendlyTest.js';
 import { pollNotifier } from './notifier.js';
+import { syncRoles } from './roleSync.js';
 import { fetchAllMembers } from './guildMembers.js';
 
 // ── env ───────────────────────────────────────────────────────────────────────
@@ -164,6 +165,14 @@ client.once(Events.ClientReady, async ready => {
   // DMs to real members are a write we must never make from a dry run.
   if (!READ_ONLY) {
     every(60_000, 'notifier', () => pollNotifier(ready, SITE_URL));
+  }
+
+  // Role mirror: signed-up role tracks the open Frontier's roster, punished
+  // role tracks active suspensions. Assigning roles is a real-server write —
+  // gated off in test mode like everything else.
+  if (!READ_ONLY) {
+    await syncRoles(guild).catch(e => console.error('[bot] role sync failed —', e));
+    every(60_000, 'role sync', () => syncRoles(guild));
   }
 });
 

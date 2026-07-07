@@ -23,6 +23,8 @@ const DEFAULT_CONFIG: ConfigRow = {
   eaClubIds: null,
   eaPlatform: 'common-gen5',
   frontierRules: null,
+  signupRoleId: null,
+  punishedRoleId: null,
   updatedAt: new Date(),
 };
 
@@ -45,6 +47,8 @@ export async function updateConfig(
     eaClubIds?: string | null;
     eaPlatform?: string;
     frontierRules?: string | null;
+    signupRoleId?: string | null;
+    punishedRoleId?: string | null;
   },
 ): Promise<void> {
   const now = new Date();
@@ -60,6 +64,8 @@ export async function updateConfig(
     ...(data.eaClubIds !== undefined && { eaClubIds: data.eaClubIds }),
     ...(data.eaPlatform !== undefined && { eaPlatform: data.eaPlatform }),
     ...(data.frontierRules !== undefined && { frontierRules: data.frontierRules }),
+    ...(data.signupRoleId !== undefined && { signupRoleId: data.signupRoleId }),
+    ...(data.punishedRoleId !== undefined && { punishedRoleId: data.punishedRoleId }),
     updatedAt: now,
   };
 

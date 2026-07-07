@@ -1,5 +1,13 @@
 import type { Client } from 'discord.js';
-import { getLatestOpenTournament, getNewAwardGrants, getNewSignups, getTeamMemberKeys } from '@inazuma/db';
+import {
+  SANCTION_LABELS,
+  getLatestOpenTournament,
+  getNewAwardGrants,
+  getNewSignups,
+  getTeamMemberKeys,
+  listActiveSanctions,
+  type PlayerSanction,
+} from '@inazuma/db';
 
 // DM notifier — polls the database for things players should hear about
 // directly: award wins, signup confirmations, and being drafted onto a team.
@@ -12,6 +20,9 @@ let signupsSince = new Date();
 /** `${teamId}:${userId}` roster snapshot; null = needs (re)seeding, so the
  *  first pass after boot or a new tournament never DMs the whole roster. */
 let teamKeys: Set<string> | null = null;
+/** Active suspensions by sanction id; null = seed on the first pass (no DMs
+ *  on restart). New id → "you're suspended"; vanished id → "you're back". */
+let sanctions: Map<string, PlayerSanction> | null = null;
 
 /** Fire-and-forget DM — closed DMs are common and fine, so failures only log.
  *  Shared by the notifier ticks and the frontier sync's admin alerts. */
@@ -40,6 +51,35 @@ export async function pollNotifier(client: Client<true>, siteUrl: string): Promi
       );
     }
     console.log(`[notifier] sent ${grants.length} award DM${grants.length === 1 ? '' : 's'}`);
+  }
+
+  // ── Suspensions (always on — issued, served, and pardoned regardless of
+  //    an open Frontier: bans serve themselves when one COMPLETES) ─────────
+  const activeSanctions = await listActiveSanctions();
+  const activeNow = new Map(activeSanctions.map(s => [s.id, s]));
+  if (sanctions === null) {
+    sanctions = activeNow; // seed pass — a restart never re-announces old bans
+  } else {
+    for (const [id, s] of activeNow) {
+      if (sanctions.has(id)) continue;
+      const n = s.frontiersRemaining;
+      await sendDm(
+        client,
+        s.discordId,
+        `🚫 You've been suspended from the Frontier — you're sitting out ${n === 1 ? '**the next tournament**' : `**the next ${n} tournaments**`} ` +
+        `(${SANCTION_LABELS[s.type].toLowerCase()}${s.reason ? `: ${s.reason}` : ''}). ` +
+        `Signups are blocked until it's served. If you think this is wrong, talk to an admin.`,
+      );
+    }
+    for (const [id, s] of sanctions) {
+      if (activeNow.has(id)) continue;
+      await sendDm(
+        client,
+        s.discordId,
+        `🕊️ Your Frontier suspension has ended — you're eligible to sign up again. Welcome back.`,
+      );
+    }
+    sanctions = activeNow;
   }
 
   // ── Signups + drafts only matter while a Frontier is open ───────────────

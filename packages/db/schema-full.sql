@@ -232,6 +232,8 @@ create table config (
     ea_club_ids         text,
     ea_platform         text not null default 'common-gen5',
     frontier_rules      text,
+    signup_role_id      text,
+    punished_role_id    text,
     updated_at          timestamptz not null default now(),
     check (id = 1)
 );
@@ -365,6 +367,24 @@ create table tournament_exclusions (
     excluded_at   timestamptz not null default now(),
     primary key (tournament_id, user_id)
 );
+
+-- ----------------------------------------------------------------------------
+--  PLAYER_SANCTIONS  -- suspensions for no-shows / mid-tournament leavers (0013)
+-- ----------------------------------------------------------------------------
+create table player_sanctions (
+    id                  uuid primary key default gen_random_uuid(),
+    user_id             text not null references users(discord_id) on delete cascade,
+    type                text not null,      -- 'no_show' | 'abandon' | 'other'
+    reason              text,
+    tournament_id       uuid references tournaments(id) on delete set null,
+    frontiers_remaining integer not null default 1,
+    issued_by           text not null,
+    issued_at           timestamptz not null default now(),
+    lifted_by           text,
+    lifted_at           timestamptz
+);
+
+create index idx_sanctions_user on player_sanctions (user_id);
 
 
 create index idx_mp_match             on match_participants (match_id);

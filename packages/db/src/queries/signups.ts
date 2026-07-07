@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { getDb } from '../client';
 import { eventSignups, tournaments, users, voicePresence } from '../schema';
+import { SANCTION_LABELS, getActiveSanction } from './sanctions';
 
 // Frontier signups — uses the event_signups table that has existed since the
 // original schema. Signing up says "I want in"; the draft board then cross-
@@ -38,6 +39,16 @@ export async function signUpForTournament(discordId: string, tournamentId: strin
     .limit(1);
   if (!player || player.isBlacklisted) throw new Error('Unknown player.');
   if (!player.initialised) throw new Error('Complete your profile first.');
+
+  const ban = await getActiveSanction(discordId);
+  if (ban) {
+    const n = ban.frontiersRemaining;
+    throw new Error(
+      `Suspended — you're sitting out ${n === 1 ? 'the next Frontier' : `the next ${n} Frontiers`} ` +
+      `(${SANCTION_LABELS[ban.type].toLowerCase()}${ban.reason ? `: ${ban.reason}` : ''}). ` +
+      `Talk to an admin if you think this is wrong.`,
+    );
+  }
 
   const [existing] = await db
     .select({ id: eventSignups.id })
@@ -126,6 +137,15 @@ export async function getSignupsForTournament(tournamentId: string): Promise<Pub
     });
   }
   return out;
+}
+
+/** discordIds signed up for a tournament — feeds the bot's signup-role mirror. */
+export async function getSignupDiscordIds(tournamentId: string): Promise<string[]> {
+  const rows = await getDb()
+    .select({ userId: eventSignups.userId })
+    .from(eventSignups)
+    .where(eq(eventSignups.tournamentId, tournamentId));
+  return [...new Set(rows.map(r => r.userId))];
 }
 
 /** publicIds of everyone currently in voice — the draft board's live layer. */
