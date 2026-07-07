@@ -55,7 +55,12 @@ export {
   ingestFrontierResult,
   setTeamEaClub,
   voidMatchResult,
+  addPendingMatch,
+  listPendingMatches,
+  applyPendingMatch,
+  discardPendingMatch,
 } from './queries/frontierAuto';
+export type { PendingMatch, PendingPlayer } from './queries/frontierAuto';
 export {
   listTournamentExclusions,
   setTournamentExclusion,

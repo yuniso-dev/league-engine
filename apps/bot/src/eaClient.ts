@@ -40,6 +40,8 @@ export type EaRawMatch = {
     passesmade?: string | number;
     passattempts?: string | number;
     redcards?: string | number;
+    /** In-game seconds — 5400 ≈ a full 90'. Short = abandoned/glitched game. */
+    secondsPlayed?: string | number;
     mom?: string | number;
   }>>;
 };

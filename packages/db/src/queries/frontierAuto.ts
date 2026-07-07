@@ -1,6 +1,7 @@
-import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { getDb } from '../client';
-import { adminActions, matches, matchParticipants, teams, tournaments, users, voidedEaMatches } from '../schema';
+import { adminActions, eaPendingMatches, matches, matchParticipants, teams, tournaments, users, voidedEaMatches } from '../schema';
 
 // Frontier automation: teams link the captain's fresh EA club, and the bot
 // fills unscored fixtures from the EA API — scores AND per-player stats — so
@@ -67,8 +68,8 @@ export async function getLinkedLiveTournaments(): Promise<LinkedLiveTournament[]
     .filter(t => t.clubs.length >= 2);
 }
 
-/** Fast dedup: EA matchIds we've already ingested OR an admin has VOIDed
- *  (junk games from back-outs/glitches must never re-record). */
+/** Fast dedup: EA matchIds we've already ingested, an admin has VOIDed, or
+ *  that sit in the captured-games queue — each is handled exactly once. */
 export async function isEaMatchIngested(eaMatchId: string): Promise<boolean> {
   const db = getDb();
   const [ingested] = await db
@@ -82,7 +83,13 @@ export async function isEaMatchIngested(eaMatchId: string): Promise<boolean> {
     .from(voidedEaMatches)
     .where(eq(voidedEaMatches.eaMatchId, eaMatchId))
     .limit(1);
-  return voided != null;
+  if (voided) return true;
+  const [pending] = await db
+    .select({ id: eaPendingMatches.eaMatchId })
+    .from(eaPendingMatches)
+    .where(eq(eaPendingMatches.eaMatchId, eaMatchId))
+    .limit(1);
+  return pending != null;
 }
 
 /** VOID a bad auto-recorded result (kickoff back-out, half-time glitch):
@@ -171,7 +178,20 @@ export type FrontierIngestOutcome =
 export async function ingestFrontierResult(input: FrontierIngestInput): Promise<FrontierIngestOutcome> {
   const db = getDb();
 
-  if (await isEaMatchIngested(input.eaMatchId)) return { ok: false, reason: 'already-ingested' };
+  // Guard on the fixture ledger + void ledger only — NOT the captured-games
+  // queue (applying a captured game routes through here deliberately).
+  const [ingested] = await db
+    .select({ id: matches.id })
+    .from(matches)
+    .where(eq(matches.eaMatchId, input.eaMatchId))
+    .limit(1);
+  if (ingested) return { ok: false, reason: 'already-ingested' };
+  const [voided] = await db
+    .select({ id: voidedEaMatches.eaMatchId })
+    .from(voidedEaMatches)
+    .where(eq(voidedEaMatches.eaMatchId, input.eaMatchId))
+    .limit(1);
+  if (voided) return { ok: false, reason: 'already-ingested' };
 
   const [match] = await db
     .select({ id: matches.id, homeTeamId: matches.homeTeamId, homeScore: matches.homeScore })
@@ -240,6 +260,169 @@ export async function ingestFrontierResult(input: FrontierIngestInput): Promise<
   });
 
   return { ok: true, participants: matched.length, unmatched };
+}
+
+// ── Captured games (the bug workaround) ───────────────────────────────────────
+// The admin is usually PLAYING when a game glitches and gets replayed — they
+// can't void the junk result before the replay finishes. So the sync never
+// discards a game: anything between linked clubs with no open fixture is
+// CAPTURED here in full, and the admin resolves it afterwards.
+
+export type PendingPlayer = FrontierIngestPlayer & { secondsPlayed: number };
+
+export type PendingMatchInput = {
+  eaMatchId: string;
+  tournamentId: string;
+  teamAId: string;
+  teamBId: string;
+  scoreA: number;
+  scoreB: number;
+  dnf: boolean;
+  durationMin: number | null;
+  playedAt: Date;
+  players: PendingPlayer[];
+};
+
+/** Store a captured game. Idempotent — returns false if already known. */
+export async function addPendingMatch(input: PendingMatchInput): Promise<boolean> {
+  const rows = await getDb()
+    .insert(eaPendingMatches)
+    .values({
+      eaMatchId: input.eaMatchId,
+      tournamentId: input.tournamentId,
+      teamAId: input.teamAId,
+      teamBId: input.teamBId,
+      scoreA: input.scoreA,
+      scoreB: input.scoreB,
+      dnf: input.dnf,
+      durationMin: input.durationMin,
+      playedAt: input.playedAt,
+      players: input.players,
+    })
+    .onConflictDoNothing()
+    .returning({ id: eaPendingMatches.eaMatchId });
+  return rows.length > 0;
+}
+
+export type PendingMatch = {
+  eaMatchId: string;
+  teamAId: string;
+  teamAName: string;
+  teamBId: string;
+  teamBName: string;
+  scoreA: number;
+  scoreB: number;
+  dnf: boolean;
+  durationMin: number | null;
+  playedAt: Date;
+};
+
+/** Unresolved captured games for one tournament, oldest first. */
+export async function listPendingMatches(tournamentId: string): Promise<PendingMatch[]> {
+  const teamA = alias(teams, 'team_a');
+  const teamB = alias(teams, 'team_b');
+  return getDb()
+    .select({
+      eaMatchId: eaPendingMatches.eaMatchId,
+      teamAId: eaPendingMatches.teamAId,
+      teamAName: teamA.name,
+      teamBId: eaPendingMatches.teamBId,
+      teamBName: teamB.name,
+      scoreA: eaPendingMatches.scoreA,
+      scoreB: eaPendingMatches.scoreB,
+      dnf: eaPendingMatches.dnf,
+      durationMin: eaPendingMatches.durationMin,
+      playedAt: eaPendingMatches.playedAt,
+    })
+    .from(eaPendingMatches)
+    .innerJoin(teamA, eq(eaPendingMatches.teamAId, teamA.id))
+    .innerJoin(teamB, eq(eaPendingMatches.teamBId, teamB.id))
+    .where(and(eq(eaPendingMatches.tournamentId, tournamentId), eq(eaPendingMatches.status, 'pending')))
+    .orderBy(asc(eaPendingMatches.playedAt));
+}
+
+/** APPLY a captured game onto the fixture between its two teams. Targets the
+ *  oldest unscored fixture; if every fixture between the pair is scored, the
+ *  most recent UNPROCESSED one is voided first and this game takes its place
+ *  (the "delete game 1, keep game 2" move). Blocked once Elo has run. */
+export async function applyPendingMatch(adminId: string, eaMatchId: string): Promise<string> {
+  const db = getDb();
+
+  const [pending] = await db
+    .select()
+    .from(eaPendingMatches)
+    .where(and(eq(eaPendingMatches.eaMatchId, eaMatchId), eq(eaPendingMatches.status, 'pending')))
+    .limit(1);
+  if (!pending) throw new Error('Captured game not found (already resolved?).');
+
+  // Fixtures between the pair, either orientation.
+  const pairFixtures = await db
+    .select({
+      id: matches.id,
+      homeTeamId: matches.homeTeamId,
+      homeScore: matches.homeScore,
+      processed: matches.processed,
+      eaMatchId: matches.eaMatchId,
+      createdAt: matches.createdAt,
+    })
+    .from(matches)
+    .where(and(
+      eq(matches.tournamentId, pending.tournamentId),
+      sql`((${matches.homeTeamId} = ${pending.teamAId} and ${matches.awayTeamId} = ${pending.teamBId})
+        or (${matches.homeTeamId} = ${pending.teamBId} and ${matches.awayTeamId} = ${pending.teamAId}))`,
+    ))
+    .orderBy(desc(matches.createdAt));
+  if (pairFixtures.length === 0) throw new Error('No fixture exists between these two teams.');
+
+  const unscored = [...pairFixtures].reverse().find(f => f.homeScore === null); // oldest unscored
+  const swappable = pairFixtures.find(f => f.homeScore !== null && !f.processed); // most recent unprocessed result
+  const target = unscored ?? swappable;
+  if (!target) throw new Error('Every fixture between these teams has been processed for Elo — apply is blocked.');
+
+  // Swapping out a result? The old game goes to the void ledger so it can't return.
+  if (target.homeScore !== null) {
+    await voidMatchResult(adminId, target.id, `superseded by captured game ${eaMatchId}`);
+  }
+
+  const players = pending.players as PendingPlayer[];
+  const homeIsA = target.homeTeamId === pending.teamAId;
+  const outcome = await ingestFrontierResult({
+    matchId: target.id,
+    eaMatchId,
+    playedAt: pending.playedAt,
+    homeScore: homeIsA ? pending.scoreA : pending.scoreB,
+    awayScore: homeIsA ? pending.scoreB : pending.scoreA,
+    dnf: pending.dnf,
+    players,
+  });
+  if (!outcome.ok) throw new Error(`Could not apply — ${outcome.reason}.`);
+
+  await db
+    .update(eaPendingMatches)
+    .set({ status: 'applied', resolvedBy: adminId, resolvedAt: new Date() })
+    .where(eq(eaPendingMatches.eaMatchId, eaMatchId));
+  await db.insert(adminActions).values({
+    adminId,
+    action: 'match.applyPending',
+    details: { eaMatchId, matchId: target.id, swapped: target.homeScore !== null },
+  });
+
+  return outcome.unmatched.length > 0
+    ? `Applied. No site account for: ${outcome.unmatched.join(', ')} — their lines were skipped.`
+    : 'Applied — score and every stat line are on the fixture.';
+}
+
+/** Bin a captured game (stays on record as discarded; can never re-ingest). */
+export async function discardPendingMatch(adminId: string, eaMatchId: string): Promise<void> {
+  await getDb()
+    .update(eaPendingMatches)
+    .set({ status: 'discarded', resolvedBy: adminId, resolvedAt: new Date() })
+    .where(and(eq(eaPendingMatches.eaMatchId, eaMatchId), eq(eaPendingMatches.status, 'pending')));
+  await getDb().insert(adminActions).values({
+    adminId,
+    action: 'match.discardPending',
+    details: { eaMatchId },
+  });
 }
 
 // ── Admin: bind a club to a team ──────────────────────────────────────────────
