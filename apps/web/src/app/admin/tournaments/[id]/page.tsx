@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { frontierFormat } from '@inazuma/core';
 import { computeGroupTable, getAdminTournament, listPendingMatches } from '@inazuma/db';
 import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, FONT_M, T, glass, rgba } from '@/lib/realm-colors';
@@ -50,6 +51,7 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
   const hasKnockout = matches.some(m => m.stage !== 'group' && m.stage !== 'friendly');
   const groupComplete = groupMatches.length > 0 &&
     groupMatches.every(m => m.homeScore !== null && m.awayScore !== null);
+  const fmt = frontierFormat(teams.length);
   const table = groupMatches.length > 0 ? await computeGroupTable(tournament.id) : null;
 
   return (
@@ -210,17 +212,38 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
       {matches.length === 0 ? (
         teams.length >= 2 ? (
           <div style={{ marginBottom: 16 }}>
-            <p style={{ fontFamily: FONT_B, color: T.faint, fontSize: 14, margin: '0 0 12px' }}>
-              <strong style={{ color: T.dim }}>Group stage</strong> gives every team a game against every
-              other team and builds a league table, then the knockout is seeded from the standings —
-              the usual Frontier format. <strong style={{ color: T.dim }}>Random knockout</strong> skips
-              straight to a cup draw (needs 2, 4, 8 or 16 teams).
-            </p>
+            <div style={{
+              ...glass({ padding: '12px 16px', borderRadius: 12 }),
+              marginBottom: 12, border: `1px solid ${rgba(ADMIN_ACCENT, 0.35)}`,
+            }}>
+              <div style={{ fontFamily: FONT_M, fontSize: 11, letterSpacing: 1.5, color: ADMIN_ACCENT, marginBottom: 4 }}>
+                FORMAT · {teams.length} TEAMS
+              </div>
+              <div style={{ fontFamily: FONT_B, fontSize: 14, color: T.text }}>{fmt.label}</div>
+              <div style={{ fontFamily: FONT_B, fontSize: 12.5, color: T.faint, marginTop: 4 }}>
+                {fmt.knockout === 'none'
+                  ? 'The series decides the winner — set it from the standings when it’s done.'
+                  : 'The knockout is drawn automatically once the group finishes (or use the button that appears then).'}
+              </div>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {teams.length >= 3 && (
-                <BracketControls tournamentId={tournament.id} mode="group" teamCount={teams.length} />
-              )}
-              <BracketControls tournamentId={tournament.id} mode="draw" teamCount={teams.length} />
+              <BracketControls
+                tournamentId={tournament.id}
+                mode="auto"
+                teamCount={teams.length}
+                label="⚡ GENERATE FIXTURES (auto-format)"
+              />
+              <details>
+                <summary style={{ fontFamily: FONT_B, fontSize: 12.5, color: T.faint, cursor: 'pointer' }}>
+                  Manual options (random knockout / plain round robin)
+                </summary>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+                  {teams.length >= 3 && (
+                    <BracketControls tournamentId={tournament.id} mode="group" teamCount={teams.length} />
+                  )}
+                  <BracketControls tournamentId={tournament.id} mode="draw" teamCount={teams.length} />
+                </div>
+              </details>
             </div>
           </div>
         ) : (
@@ -243,14 +266,21 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
               ))}
             </div>
           )}
-          {fixtures.length === 0 && groupComplete && !hasKnockout && (
+          {fixtures.length === 0 && groupComplete && !hasKnockout && fmt.knockout !== 'none' && (
             <div style={{ marginBottom: 16 }}>
               <p style={{ fontFamily: FONT_B, color: T.faint, fontSize: 14, margin: '0 0 12px' }}>
-                The group stage is complete — draw the knockout from the standings
-                ({teams.length >= 5 ? 'top 4 → semi-finals' : 'top 2 → straight final'}).
+                The group is complete — the bot draws the knockout automatically within ~2 minutes
+                ({fmt.knockout === 'semis' ? 'top 4 → seeded semi-finals' : 'top 2 → straight final'}),
+                or draw it now:
               </p>
               <BracketControls tournamentId={tournament.id} mode="knockout" teamCount={teams.length} />
             </div>
+          )}
+          {fixtures.length === 0 && groupComplete && !hasKnockout && fmt.knockout === 'none' && (
+            <p style={{ fontFamily: FONT_B, color: T.faint, fontSize: 14, margin: '0 0 16px' }}>
+              The best-of-{fmt.seriesLength} series is complete — the winner is set automatically once a
+              team reaches {fmt.seriesWinTarget} wins. Run the ceremony when you’re ready.
+            </p>
           )}
           {fixtures.length === 0 && hasKnockout && (
             <div style={{ marginBottom: 16 }}>

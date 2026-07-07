@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import type { InferSelectModel } from 'drizzle-orm';
+import { frontierFormat } from '@inazuma/core';
 import { getDb } from '../client';
 import { computeGroupTable } from './stats';
 import { markAttendedIfSignedUp } from './signups';
@@ -643,9 +644,9 @@ export async function generateGroupStage(adminId: string, tournamentId: string):
   return created;
 }
 
-/** Knockout drawn from the finished group table. With 5+ teams the top 4 go
- *  to semis (1st v 4th, 2nd v 3rd); with 4 or fewer, the top 2 meet in a
- *  straight final — a 4-team round robin already settles who deserves it. */
+/** Knockout drawn from the finished group table, shaped by the Frontier format:
+ *  6+ teams send the top 4 to seeded semis (1st v 4th, 2nd v 3rd); 3–5 teams
+ *  send the top 2 to a straight final; a 2-team series has no knockout. */
 export async function generateKnockoutFromTable(adminId: string, tournamentId: string): Promise<number> {
   const db = getDb();
 
@@ -655,6 +656,12 @@ export async function generateKnockoutFromTable(adminId: string, tournamentId: s
     .where(eq(tournaments.id, tournamentId))
     .limit(1);
   if (!tournament) throw new Error('Unknown tournament.');
+
+  const teamCount = await countTeams(tournamentId);
+  const fmt = frontierFormat(teamCount);
+  if (fmt.knockout === 'none') {
+    throw new Error('This format has no knockout — the group (or series) decides the winner. Set the winner from the standings.');
+  }
 
   const all = await db
     .select({ id: matches.id, stage: matches.stage, homeScore: matches.homeScore, awayScore: matches.awayScore })
@@ -672,30 +679,32 @@ export async function generateKnockoutFromTable(adminId: string, tournamentId: s
   }
 
   const table = await computeGroupTable(tournamentId);
-
-  let created = 0;
-  if (table.length >= 5) {
-    // Semis seeded from the table; insert in bracket order so the final pairs
-    // the two winners (generateNextRound relies on createdAt order).
-    const [t1, t2, t3, t4] = table;
-    await db.insert(matches).values({
-      tournamentId, homeTeamId: t1.teamId, awayTeamId: t4.teamId, stage: 'semi', ranked: tournament.ranked,
-    });
-    await db.insert(matches).values({
-      tournamentId, homeTeamId: t2.teamId, awayTeamId: t3.teamId, stage: 'semi', ranked: tournament.ranked,
-    });
-    created = 2;
-  } else {
-    const [t1, t2] = table;
-    if (!t1 || !t2) throw new Error('Not enough teams for a knockout.');
-    await db.insert(matches).values({
-      tournamentId, homeTeamId: t1.teamId, awayTeamId: t2.teamId, stage: 'final', ranked: tournament.ranked,
-    });
-    created = 1;
-  }
-
-  await logAdminAction(adminId, 'knockout.from_table', { tournamentId, matches: created });
+  const created = await drawKnockoutFromTable(db, tournamentId, tournament.ranked, table, fmt.knockout);
+  await logAdminAction(adminId, 'knockout.from_table', { tournamentId, shape: fmt.knockout, matches: created });
   return created;
+}
+
+/** Insert the knockout fixtures for a shape from a sorted table. Semis are
+ *  seeded 1v4 / 2v3, inserted in bracket order so generateNextRound pairs the
+ *  two winners into the final (it relies on createdAt order). */
+async function drawKnockoutFromTable(
+  db: ReturnType<typeof getDb>,
+  tournamentId: string,
+  ranked: boolean,
+  table: { teamId: string }[],
+  shape: 'final' | 'semis',
+): Promise<number> {
+  if (shape === 'semis') {
+    const [t1, t2, t3, t4] = table;
+    if (!t1 || !t2 || !t3 || !t4) throw new Error('Not enough teams for seeded semi-finals.');
+    await db.insert(matches).values({ tournamentId, homeTeamId: t1.teamId, awayTeamId: t4.teamId, stage: 'semi', ranked });
+    await db.insert(matches).values({ tournamentId, homeTeamId: t2.teamId, awayTeamId: t3.teamId, stage: 'semi', ranked });
+    return 2;
+  }
+  const [t1, t2] = table;
+  if (!t1 || !t2) throw new Error('Not enough teams for a final.');
+  await db.insert(matches).values({ tournamentId, homeTeamId: t1.teamId, awayTeamId: t2.teamId, stage: 'final', ranked });
+  return 1;
 }
 
 /** Once every fixture in the current round has a score, pair the winners into
@@ -760,6 +769,197 @@ export async function generateNextRound(adminId: string, tournamentId: string): 
 
   await logAdminAction(adminId, 'bracket.next_round', { tournamentId, stage: next, matches: created });
   return created;
+}
+
+async function countTeams(tournamentId: string): Promise<number> {
+  const rows = await getDb()
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.tournamentId, tournamentId));
+  return rows.length;
+}
+
+const pairKey = (a: string, b: string): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
+
+/** Round-robin fixtures with an optional set of pairs to SKIP (for the 6-team
+ *  partial format). Gap-based ordering keeps a team off back-to-back games. */
+async function insertRoundRobin(
+  db: ReturnType<typeof getDb>,
+  tournamentId: string,
+  ids: string[],
+  ranked: boolean,
+  skip?: Set<string>,
+): Promise<number> {
+  let created = 0;
+  for (let gap = 1; gap < ids.length; gap++) {
+    for (let i = 0; i + gap < ids.length; i++) {
+      if (skip?.has(pairKey(ids[i], ids[i + gap]))) continue;
+      await db.insert(matches).values({
+        tournamentId,
+        homeTeamId: ids[i],
+        awayTeamId: ids[i + gap],
+        stage: 'group',
+        ranked,
+      });
+      created++;
+    }
+  }
+  return created;
+}
+
+/** Generate a Frontier's fixtures with the format decided by team count
+ *  (see @inazuma/core's frontierFormat): a best-of-5 series for 2 teams, a full
+ *  round robin for 3–5, a partial round robin (each plays 4) for 6, and a round
+ *  robin for 7+. Series fixtures alternate the home team (who sends the invite).
+ *  The knockout is drawn later from the finished table (auto-progressed by the
+ *  bot). Refuses to run if fixtures already exist — delete them to redraw. */
+export async function generateFrontierFixtures(
+  adminId: string,
+  tournamentId: string,
+): Promise<{ created: number; label: string }> {
+  const db = getDb();
+
+  const [tournament] = await db
+    .select()
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1);
+  if (!tournament) throw new Error('Unknown tournament.');
+
+  const [existing] = await db
+    .select({ id: matches.id })
+    .from(matches)
+    .where(eq(matches.tournamentId, tournamentId))
+    .limit(1);
+  if (existing) throw new Error('This tournament already has fixtures — delete them first to redraw.');
+
+  const teamRows = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.tournamentId, tournamentId))
+    .orderBy(asc(teams.createdAt));
+
+  const fmt = frontierFormat(teamRows.length);
+  if (teamRows.length < 2) throw new Error('A Frontier needs at least 2 teams.');
+
+  let created = 0;
+  if (fmt.phase === 'series') {
+    // Best of N between the two teams; the home team (who invites) alternates.
+    const [a, b] = teamRows.map(t => t.id);
+    for (let g = 0; g < fmt.seriesLength; g++) {
+      const homeFirst = g % 2 === 0;
+      await db.insert(matches).values({
+        tournamentId,
+        homeTeamId: homeFirst ? a : b,
+        awayTeamId: homeFirst ? b : a,
+        stage: 'group',
+        ranked: tournament.ranked,
+      });
+      created++;
+    }
+  } else if (fmt.phase === 'partial_round_robin') {
+    // Drop a random perfect matching so every team skips exactly one opponent
+    // (each plays teamCount-2 games — 4 of 5 with six teams). teamCount is even.
+    const ids = shuffle(teamRows.map(t => t.id));
+    const skip = new Set<string>();
+    for (let i = 0; i + 1 < ids.length; i += 2) skip.add(pairKey(ids[i], ids[i + 1]));
+    created = await insertRoundRobin(db, tournamentId, ids, tournament.ranked, skip);
+  } else {
+    const ids = shuffle(teamRows.map(t => t.id));
+    created = await insertRoundRobin(db, tournamentId, ids, tournament.ranked);
+  }
+
+  await logAdminAction(adminId, 'frontier.generate', { tournamentId, format: fmt.label, matches: created });
+  return { created, label: fmt.label };
+}
+
+/** Live tournament IDs — the bot's auto-progression work queue. */
+export async function listLiveTournamentIds(): Promise<string[]> {
+  const rows = await getDb()
+    .select({ id: tournaments.id })
+    .from(tournaments)
+    .where(eq(tournaments.status, 'live'));
+  return rows.map(r => r.id);
+}
+
+export type FrontierProgress = {
+  action: 'series_decided' | 'knockout_drawn' | 'final_drawn';
+  detail: string;
+};
+
+/** Advance a live Frontier's bracket without the admin at the keyboard — the
+ *  bot calls this every couple of minutes. It: decides a best-of-5 series once
+ *  a team reaches the win target; draws the knockout once the group is complete;
+ *  and draws the final once the semis finish. Every step is idempotent (it only
+ *  acts when the next phase is due and not already present) and reversible. */
+export async function autoProgressFrontier(
+  actorId: string,
+  tournamentId: string,
+): Promise<FrontierProgress | null> {
+  const db = getDb();
+
+  const [tournament] = await db
+    .select()
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1);
+  if (!tournament || tournament.status !== 'live') return null;
+
+  const teamCount = await countTeams(tournamentId);
+  if (teamCount < 2) return null;
+  const fmt = frontierFormat(teamCount);
+
+  const all = await db
+    .select({ stage: matches.stage, homeScore: matches.homeScore, awayScore: matches.awayScore })
+    .from(matches)
+    .where(eq(matches.tournamentId, tournamentId));
+  if (all.length === 0) return null;
+
+  const scored = (m: { homeScore: number | null; awayScore: number | null }) =>
+    m.homeScore !== null && m.awayScore !== null;
+
+  // ── Best-of-5 series: set the winner once a team reaches the target ──
+  if (fmt.phase === 'series') {
+    if (tournament.winnerTeamId) return null;
+    const table = await computeGroupTable(tournamentId);
+    const leader = table[0];
+    if (leader && leader.won >= fmt.seriesWinTarget) {
+      await db.update(tournaments)
+        .set({ winnerTeamId: leader.teamId, updatedAt: new Date() })
+        .where(eq(tournaments.id, tournamentId));
+      await logAdminAction(actorId, 'frontier.series_decided', { tournamentId, winner: leader.teamId });
+      return {
+        action: 'series_decided',
+        detail: `${leader.teamName} take the best-of-${fmt.seriesLength} (${leader.won}–${table[1]?.won ?? 0})`,
+      };
+    }
+    return null;
+  }
+
+  const group = all.filter(m => m.stage === 'group');
+  const knockoutDrawn = all.some(m => m.stage !== 'group' && m.stage !== 'friendly');
+  const groupComplete = group.length > 0 && group.every(scored);
+
+  // ── Draw the knockout once the group is complete ──
+  if (fmt.knockout !== 'none' && groupComplete && !knockoutDrawn) {
+    const table = await computeGroupTable(tournamentId);
+    const created = await drawKnockoutFromTable(db, tournamentId, tournament.ranked, table, fmt.knockout);
+    await logAdminAction(actorId, 'frontier.auto_knockout', { tournamentId, shape: fmt.knockout, matches: created });
+    const detail = fmt.knockout === 'semis'
+      ? `Top 4 seeded → ${table[0].teamName} v ${table[3].teamName} and ${table[1].teamName} v ${table[2].teamName}`
+      : `Top 2 → ${table[0].teamName} v ${table[1].teamName}`;
+    return { action: 'knockout_drawn', detail };
+  }
+
+  // ── Draw the final once both semis are decided ──
+  const semis = all.filter(m => m.stage === 'semi');
+  const hasFinal = all.some(m => m.stage === 'final');
+  if (semis.length > 0 && !hasFinal && semis.every(m => scored(m) && m.homeScore !== m.awayScore)) {
+    await generateNextRound(actorId, tournamentId);
+    return { action: 'final_drawn', detail: 'Both semi-finals decided — the final and third-place playoff are drawn.' };
+  }
+
+  return null;
 }
 
 /** Fill in the result of a generated fixture (a match whose scores are still null). */

@@ -18,6 +18,7 @@ import {
   deleteTournament,
   findAwardByName,
   generateBracket,
+  generateFrontierFixtures,
   generateGroupStage,
   generateKnockoutFromTable,
   generateNextRound,
@@ -795,6 +796,26 @@ export async function generateBracketAction(
     const created = await generateBracket(admin.discordId, tournamentId);
     revalidatePath(`/admin/tournaments/${tournamentId}`);
     return { ok: true, message: `Bracket drawn — ${created} fixture${created === 1 ? '' : 's'} created.` };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+/** Auto-format generator: picks the format from the team count and creates the
+ *  group/series fixtures. The knockout is drawn automatically once the group
+ *  finishes (by the bot) or via the button below. */
+export async function generateFrontierFixturesAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const tournamentId = str(formData, 'tournamentId');
+    if (!tournamentId) return { error: 'Missing tournament.' };
+
+    const { created, label } = await generateFrontierFixtures(admin.discordId, tournamentId);
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return { ok: true, message: `${label} — ${created} fixture${created === 1 ? '' : 's'} created.` };
   } catch (e) {
     return { error: message(e) };
   }

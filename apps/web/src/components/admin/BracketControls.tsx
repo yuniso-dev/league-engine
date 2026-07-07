@@ -4,24 +4,28 @@ import { FONT_B, FONT_D, T, rgba } from '@/lib/realm-colors';
 import { ADMIN_ACCENT } from '@/components/admin/ui';
 import {
   generateBracketAction,
+  generateFrontierFixturesAction,
   generateGroupStageAction,
   generateKnockoutAction,
   generateNextRoundAction,
   type AdminFormState,
 } from '@/app/admin/actions';
 
-// Fixture generators: random knockout draw, round-robin group stage,
-// knockout seeded from the finished table, and next-round pairing.
+// Fixture generators: auto-format (picks by team count), random knockout draw,
+// round-robin group stage, knockout seeded from the table, next-round pairing.
 
-type Mode = 'draw' | 'group' | 'knockout' | 'next';
+type Mode = 'auto' | 'draw' | 'group' | 'knockout' | 'next';
 
 type Props = {
   tournamentId: string;
   mode: Mode;
   teamCount: number;
+  /** Optional custom button label (auto mode shows the detected format). */
+  label?: string;
 };
 
 const ACTION_OF: Record<Mode, typeof generateBracketAction> = {
+  auto: generateFrontierFixturesAction,
   draw: generateBracketAction,
   group: generateGroupStageAction,
   knockout: generateKnockoutAction,
@@ -29,6 +33,7 @@ const ACTION_OF: Record<Mode, typeof generateBracketAction> = {
 };
 
 const LABEL_OF: Record<Mode, string> = {
+  auto: '⚡ GENERATE FIXTURES',
   draw: '🎲 DRAW KNOCKOUT (random)',
   group: '📋 GROUP FIXTURES (round robin)',
   knockout: '🏁 DRAW KNOCKOUT FROM TABLE',
@@ -36,6 +41,7 @@ const LABEL_OF: Record<Mode, string> = {
 };
 
 const CONFIRM_OF: Partial<Record<Mode, (teams: number) => string>> = {
+  auto: n => `Generate the fixtures for ${n} teams using the automatic format?`,
   draw: n => `Randomly draw the knockout for ${n} teams?`,
   group: n => `Generate a round robin for ${n} teams (every team plays every other team once)?`,
   knockout: () => 'Draw the knockout from the current table standings?',
@@ -66,7 +72,7 @@ function GoButton({ label }: { label: string }) {
   );
 }
 
-export default function BracketControls({ tournamentId, mode, teamCount }: Props) {
+export default function BracketControls({ tournamentId, mode, teamCount, label }: Props) {
   const [state, action] = useFormState<AdminFormState, FormData>(ACTION_OF[mode], {});
 
   return (
@@ -79,7 +85,7 @@ export default function BracketControls({ tournamentId, mode, teamCount }: Props
       style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
     >
       <input type="hidden" name="tournamentId" value={tournamentId} />
-      <GoButton label={LABEL_OF[mode]} />
+      <GoButton label={label ?? LABEL_OF[mode]} />
       {state.error && (
         <span style={{ fontFamily: FONT_B, color: T.loss, fontSize: 13 }}>{state.error}</span>
       )}
