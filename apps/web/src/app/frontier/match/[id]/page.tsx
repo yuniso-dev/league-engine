@@ -51,6 +51,9 @@ function PlayerRow({ p }: { p: MatchDetailPlayer }) {
       }}>
         {p.displayName}
         {p.mom && <span title="Man of the Match" style={{ marginLeft: 6 }}>⭐</span>}
+        {p.excluded && (
+          <span title="Excluded from this Frontier's honours (rule violation)" style={{ marginLeft: 6 }}>⚠</span>
+        )}
       </span>
       {p.position && (
         <span style={{ fontFamily: FONT_M, fontSize: 10, color: T.faint, minWidth: 28, textAlign: 'center' }}>

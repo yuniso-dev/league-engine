@@ -7,7 +7,12 @@ import { FONT_B, FONT_D, FONT_M, T, glass, rgba } from '@/lib/realm-colors';
 import { ADMIN_ACCENT } from '@/components/admin/ui';
 import { buildCeremonyAnnouncement } from '@/lib/announcementDraft';
 import { pickTeamOfTournament } from '@/lib/tott';
-import { runCeremonyAction, type AdminFormState } from '@/app/admin/actions';
+import {
+  excludePlayerAction,
+  removeExclusionAction,
+  runCeremonyAction,
+  type AdminFormState,
+} from '@/app/admin/actions';
 
 // The ceremony sheet: computed winners per honour, the GK rating table, the
 // champion roster, two pickers for the VOTED honours, one GRANT ALL button,
@@ -25,6 +30,69 @@ const inputBase: React.CSSProperties = {
   fontSize: 14,
   padding: '8px 12px',
 };
+
+function SmallSubmit({ label, color }: { label: string; color: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      style={{
+        background: 'none', border: `1px solid ${rgba(color, 0.4)}`, borderRadius: 7,
+        color, fontFamily: FONT_M, fontSize: 11, letterSpacing: 1, padding: '6px 12px',
+        cursor: pending ? 'not-allowed' : 'pointer', opacity: pending ? 0.6 : 1,
+      }}
+    >
+      {pending ? '…' : label}
+    </button>
+  );
+}
+
+/** Add-exclusion form — its own action state, separate from GRANT ALL. */
+function ExcludeForm({ tournamentId, pool }: {
+  tournamentId: string;
+  pool: { publicId: string; displayName: string }[];
+}) {
+  const [state, action] = useFormState<AdminFormState, FormData>(excludePlayerAction, {});
+  return (
+    <form action={action} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+      <input type="hidden" name="tournamentId" value={tournamentId} />
+      <select name="publicId" defaultValue="" style={{ ...inputBase, minWidth: 170 }}>
+        <option value="">— pick a player —</option>
+        {pool.map(p => <option key={p.publicId} value={p.publicId}>{p.displayName}</option>)}
+      </select>
+      <input
+        name="reason"
+        placeholder="reason (e.g. heights)"
+        maxLength={200}
+        style={{ ...inputBase, flex: 1, minWidth: 160 }}
+      />
+      <SmallSubmit label="EXCLUDE" color={T.loss} />
+      {state.ok && <span style={{ fontFamily: FONT_B, fontSize: 12, color: T.win }}>✓</span>}
+      {state.error && <span style={{ fontFamily: FONT_B, fontSize: 12, color: T.loss }}>{state.error}</span>}
+    </form>
+  );
+}
+
+/** One excluded player row with its lift-exclusion form. */
+function ExclusionRow({ tournamentId, exclusion }: {
+  tournamentId: string;
+  exclusion: { publicId: string; displayName: string; reason: string | null };
+}) {
+  const [state, action] = useFormState<AdminFormState, FormData>(removeExclusionAction, {});
+  return (
+    <form action={action} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
+      <input type="hidden" name="tournamentId" value={tournamentId} />
+      <input type="hidden" name="publicId" value={exclusion.publicId} />
+      <span style={{ fontFamily: FONT_B, fontSize: 13.5, color: T.loss }}>⚠ {exclusion.displayName}</span>
+      {exclusion.reason && (
+        <span style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, flex: 1 }}>— {exclusion.reason}</span>
+      )}
+      <SmallSubmit label="LIFT" color={T.win} />
+      {state.error && <span style={{ fontFamily: FONT_B, fontSize: 12, color: T.loss }}>{state.error}</span>}
+    </form>
+  );
+}
 
 function GrantButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
@@ -210,6 +278,20 @@ export default function CeremonyBoard({
             </p>
           </>
         )}
+      </div>
+
+      {/* ── Honours exclusions (rule violators) ── */}
+      <div style={glass({ padding: 18 })}>
+        <div style={{ ...label, marginBottom: 4 }}>⚠ HONOURS EXCLUSIONS</div>
+        <p style={{ fontFamily: FONT_M, fontSize: 11.5, color: T.faint, margin: '0 0 8px' }}>
+          Rule violators (heights etc.): excluded players can&apos;t win computed honours, make the
+          Team of the Tournament, or top the races — their match stats and team results stand.
+          They remain pickable in the voted-award dropdowns; that call stays yours.
+        </p>
+        {sheet.exclusions.map(x => (
+          <ExclusionRow key={x.publicId} tournamentId={sheet.tournament.id} exclusion={x} />
+        ))}
+        <ExcludeForm tournamentId={sheet.tournament.id} pool={sheet.voterPool} />
       </div>
 
       {/* ── The form: numeral + voted honours + GRANT ALL ── */}

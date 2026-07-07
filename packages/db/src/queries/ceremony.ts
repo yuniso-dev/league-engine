@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, isNotNull, sql } from 'drizzle-orm';
 import { getDb } from '../client';
 import { matchParticipants, matches, teamMembers, teams, tournaments, users } from '../schema';
+import { getExcludedDiscordIds, listTournamentExclusions, type TournamentExclusion } from './exclusions';
 
 // The awards-ceremony sheet: everything the admin needs to close out a
 // Frontier — stat winners WITH ties, the goalkeeper rating table, and the
@@ -32,8 +33,12 @@ export type CeremonySheet = {
     captain: { publicId: string; discordId: string; displayName: string } | null;
     members: { publicId: string; discordId: string; displayName: string }[];
   } | null;
-  /** Every rostered player — the pool for the two voted-award pickers. */
+  /** Every rostered player — the pool for the two voted-award pickers.
+   *  Deliberately NOT exclusion-filtered: voted honours stay admin judgement. */
   voterPool: { publicId: string; discordId: string; displayName: string }[];
+  /** Honours exclusions (rule violators) — filtered OUT of every computed
+   *  list above before winners are decided. */
+  exclusions: TournamentExclusion[];
 };
 
 export async function getCeremonySheet(tournamentId: string): Promise<CeremonySheet | null> {
@@ -52,6 +57,10 @@ export async function getCeremonySheet(tournamentId: string): Promise<CeremonySh
     .limit(1);
   if (!tournament) return null;
 
+  // Rule violators: out of every COMPUTED list below (filtered before winners
+  // are decided, so an excluded top scorer can't hide the real one).
+  const excluded = await getExcludedDiscordIds(tournamentId);
+
   // ── Stat totals (goals + assists in one pass) ──────────────────────────────
   const totals = await db
     .select({
@@ -67,7 +76,9 @@ export async function getCeremonySheet(tournamentId: string): Promise<CeremonySh
     .where(eq(matches.tournamentId, tournamentId))
     .groupBy(users.publicId, users.discordId, users.displayName);
 
-  const withPublicId = totals.filter((r): r is typeof r & { publicId: string } => r.publicId != null);
+  const withPublicId = totals.filter(
+    (r): r is typeof r & { publicId: string } => r.publicId != null && !excluded.has(r.discordId),
+  );
   const maxGoals = Math.max(0, ...withPublicId.map(r => r.goals));
   const maxAssists = Math.max(0, ...withPublicId.map(r => r.assists));
   const toPlayer = (r: (typeof withPublicId)[number], value: number): CeremonyPlayer => ({
@@ -163,7 +174,7 @@ export async function getCeremonySheet(tournamentId: string): Promise<CeremonySh
       ? withPublicId.filter(r => r.assists === maxAssists).map(r => toPlayer(r, r.assists))
       : [],
     gkTable: gkRows
-      .filter((r): r is typeof r & { publicId: string } => r.publicId != null)
+      .filter((r): r is typeof r & { publicId: string } => r.publicId != null && !excluded.has(r.discordId))
       .map(r => ({
         publicId: r.publicId,
         discordId: r.discordId,
@@ -172,7 +183,7 @@ export async function getCeremonySheet(tournamentId: string): Promise<CeremonySh
         appearances: r.appearances,
       })),
     ratedPlayers: ratedRows
-      .filter((r): r is typeof r & { publicId: string } => r.publicId != null)
+      .filter((r): r is typeof r & { publicId: string } => r.publicId != null && !excluded.has(r.discordId))
       .map(r => ({
         publicId: r.publicId,
         discordId: r.discordId,
@@ -183,5 +194,6 @@ export async function getCeremonySheet(tournamentId: string): Promise<CeremonySh
       })),
     championTeam,
     voterPool: poolRows.filter((p): p is typeof p & { publicId: string } => p.publicId != null),
+    exclusions: await listTournamentExclusions(tournamentId),
   };
 }

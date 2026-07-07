@@ -2,6 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { getDb } from '../client';
 import { matchParticipants, matches, teams, tournaments, users } from '../schema';
+import { getExcludedDiscordIds } from './exclusions';
 import type { MatchStage } from './admin';
 
 // The public match centre: one recorded match with both teams' full stat
@@ -23,6 +24,8 @@ export type MatchDetailPlayer = {
   rating: number | null;
   /** EA position bucket: goalkeeper | defender | midfielder | forward. */
   position: string | null;
+  /** Honours-excluded for this tournament (rule violation) — stats shown, flagged. */
+  excluded: boolean;
 };
 
 export type MatchDetail = {
@@ -68,9 +71,12 @@ export async function getMatchDetail(matchId: string): Promise<MatchDetail | nul
     .limit(1);
   if (!match) return null;
 
+  const excluded = await getExcludedDiscordIds(match.tournamentId);
+
   const rows = await db
     .select({
       teamId: matchParticipants.teamId,
+      discordId: matchParticipants.userId,
       publicId: users.publicId,
       displayName: users.displayName,
       avatarUrl: users.avatarUrl,
@@ -108,6 +114,7 @@ export async function getMatchDetail(matchId: string): Promise<MatchDetail | nul
         mom: r.mom,
         rating: r.rating != null ? parseFloat(r.rating) : null,
         position: r.position,
+        excluded: excluded.has(r.discordId),
       }))
       .sort((a, b) =>
         (BUCKET_ORDER[a.position ?? ''] ?? 9) - (BUCKET_ORDER[b.position ?? ''] ?? 9) ||

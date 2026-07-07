@@ -207,6 +207,29 @@ export const adminActions = pgTable('admin_actions', {
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// EA games an admin VOIDed (kickoff back-outs, half-time glitches) — the
+// ingest must never re-record these; the fixture reopens and the REAL
+// replayed game auto-records instead.
+export const voidedEaMatches = pgTable('voided_ea_matches', {
+  eaMatchId: text('ea_match_id').primaryKey(),
+  matchId:   uuid('match_id'), // the fixture it was cleared from (informational)
+  voidedBy:  text('voided_by').notNull(),
+  voidedAt:  timestamp('voided_at', { withTimezone: true }).notNull().defaultNow(),
+  reason:    text('reason'),
+});
+
+// Players excluded from a tournament's honours (rule violations). Honours-only:
+// match stats + team results stand; no computed honours, TOTT, or race spots.
+export const tournamentExclusions = pgTable('tournament_exclusions', {
+  tournamentId: uuid('tournament_id').notNull().references(() => tournaments.id, { onDelete: 'cascade' }),
+  userId:       text('user_id').notNull().references(() => users.discordId, { onDelete: 'cascade' }),
+  reason:       text('reason'),
+  excludedBy:   text('excluded_by').notNull(),
+  excludedAt:   timestamp('excluded_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.tournamentId, table.userId] }),
+}));
+
 // Live voice-channel presence, written by the Discord bot.
 export const voicePresence = pgTable('voice_presence', {
   discordId:   text('discord_id').primaryKey().references(() => users.discordId, { onDelete: 'cascade' }),

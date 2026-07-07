@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { getDb } from '../client';
-import { adminActions, matches, matchParticipants, teams, tournaments, users } from '../schema';
+import { adminActions, matches, matchParticipants, teams, tournaments, users, voidedEaMatches } from '../schema';
 
 // Frontier automation: teams link the captain's fresh EA club, and the bot
 // fills unscored fixtures from the EA API — scores AND per-player stats — so
@@ -67,14 +67,68 @@ export async function getLinkedLiveTournaments(): Promise<LinkedLiveTournament[]
     .filter(t => t.clubs.length >= 2);
 }
 
-/** Fast dedup: EA matchIds we've already ingested (checked before any work). */
+/** Fast dedup: EA matchIds we've already ingested OR an admin has VOIDed
+ *  (junk games from back-outs/glitches must never re-record). */
 export async function isEaMatchIngested(eaMatchId: string): Promise<boolean> {
-  const [row] = await getDb()
+  const db = getDb();
+  const [ingested] = await db
     .select({ id: matches.id })
     .from(matches)
     .where(eq(matches.eaMatchId, eaMatchId))
     .limit(1);
-  return row != null;
+  if (ingested) return true;
+  const [voided] = await db
+    .select({ id: voidedEaMatches.eaMatchId })
+    .from(voidedEaMatches)
+    .where(eq(voidedEaMatches.eaMatchId, eaMatchId))
+    .limit(1);
+  return voided != null;
+}
+
+/** VOID a bad auto-recorded result (kickoff back-out, half-time glitch):
+ *  clears the fixture back to unscored, wipes its stat lines, and blacklists
+ *  the junk EA match ID — so the REAL replayed game auto-records onto the
+ *  reopened fixture within a couple of minutes of finishing. Blocked once the
+ *  match has been processed for Elo (correct that via the reveal, not here). */
+export async function voidMatchResult(
+  adminId: string,
+  matchId: string,
+  reason: string | null,
+): Promise<void> {
+  const db = getDb();
+  const [match] = await db
+    .select({
+      id: matches.id,
+      homeScore: matches.homeScore,
+      processed: matches.processed,
+      eaMatchId: matches.eaMatchId,
+    })
+    .from(matches)
+    .where(eq(matches.id, matchId))
+    .limit(1);
+  if (!match) throw new Error('Unknown match.');
+  if (match.homeScore === null) throw new Error('This fixture has no result to void.');
+  if (match.processed) throw new Error('Already processed for Elo — void is blocked to protect ratings.');
+
+  await db.transaction(async tx => {
+    if (match.eaMatchId) {
+      await tx
+        .insert(voidedEaMatches)
+        .values({ eaMatchId: match.eaMatchId, matchId, voidedBy: adminId, reason })
+        .onConflictDoNothing();
+    }
+    await tx.delete(matchParticipants).where(eq(matchParticipants.matchId, matchId));
+    await tx
+      .update(matches)
+      .set({ homeScore: null, awayScore: null, playedAt: null, eaMatchId: null, dnf: false })
+      .where(eq(matches.id, matchId));
+  });
+
+  await db.insert(adminActions).values({
+    adminId,
+    action: 'match.void',
+    details: { matchId, eaMatchId: match.eaMatchId, reason },
+  });
 }
 
 // ── The ingest itself ─────────────────────────────────────────────────────────

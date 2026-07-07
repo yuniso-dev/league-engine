@@ -13,7 +13,7 @@ import BracketControls from '@/components/admin/BracketControls';
 import FixtureResultForm from '@/components/admin/FixtureResultForm';
 import MatchStatsForm from '@/components/admin/MatchStatsForm';
 import { LeagueTable } from '@/components/LeagueTable';
-import { deleteMatchAction, deleteTeamAction, deleteTournamentAction } from '@/app/admin/actions';
+import { deleteMatchAction, deleteTeamAction, deleteTournamentAction, voidMatchAction } from '@/app/admin/actions';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -324,11 +324,25 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
               {m.processed ? (
                 <span style={{ fontFamily: FONT_M, fontSize: 10, color: T.win }}>PROCESSED</span>
               ) : (
-                <DeleteButton
-                  action={deleteMatchAction}
-                  hidden={{ matchId: m.id, tournamentId: tournament.id }}
-                  confirmText="Delete this match result?"
-                />
+                <>
+                  {/* Junk auto-record (kickoff back-out / glitch)? VOID reopens the
+                      fixture and blacklists the EA game — the replay auto-records. */}
+                  <DeleteButton
+                    action={voidMatchAction}
+                    hidden={{ matchId: m.id, tournamentId: tournament.id }}
+                    confirmText={
+                      'VOID this result? The fixture reopens as unscored, its stat lines are wiped, and this EA game is ' +
+                      'blacklisted so it can never re-record — the real replayed game auto-records instead. ' +
+                      'Use for kickoff back-outs and half-time glitches.'
+                    }
+                    label="VOID"
+                  />
+                  <DeleteButton
+                    action={deleteMatchAction}
+                    hidden={{ matchId: m.id, tournamentId: tournament.id }}
+                    confirmText="Delete this match result? (This removes the fixture entirely — to reopen it for a replay, use VOID instead.)"
+                  />
+                </>
               )}
               {/* goals / assists / clean sheets — feeds leaderboards + milestones */}
               <MatchStatsForm matchId={m.id} tournamentId={tournament.id} />
