@@ -252,6 +252,22 @@ export const eaPendingMatches = pgTable('ea_pending_matches', {
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Tracked EA clubs — the community's own FC Clubs. Admins register IDs; the
+// bot refreshes snapshots round-robin from the EA API; the site reads ONLY
+// these stored snapshots (instant loads, survives EA outages).
+export const trackedClubs = pgTable('tracked_clubs', {
+  clubId:        text('club_id').primaryKey(),
+  name:          text('name'),
+  addedBy:       text('added_by').notNull(),
+  addedAt:       timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
+  info:          jsonb('info'),
+  overall:       jsonb('overall'),
+  members:       jsonb('members'),
+  recentMatches: jsonb('recent_matches'),
+  fetchedAt:     timestamp('fetched_at', { withTimezone: true }),
+  fetchError:    text('fetch_error'),
+});
+
 // Suspensions for no-shows and mid-tournament leavers. A sanction blocks
 // signing up while frontiers_remaining > 0 and it hasn't been lifted; each
 // completed Frontier (other than the offence tournament) serves one unit.

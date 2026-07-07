@@ -8,7 +8,7 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
 } from 'discord.js';
-import { getConfig, getLinkedLiveTournaments, getUserByDiscordId, listAwardsForPlayer } from '@inazuma/db';
+import { addTrackedClubs, areClubsTracked, getConfig, getLinkedLiveTournaments, getUserByDiscordId, listAwardsForPlayer } from '@inazuma/db';
 import { handleLeaderboard, handlePostLeaderboard } from './leaderboard.js';
 import { resetAllNicknames, syncNicknames } from './nicknameSync.js';
 import { snapshotVoiceChannel } from './voicePresence.js';
@@ -19,6 +19,7 @@ import { closeAwardPoll, startAwardPoll } from './awardPoll.js';
 import { handleSpinOrder } from './spinOrder.js';
 import { handleFrontierIntro } from './frontierIntro.js';
 import { handlePardon, handlePunish, handleSuspensions } from './sanctions.js';
+import { refreshTrackedClub } from './clubTracker.js';
 import { frontierWatchState, syncFrontierMatches } from './frontierSync.js';
 
 const definitions = [
@@ -134,6 +135,14 @@ const definitions = [
   new SlashCommandBuilder()
     .setName('frontierintro')
     .setDescription('Admin: draft the Frontier intro post (captains, honours, rules, signup link)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+  new SlashCommandBuilder()
+    .setName('trackclub')
+    .setDescription("Admin: add a community club to the site's CASUAL → CLUBS tracker")
+    .addStringOption(o =>
+      o.setName('club')
+        .setDescription('Club name (or numeric club ID)')
+        .setRequired(true))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder()
     .setName('punish')
@@ -463,6 +472,46 @@ async function handleTestFriendly(interaction: ChatInputCommandInteraction): Pro
   );
 }
 
+async function handleTrackClub(
+  interaction: ChatInputCommandInteraction,
+  ctx: { siteUrl: string; readOnly: boolean },
+): Promise<void> {
+  if (ctx.readOnly) {
+    await interaction.reply({
+      content: '⚠ Bot is in read-only test mode — tracking a club writes to the database. Unset BOT_READ_ONLY for the real run.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  await interaction.deferReply();
+
+  const input = interaction.options.getString('club', true).trim();
+  const platform = (await getConfig()).eaPlatform || 'common-gen5';
+
+  const res = await resolveClub(input, platform);
+  if (!res.ok) {
+    await interaction.editReply(`${res.error}\nYou can also paste the numeric club ID directly.`);
+    return;
+  }
+
+  const already = await areClubsTracked([res.id]);
+  if (already.has(res.id)) {
+    await interaction.editReply(`**${res.name}** (\`${res.id}\`) is already tracked — see ${ctx.siteUrl} → CASUAL → CLUBS.`);
+    return;
+  }
+
+  await addTrackedClubs(interaction.user.id, [res.id]);
+  // First sync right now so the club card isn't empty when they go look.
+  const sync = await refreshTrackedClub(res.id, platform);
+  await interaction.editReply(
+    `📡 Now tracking **${res.name}** (\`${res.id}\`).` +
+    (sync.ok
+      ? ` First sync done — live at ${ctx.siteUrl} → **CASUAL → CLUBS**.`
+      : ` EA didn't answer the first sync — the tracker retries automatically every couple of minutes.`) +
+    ` Stats refresh on their own from here; remove clubs in Admin → Clubs.`,
+  );
+}
+
 export async function dispatch(
   interaction: Interaction,
   ctx: { siteUrl: string; readOnly: boolean },
@@ -513,6 +562,9 @@ export async function dispatch(
         break;
       case 'frontierintro':
         await handleFrontierIntro(interaction, ctx.siteUrl);
+        break;
+      case 'trackclub':
+        await handleTrackClub(interaction, ctx);
         break;
       case 'punish':
         await handlePunish(interaction, ctx.readOnly);

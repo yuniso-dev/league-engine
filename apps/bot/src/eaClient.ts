@@ -219,13 +219,14 @@ export async function searchClubs(name: string, platform: string): Promise<EaClu
     .slice(0, 25);
 }
 
-/** Look up clubs by ID (name + record) — validates pasted IDs and puts real
- *  names on reports instead of "club 118660". */
+/** Look up clubs by ID (name + crest identity) — validates pasted IDs and puts
+ *  real names on reports instead of "club 118660". teamId/crestAssetId pick
+ *  the in-game crest artwork (used by the site's club tracker). */
 export async function fetchClubsInfo(
   clubIds: string[],
   platform: string,
-): Promise<Map<string, { name: string }>> {
-  const out = new Map<string, { name: string }>();
+): Promise<Map<string, { name: string; teamId: string | null; crestAssetId: string | null }>> {
+  const out = new Map<string, { name: string; teamId: string | null; crestAssetId: string | null }>();
   if (clubIds.length === 0) return out;
   const url = `${BASE}/clubs/info?platform=${encodeURIComponent(platform)}&clubIds=${encodeURIComponent(clubIds.join(','))}`;
   let data: unknown;
@@ -236,9 +237,48 @@ export async function fetchClubsInfo(
   }
   if (typeof data !== 'object' || data === null) return out;
   for (const [id, value] of Object.entries(data as Record<string, unknown>)) {
-    if (typeof value === 'object' && value !== null && 'name' in value && (value as { name?: unknown }).name != null) {
-      out.set(String(id), { name: String((value as { name: unknown }).name) });
-    }
+    if (typeof value !== 'object' || value === null) continue;
+    const v = value as Record<string, unknown>;
+    if (v.name == null) continue;
+    const kit = (typeof v.customKit === 'object' && v.customKit !== null ? v.customKit : {}) as Record<string, unknown>;
+    out.set(String(id), {
+      name: String(v.name),
+      teamId: v.teamId != null ? String(v.teamId) : null,
+      crestAssetId: kit.crestAssetId != null ? String(kit.crestAssetId) : null,
+    });
   }
   return out;
+}
+
+/** Career club stats — clubs/overallStats. Fetched one club at a time so a
+ *  malformed entry for one club can't poison a batch. Returns EA's raw
+ *  (stringly-typed) record, or null when EA has nothing. */
+export async function fetchClubOverall(
+  clubId: string,
+  platform: string,
+): Promise<Record<string, unknown> | null> {
+  const url = `${BASE}/clubs/overallStats?platform=${encodeURIComponent(platform)}&clubIds=${encodeURIComponent(clubId)}`;
+  const data = await getJson(url);
+  const list: unknown[] = Array.isArray(data)
+    ? data
+    : typeof data === 'object' && data !== null
+      ? Object.values(data)
+      : [];
+  const first = list.find(e => typeof e === 'object' && e !== null);
+  return (first as Record<string, unknown> | undefined) ?? null;
+}
+
+/** Per-member career stats — members/stats. Raw EA member records. */
+export async function fetchClubMembers(
+  clubId: string,
+  platform: string,
+): Promise<Record<string, unknown>[]> {
+  const url = `${BASE}/members/stats?platform=${encodeURIComponent(platform)}&clubId=${encodeURIComponent(clubId)}`;
+  const data = await getJson(url);
+  const list: unknown[] = Array.isArray(data)
+    ? data
+    : typeof data === 'object' && data !== null && Array.isArray((data as { members?: unknown }).members)
+      ? (data as { members: unknown[] }).members
+      : [];
+  return list.filter((m): m is Record<string, unknown> => typeof m === 'object' && m !== null);
 }
