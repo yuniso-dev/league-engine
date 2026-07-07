@@ -19,6 +19,7 @@ import { syncCasualMatches } from './casualSync.js';
 import { syncFrontierMatches } from './frontierSync.js';
 import { pollFriendlyTest } from './friendlyTest.js';
 import { pollNotifier } from './notifier.js';
+import { pollClubTracker } from './clubTracker.js';
 import { syncRoles } from './roleSync.js';
 import { fetchAllMembers } from './guildMembers.js';
 
@@ -45,6 +46,7 @@ const MEMBER_SYNC_MS = 6 * 3_600_000; // periodic full member re-sync
 const GUILD_RETRY_MS = 60_000;        // re-check config.guildId when unset
 const CASUAL_POLL_MS = 10 * 60_000;   // EA Clubs API poll (unofficial API — be gentle)
 const FRONTIER_POLL_MS = 2 * 60_000;  // live-tournament result ingest (no-op unless a linked Frontier is live)
+const CLUB_TRACK_MS = 2 * 60_000;     // tracked-club snapshots, a few stalest clubs per pass
 
 // ── client ────────────────────────────────────────────────────────────────────
 const client = new Client({
@@ -165,6 +167,11 @@ client.once(Events.ClientReady, async ready => {
   // DMs to real members are a write we must never make from a dry run.
   if (!READ_ONLY) {
     every(60_000, 'notifier', () => pollNotifier(ready, SITE_URL));
+  }
+
+  // Tracked community clubs (CASUAL → CLUBS): round-robin snapshot refresh.
+  if (!READ_ONLY) {
+    every(CLUB_TRACK_MS, 'club tracker', pollClubTracker);
   }
 
   // Role mirror: signed-up role tracks the open Frontier's roster, punished

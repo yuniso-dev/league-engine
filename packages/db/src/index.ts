@@ -80,6 +80,23 @@ export {
   getActiveSanction,
 } from './queries/sanctions';
 export type { PlayerSanction, SanctionType } from './queries/sanctions';
+export {
+  addTrackedClubs,
+  removeTrackedClub,
+  listTrackedClubs,
+  getTrackedClub,
+  listTrackedClubIds,
+  updateTrackedClubSnapshot,
+  markTrackedClubError,
+  areClubsTracked,
+} from './queries/trackedClubs';
+export type {
+  TrackedClub,
+  TrackedClubInfo,
+  TrackedClubOverall,
+  TrackedClubMember,
+  TrackedClubMatch,
+} from './queries/trackedClubs';
 export type {
   LinkedLiveTournament,
   FrontierIngestInput,

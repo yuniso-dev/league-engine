@@ -386,6 +386,22 @@ create table player_sanctions (
 
 create index idx_sanctions_user on player_sanctions (user_id);
 
+-- ----------------------------------------------------------------------------
+--  TRACKED_CLUBS  -- community EA clubs shown on the CASUAL realm (0014)
+-- ----------------------------------------------------------------------------
+create table tracked_clubs (
+    club_id        text primary key,
+    name           text,
+    added_by       text not null,
+    added_at       timestamptz not null default now(),
+    info           jsonb,
+    overall        jsonb,
+    members        jsonb,
+    recent_matches jsonb,
+    fetched_at     timestamptz,
+    fetch_error    text
+);
+
 
 create index idx_mp_match             on match_participants (match_id);
 create index idx_history_user_week    on rating_history (user_id, week_of);

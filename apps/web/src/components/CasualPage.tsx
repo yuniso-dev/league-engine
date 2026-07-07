@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { CasualCareer, CasualHistoryMatch, CasualLeaderRow, LinkedCasualPlayer } from '@inazuma/db';
 import { Avatar } from '@/components/ui/Avatar';
 import { Bolt } from '@/components/ui/Bolt';
+import { ClubCrest } from '@/components/ui/ClubCrest';
 import { FlagIcon } from '@/components/ui/FlagIcon';
 import { RankMedal } from '@/components/ui/RankMedal';
 import GlassSelect from '@/components/ui/GlassSelect';
@@ -27,7 +28,23 @@ type Bootstrap = {
 
 type PlayerData = { career: CasualCareer | null; matches: CasualHistoryMatch[] };
 
-type SubTab = 'history' | 'performance' | 'board';
+type ClubCard = {
+  clubId: string;
+  name: string | null;
+  teamId: string | null;
+  crestAssetId: string | null;
+  wins: number | null;
+  ties: number | null;
+  losses: number | null;
+  skillRating: number | null;
+  bestDivision: number | null;
+  squadSize: number | null;
+  goalsPerMatch: number | null;
+  againstPerMatch: number | null;
+  fetchedAt: string | null;
+};
+
+type SubTab = 'history' | 'performance' | 'board' | 'clubs';
 
 const playerCache = new Map<string, PlayerData>();
 
@@ -79,6 +96,8 @@ export const CasualPage = memo(function CasualPage({ active, mePublicId }: {
   const [playerData, setPlayerData] = useState<PlayerData | null>(null);
   const [playerLoading, setPlayerLoading] = useState(false);
   const [wanted, setWanted] = useState(false);
+  const [clubs, setClubs] = useState<ClubCard[] | null>(null);
+  const [clubsError, setClubsError] = useState(false);
 
   useEffect(() => { if (active) setWanted(true); }, [active]);
 
@@ -119,6 +138,17 @@ export const CasualPage = memo(function CasualPage({ active, mePublicId }: {
     return () => { alive = false; };
   }, [selected, tab]);
 
+  // Tracked-clubs grid, once, on first open of the CLUBS tab.
+  useEffect(() => {
+    if (tab !== 'clubs' || clubs !== null) return;
+    let alive = true;
+    fetch('/api/casual/clubs')
+      .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json() as Promise<{ clubs: ClubCard[] }>; })
+      .then(data => { if (alive) setClubs(data.clubs); })
+      .catch(() => { if (alive) setClubsError(true); });
+    return () => { alive = false; };
+  }, [tab, clubs]);
+
   const pickerOptions = useMemo(() =>
     (boot?.players ?? []).map(p => ({
       value: p.publicId,
@@ -132,6 +162,7 @@ export const CasualPage = memo(function CasualPage({ active, mePublicId }: {
     { id: 'history', label: 'Match history' },
     { id: 'performance', label: 'Performance' },
     { id: 'board', label: 'Leaderboard' },
+    { id: 'clubs', label: 'Clubs' },
   ];
 
   return (
@@ -393,6 +424,63 @@ export const CasualPage = memo(function CasualPage({ active, mePublicId }: {
                       </div>
                       <div style={{ fontFamily: FONT_M, fontSize: 8, letterSpacing: 1, color: T.faint, marginTop: 3 }}>
                         AVG R
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )
+          )}
+
+          {/* ── CLUBS — tracked community clubs ── */}
+          {tab === 'clubs' && (
+            clubsError ? (
+              <EmptyCard title="STORM INTERFERENCE">
+                Club data didn&apos;t load — try again in a minute.
+              </EmptyCard>
+            ) : clubs === null ? (
+              <div style={{ fontFamily: FONT_B, color: T.faint, fontSize: 13, textAlign: 'center', padding: '40px 0' }}>
+                Loading clubs…
+              </div>
+            ) : clubs.length === 0 ? (
+              <EmptyCard title="NO CLUBS TRACKED YET">
+                Admins add community clubs with /trackclub in Discord (or Admin → Clubs) —
+                every club&apos;s record, squad and recent form shows up here.
+              </EmptyCard>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(285px, 1fr))', gap: 10 }}>
+                {clubs.map(c => (
+                  <Link
+                    key={c.clubId}
+                    href={`/casual/club/${c.clubId}`}
+                    className="tap"
+                    style={{
+                      ...glass({ padding: '14px 16px' }),
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      textDecoration: 'none',
+                      borderLeft: `3px solid ${rgba(ACCENT, 0.45)}`,
+                    }}
+                  >
+                    <ClubCrest name={c.name ?? '?'} teamId={c.teamId} crestAssetId={c.crestAssetId} size={42} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontFamily: FONT_B, fontWeight: 700, fontSize: 14.5, color: T.text,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {c.name ?? <span style={{ color: T.faint, fontStyle: 'italic' }}>syncing…</span>}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, flexWrap: 'wrap' }}>
+                        {c.wins !== null && <Pill label="W·D·L" value={`${c.wins}·${c.ties}·${c.losses}`} />}
+                        {c.goalsPerMatch !== null && <Pill label="GF/M" value={c.goalsPerMatch.toFixed(2)} c={T.win} />}
+                        {c.squadSize !== null && <Pill label="SQUAD" value={c.squadSize} />}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'center', flexShrink: 0, minWidth: 48 }}>
+                      <div style={{ fontFamily: FONT_D, fontSize: 20, color: c.skillRating != null ? lighten(ACCENT, 0.3) : T.faint, lineHeight: 1 }}>
+                        {c.skillRating ?? '—'}
+                      </div>
+                      <div style={{ fontFamily: FONT_M, fontSize: 8, letterSpacing: 1, color: T.faint, marginTop: 3 }}>
+                        SKILL R
                       </div>
                     </div>
                   </Link>

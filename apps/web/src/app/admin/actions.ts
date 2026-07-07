@@ -34,6 +34,8 @@ import {
   issueSanction,
   liftSanction,
   getLatestOpenTournament,
+  addTrackedClubs,
+  removeTrackedClub,
   voidMatchResult,
   type SanctionType,
   recordMatchResult,
@@ -894,6 +896,53 @@ export async function removeExclusionAction(
     revalidatePath(`/admin/tournaments/${tournamentId}/awards`);
     revalidatePath(`/frontier/${tournamentId}`);
     return { ok: true, message: 'Exclusion lifted.' };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+/** Register EA clubs on the tracker — IDs only (the site can't reach EA;
+ *  the bot fills names + stats within minutes; /trackclub adds by name). */
+export async function addTrackedClubsAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const raw = str(formData, 'clubIds');
+    if (!raw) return { error: 'Paste at least one EA club ID.' };
+
+    const ids = raw.split(/[\s,]+/).filter(Boolean);
+    const bad = ids.filter(id => !/^\d{1,12}$/.test(id));
+    if (bad.length > 0) {
+      return { error: `Not numeric club IDs: ${bad.slice(0, 5).join(', ')}. Find IDs with /findclub or /trackclub in Discord.` };
+    }
+
+    const added = await addTrackedClubs(admin.discordId, ids);
+    revalidatePath('/admin/clubs');
+    return {
+      ok: true,
+      message: added === 0
+        ? 'All of those were already tracked.'
+        : `Tracking ${added} new club${added === 1 ? '' : 's'} — the bot fills in names and stats within a few minutes.`,
+    };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function removeTrackedClubAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const clubId = str(formData, 'clubId');
+    if (!clubId) return { error: 'Missing club.' };
+
+    await removeTrackedClub(admin.discordId, clubId);
+    revalidatePath('/admin/clubs');
+    return { ok: true, message: 'Club removed from the tracker.' };
   } catch (e) {
     return { error: message(e) };
   }
