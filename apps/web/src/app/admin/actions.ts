@@ -31,7 +31,11 @@ import {
   discardPendingMatch,
   removeTournamentExclusion,
   setTournamentExclusion,
+  issueSanction,
+  liftSanction,
+  getLatestOpenTournament,
   voidMatchResult,
+  type SanctionType,
   recordMatchResult,
   removeFromDraftPool,
   updateMatchStats,
@@ -638,9 +642,18 @@ export async function updateConfigAction(
     // FRONTIER: the standing rules block /frontierintro pastes into its draft.
     const frontierRules = str(formData, 'frontierRules').slice(0, 4000) || null;
 
+    // Discord roles the bot mirrors (signed-up roster / active suspensions).
+    const signupRoleId = str(formData, 'signupRoleId') || null;
+    const punishedRoleId = str(formData, 'punishedRoleId') || null;
+    for (const [label, id] of [['Signed-up', signupRoleId], ['Punished', punishedRoleId]] as const) {
+      if (id && !/^\d{5,25}$/.test(id)) {
+        return { error: `${label} role ID must be a numeric Discord role ID (right-click the role → Copy Role ID).` };
+      }
+    }
+
     await updateConfig(admin.discordId, {
       currentSeason, eloBase, kPlacement, kEstablished, placementGames, movMultiplierCap,
-      guildId, rankingsMessageId, eaClubIds, eaPlatform, frontierRules,
+      guildId, rankingsMessageId, eaClubIds, eaPlatform, frontierRules, signupRoleId, punishedRoleId,
     });
 
     revalidatePath('/admin/settings');
@@ -881,6 +894,63 @@ export async function removeExclusionAction(
     revalidatePath(`/admin/tournaments/${tournamentId}/awards`);
     revalidatePath(`/frontier/${tournamentId}`);
     return { ok: true, message: 'Exclusion lifted.' };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+/** Suspend a player (no-show / abandoned mid-tournament / other). */
+export async function issueSanctionAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const publicId = str(formData, 'publicId');
+    if (!publicId) return { error: 'Missing player.' };
+
+    const type = str(formData, 'type');
+    if (type !== 'no_show' && type !== 'abandon' && type !== 'other') return { error: 'Pick a sanction type.' };
+
+    const frontiersRaw = str(formData, 'frontiers');
+    const frontiers = frontiersRaw ? parseInt(frontiersRaw, 10) : undefined;
+    if (frontiers !== undefined && (!Number.isInteger(frontiers) || frontiers < 1 || frontiers > 10)) {
+      return { error: 'Frontiers must be 1–10 (leave blank for the default).' };
+    }
+
+    // The open Frontier is the offence context — its completion never serves
+    // the ban, so "sits out the NEXT one" means exactly that.
+    const open = await getLatestOpenTournament();
+
+    const sanction = await issueSanction(admin.discordId, {
+      publicId,
+      type: type as SanctionType,
+      reason: str(formData, 'reason').slice(0, 300) || null,
+      frontiers,
+      tournamentId: open?.id ?? null,
+    });
+    revalidatePath(`/admin/players/${publicId}`);
+    const n = sanction.frontiersRemaining;
+    return { ok: true, message: `Suspended for ${n} Frontier${n === 1 ? '' : 's'} — role + DM follow within a minute.` };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+/** Lift one suspension early. */
+export async function liftSanctionAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const sanctionId = str(formData, 'sanctionId');
+    const publicId = str(formData, 'playerPublicId');
+    if (!sanctionId) return { error: 'Missing sanction.' };
+
+    await liftSanction(admin.discordId, sanctionId);
+    if (publicId) revalidatePath(`/admin/players/${publicId}`);
+    return { ok: true, message: 'Suspension lifted.' };
   } catch (e) {
     return { error: message(e) };
   }

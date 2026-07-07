@@ -108,6 +108,12 @@ export default function SettingsForm({ config }: Props) {
           <Field label="Rankings message ID" caption="ID of the Discord message the bot will edit to keep rankings up to date. Leave blank until the bot is set up.">
             <input name="rankingsMessageId" defaultValue={config.rankingsMessageId ?? ''} autoComplete="off" style={inputBase} />
           </Field>
+          <Field label="Signed-up role ID" caption="Role the bot gives everyone signed up for the open Frontier — added on signup, removed on withdrawal, cleared when it completes. Right-click the role → Copy Role ID (the bot's role must sit above it). Blank = off.">
+            <input name="signupRoleId" defaultValue={config.signupRoleId ?? ''} autoComplete="off" style={inputBase} />
+          </Field>
+          <Field label="Punished role ID" caption="Role the bot gives players with an active suspension (/punish, or the player page below) — removed automatically when the ban is served or pardoned. Blank = off.">
+            <input name="punishedRoleId" defaultValue={config.punishedRoleId ?? ''} autoComplete="off" style={inputBase} />
+          </Field>
         </div>
       </div>
 

@@ -195,6 +195,8 @@ export const config = pgTable('config', {
   eaClubIds:          text('ea_club_ids'),   // comma-separated EA club IDs the bot polls
   eaPlatform:         text('ea_platform').notNull().default('common-gen5'),
   frontierRules:      text('frontier_rules'), // standing rules block for /frontierintro
+  signupRoleId:       text('signup_role_id'),   // Discord role mirroring the open Frontier's signups
+  punishedRoleId:     text('punished_role_id'), // Discord role mirroring active suspensions
   updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -248,6 +250,22 @@ export const eaPendingMatches = pgTable('ea_pending_matches', {
   resolvedBy:   text('resolved_by'),
   resolvedAt:   timestamp('resolved_at', { withTimezone: true }),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Suspensions for no-shows and mid-tournament leavers. A sanction blocks
+// signing up while frontiers_remaining > 0 and it hasn't been lifted; each
+// completed Frontier (other than the offence tournament) serves one unit.
+export const playerSanctions = pgTable('player_sanctions', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  userId:             text('user_id').notNull().references(() => users.discordId, { onDelete: 'cascade' }),
+  type:               text('type').notNull(), // 'no_show' | 'abandon' | 'other'
+  reason:             text('reason'),
+  tournamentId:       uuid('tournament_id').references(() => tournaments.id, { onDelete: 'set null' }),
+  frontiersRemaining: integer('frontiers_remaining').notNull().default(1),
+  issuedBy:           text('issued_by').notNull(),
+  issuedAt:           timestamp('issued_at', { withTimezone: true }).notNull().defaultNow(),
+  liftedBy:           text('lifted_by'),
+  liftedAt:           timestamp('lifted_at', { withTimezone: true }),
 });
 
 // Live voice-channel presence, written by the Discord bot.

@@ -18,6 +18,7 @@ import { CLUB_PICK_ID, armClubMenuTimeout, buildClubMenu, cancelClubSession, clu
 import { closeAwardPoll, startAwardPoll } from './awardPoll.js';
 import { handleSpinOrder } from './spinOrder.js';
 import { handleFrontierIntro } from './frontierIntro.js';
+import { handlePardon, handlePunish, handleSuspensions } from './sanctions.js';
 import { frontierWatchState, syncFrontierMatches } from './frontierSync.js';
 
 const definitions = [
@@ -133,6 +134,33 @@ const definitions = [
   new SlashCommandBuilder()
     .setName('frontierintro')
     .setDescription('Admin: draft the Frontier intro post (captains, honours, rules, signup link)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+  new SlashCommandBuilder()
+    .setName('punish')
+    .setDescription('Admin: suspend a player — blocks Frontier signups until served or pardoned')
+    .addUserOption(o => o.setName('user').setDescription('Player to suspend').setRequired(true))
+    .addStringOption(o =>
+      o.setName('type').setDescription('What they did').setRequired(true)
+        .addChoices(
+          { name: 'No-show — signed up, never arrived (sits out the next Frontier)', value: 'no_show' },
+          { name: 'Abandoned mid-tournament — left their team hanging (sits out the next 2)', value: 'abandon' },
+          { name: 'Other rule violation (sits out the next Frontier)', value: 'other' },
+        ))
+    .addStringOption(o => o.setName('reason').setDescription('Shown to the player in their DM'))
+    .addIntegerOption(o =>
+      o.setName('frontiers')
+        .setDescription('Override how many Frontiers they sit out (1–10)')
+        .setMinValue(1)
+        .setMaxValue(10))
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+  new SlashCommandBuilder()
+    .setName('pardon')
+    .setDescription("Admin: lift ALL of a player's active suspensions early")
+    .addUserOption(o => o.setName('user').setDescription('Player to pardon').setRequired(true))
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+  new SlashCommandBuilder()
+    .setName('suspensions')
+    .setDescription("Admin: who's currently suspended and for how long")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 ];
 
@@ -485,6 +513,15 @@ export async function dispatch(
         break;
       case 'frontierintro':
         await handleFrontierIntro(interaction, ctx.siteUrl);
+        break;
+      case 'punish':
+        await handlePunish(interaction, ctx.readOnly);
+        break;
+      case 'pardon':
+        await handlePardon(interaction, ctx.readOnly);
+        break;
+      case 'suspensions':
+        await handleSuspensions(interaction);
         break;
       case 'frontierstatus':
         await handleFrontierStatus(interaction);

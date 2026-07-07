@@ -3,6 +3,7 @@ import type { InferSelectModel } from 'drizzle-orm';
 import { getDb } from '../client';
 import { computeGroupTable } from './stats';
 import { markAttendedIfSignedUp } from './signups';
+import { serveSanctionsOnCompletion } from './sanctions';
 import {
   adminActions,
   matches,
@@ -163,12 +164,26 @@ export async function updateTournamentStatus(
     if (!team) throw new Error('Winner team does not belong to this tournament.');
   }
 
+  const [before] = await getDb()
+    .select({ status: tournaments.status })
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1);
+
   await getDb()
     .update(tournaments)
     .set({ status, winnerTeamId, updatedAt: new Date() })
     .where(eq(tournaments.id, tournamentId));
 
-  await logAdminAction(adminId, 'tournament.status', { tournamentId, status, winnerTeamId });
+  // A finished Frontier serves one unit off every active suspension (the
+  // offence tournament never serves its own). Only on the FIRST transition
+  // to completed — re-toggling live↔completed must not double-serve.
+  let sanctionsServed = 0;
+  if (status === 'completed' && before && before.status !== 'completed') {
+    sanctionsServed = await serveSanctionsOnCompletion(tournamentId);
+  }
+
+  await logAdminAction(adminId, 'tournament.status', { tournamentId, status, winnerTeamId, sanctionsServed });
 }
 
 /** Initialised, non-blacklisted players for admin pickers (team creation, participants). */

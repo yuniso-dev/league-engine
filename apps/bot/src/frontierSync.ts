@@ -293,6 +293,7 @@ async function alertAdminsDnf(
     (differs ? `\nPlayer goals suggest the real score was **${statOur}–${statOpp}**.` : '') +
     `\nIf they're replaying it: hit **VOID** on the result (admin tournament page) — the fixture reopens ` +
     `and the replay auto-records. If the score just needs correcting: delete the result and re-enter it ` +
-    `manually. The result is tagged DNF on the site either way.`,
+    `manually. The result is tagged DNF on the site either way.` +
+    `\nIf someone rage-quit or backed out, **/punish** suspends them from future Frontiers.`,
   );
 }
