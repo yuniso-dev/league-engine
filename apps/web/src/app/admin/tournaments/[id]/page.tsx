@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { computeGroupTable, getAdminTournament } from '@inazuma/db';
+import { computeGroupTable, getAdminTournament, listPendingMatches } from '@inazuma/db';
 import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, FONT_M, T, glass, rgba } from '@/lib/realm-colors';
 import { ADMIN_ACCENT, STAGE_LABELS, STATUS_COLORS } from '@/components/admin/ui';
@@ -10,6 +10,7 @@ import TeamClubLink from '@/components/admin/TeamClubLink';
 import MatchEntryForm from '@/components/admin/MatchEntryForm';
 import DeleteButton from '@/components/admin/DeleteButton';
 import BracketControls from '@/components/admin/BracketControls';
+import PendingGames from '@/components/admin/PendingGames';
 import FixtureResultForm from '@/components/admin/FixtureResultForm';
 import MatchStatsForm from '@/components/admin/MatchStatsForm';
 import { LeagueTable } from '@/components/LeagueTable';
@@ -28,7 +29,11 @@ const sectionTitle: React.CSSProperties = {
 
 export default async function AdminTournamentPage({ params }: { params: { id: string } }) {
   // Role gate + tournament in one concurrent pass — no request waterfall.
-  const [, detail] = await Promise.all([requireAdmin(), getAdminTournament(params.id)]);
+  const [, detail, pendingGames] = await Promise.all([
+    requireAdmin(),
+    getAdminTournament(params.id),
+    listPendingMatches(params.id).catch(() => []),
+  ]);
   if (!detail) notFound();
 
   const { tournament, teams, matches } = detail;
@@ -278,6 +283,9 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
           </div>
         </>
       )}
+
+      {/* ── Captured games (replays after bugs) awaiting a decision ── */}
+      <PendingGames games={pendingGames} tournamentId={tournament.id} />
 
       {/* ── Results ── */}
       <h2 style={sectionTitle}>RESULTS</h2>

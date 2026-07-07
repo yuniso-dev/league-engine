@@ -1,11 +1,12 @@
 import type { Client } from 'discord.js';
 import {
+  addPendingMatch,
   getAdminDiscordIds,
   getConfig,
   getLinkedLiveTournaments,
   ingestFrontierResult,
   isEaMatchIngested,
-  type FrontierIngestPlayer,
+  type PendingPlayer,
 } from '@inazuma/db';
 import { eaNum, fetchClubMatches, type EaMatchType, type EaRawMatch } from './eaClient.js';
 import { sendDm } from './notifier.js';
@@ -113,20 +114,8 @@ export async function syncFrontierMatches(client: Client<true>): Promise<Frontie
 
           if (await isEaMatchIngested(eaMatchId)) continue;
 
-          // Oldest unscored fixture between these two teams, either orientation.
-          const fixture = t.unscoredFixtures.find(
-            f =>
-              (f.homeTeamId === ourTeam.teamId && f.awayTeamId === oppTeam.teamId) ||
-              (f.homeTeamId === oppTeam.teamId && f.awayTeamId === ourTeam.teamId),
-          );
-          if (!fixture) {
-            console.warn(`[frontier] EA match ${eaMatchId} (${ourTeam.teamName} vs ${oppTeam.teamName}) has no unscored fixture — skipped`);
-            continue;
-          }
-
           const ourGoals = eaNum(m.clubs[clubId]?.goals);
           const oppGoals = eaNum(m.clubs[clubId]?.goalsAgainst ?? m.clubs[oppId]?.goals);
-          const homeIsUs = fixture.homeTeamId === ourTeam.teamId;
 
           // A side quitting turns the score into a forfeit (a 90'-quit draw
           // becomes 3–0) while the real stats survive — tag it and tell the
@@ -134,7 +123,7 @@ export async function syncFrontierMatches(client: Client<true>): Promise<Frontie
           const dnf =
             eaNum(m.clubs[clubId]?.winnerByDnf) > 0 || eaNum(m.clubs[oppId]?.winnerByDnf) > 0;
 
-          const playersOf = (cId: string, teamId: string, concededByTeam: number): FrontierIngestPlayer[] =>
+          const playersOf = (cId: string, teamId: string, concededByTeam: number): PendingPlayer[] =>
             Object.values(m.players?.[cId] ?? {})
               .filter(p => (p.playername ?? '').trim().length > 0)
               .map(p => ({
@@ -151,7 +140,53 @@ export async function syncFrontierMatches(client: Client<true>): Promise<Frontie
                 mom: eaNum(p.mom) > 0,
                 rating: p.rating != null ? eaNum(p.rating) : null,
                 position: p.pos ? String(p.pos) : null,
+                secondsPlayed: eaNum(p.secondsPlayed),
               }));
+
+          // Oldest unscored fixture between these two teams, either orientation.
+          const fixture = t.unscoredFixtures.find(
+            f =>
+              (f.homeTeamId === ourTeam.teamId && f.awayTeamId === oppTeam.teamId) ||
+              (f.homeTeamId === oppTeam.teamId && f.awayTeamId === ourTeam.teamId),
+          );
+
+          if (!fixture) {
+            // No open fixture — likely a REPLAY after a bugged game. Never
+            // discard it: capture everything and let the admin decide later
+            // (they're probably mid-game right now and can't).
+            const allPlayers = [
+              ...playersOf(clubId, ourTeam.teamId, oppGoals),
+              ...playersOf(oppId, oppTeam.teamId, ourGoals),
+            ];
+            const durationMin = Math.round(Math.max(0, ...allPlayers.map(p => p.secondsPlayed)) / 60) || null;
+            const added = await addPendingMatch({
+              eaMatchId,
+              tournamentId: t.tournamentId,
+              teamAId: ourTeam.teamId,
+              teamBId: oppTeam.teamId,
+              scoreA: ourGoals,
+              scoreB: oppGoals,
+              dnf,
+              durationMin,
+              playedAt: new Date(eaNum(m.timestamp) * 1000),
+              players: allPlayers,
+            });
+            if (added) {
+              console.log(`[frontier] 🧾 captured extra game ${ourTeam.teamName} ${ourGoals}–${oppGoals} ${oppTeam.teamName} (~${durationMin ?? '?'}')`);
+              await alertAdmins(
+                client,
+                `🧾 **Extra game captured**: **${ourTeam.teamName} ${ourGoals}–${oppGoals} ${oppTeam.teamName}**` +
+                ` (~${durationMin ?? '?'}' in-game${dnf ? ', DNF' : ''}) — their fixture already has a result, so this is` +
+                ` probably the replay after a bugged game. Nothing was overwritten; when you're out of your game,` +
+                ` review it under **CAPTURED GAMES** on the admin tournament page: **APPLY** swaps it onto the fixture` +
+                ` (the old game is voided), **DISCARD** bins it. Stat merges for a part-played game: apply one, then` +
+                ` hand-edit in ⚽ STATS.`,
+              );
+            }
+            continue;
+          }
+
+          const homeIsUs = fixture.homeTeamId === ourTeam.teamId;
 
           const outcome = await ingestFrontierResult({
             matchId: fixture.matchId,

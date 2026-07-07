@@ -27,6 +27,8 @@ import {
   grantAward,
   grantAwardIfAbsent,
   recomputeRanks,
+  applyPendingMatch,
+  discardPendingMatch,
   removeTournamentExclusion,
   setTournamentExclusion,
   voidMatchResult,
@@ -879,6 +881,43 @@ export async function removeExclusionAction(
     revalidatePath(`/admin/tournaments/${tournamentId}/awards`);
     revalidatePath(`/frontier/${tournamentId}`);
     return { ok: true, message: 'Exclusion lifted.' };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+/** APPLY a captured game onto its fixture (voiding the game it replaces). */
+export async function applyPendingAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const eaMatchId = str(formData, 'eaMatchId');
+    const tournamentId = str(formData, 'tournamentId');
+    if (!eaMatchId) return { error: 'Missing captured game.' };
+
+    const message_ = await applyPendingMatch(admin.discordId, eaMatchId);
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return { ok: true, message: message_ };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function discardPendingAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+    const eaMatchId = str(formData, 'eaMatchId');
+    const tournamentId = str(formData, 'tournamentId');
+    if (!eaMatchId) return { error: 'Missing captured game.' };
+
+    await discardPendingMatch(admin.discordId, eaMatchId);
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return { ok: true, message: 'Discarded.' };
   } catch (e) {
     return { error: message(e) };
   }

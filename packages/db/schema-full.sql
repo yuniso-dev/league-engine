@@ -340,6 +340,23 @@ create table voided_ea_matches (
     reason       text
 );
 
+create table ea_pending_matches (
+    ea_match_id   text primary key,
+    tournament_id uuid not null references tournaments(id) on delete cascade,
+    team_a_id     uuid not null references teams(id) on delete cascade,
+    team_b_id     uuid not null references teams(id) on delete cascade,
+    score_a       integer not null,
+    score_b       integer not null,
+    dnf           boolean not null default false,
+    duration_min  integer,
+    played_at     timestamptz not null,
+    players       jsonb not null,
+    status        text not null default 'pending',
+    resolved_by   text,
+    resolved_at   timestamptz,
+    created_at    timestamptz not null default now()
+);
+
 create table tournament_exclusions (
     tournament_id uuid not null references tournaments(id) on delete cascade,
     user_id       text not null references users(discord_id) on delete cascade,

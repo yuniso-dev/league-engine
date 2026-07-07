@@ -230,6 +230,26 @@ export const tournamentExclusions = pgTable('tournament_exclusions', {
   pk: primaryKey({ columns: [table.tournamentId, table.userId] }),
 }));
 
+// Captured games: every EA game between linked clubs is kept even when its
+// fixture is already scored (replay-after-a-bug). Admin reviews later:
+// APPLY swaps it onto the fixture, DISCARD bins it. Nothing is lost to timing.
+export const eaPendingMatches = pgTable('ea_pending_matches', {
+  eaMatchId:    text('ea_match_id').primaryKey(),
+  tournamentId: uuid('tournament_id').notNull().references(() => tournaments.id, { onDelete: 'cascade' }),
+  teamAId:      uuid('team_a_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
+  teamBId:      uuid('team_b_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
+  scoreA:       integer('score_a').notNull(),
+  scoreB:       integer('score_b').notNull(),
+  dnf:          boolean('dnf').notNull().default(false),
+  durationMin:  integer('duration_min'), // in-game minutes; 90 = full game, ~45 = half-time glitch
+  playedAt:     timestamp('played_at', { withTimezone: true }).notNull(),
+  players:      jsonb('players').notNull(), // full per-player stat lines as EA served them
+  status:       text('status').notNull().default('pending'), // pending | applied | discarded
+  resolvedBy:   text('resolved_by'),
+  resolvedAt:   timestamp('resolved_at', { withTimezone: true }),
+  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Live voice-channel presence, written by the Discord bot.
 export const voicePresence = pgTable('voice_presence', {
   discordId:   text('discord_id').primaryKey().references(() => users.discordId, { onDelete: 'cascade' }),
