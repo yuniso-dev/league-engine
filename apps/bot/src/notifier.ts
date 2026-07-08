@@ -90,7 +90,12 @@ export async function pollNotifier(client: Client<true>, siteUrl: string): Promi
   if (signups.length > 0) {
     await markSignupsNotified(signups.map(s => s.signupId));
     for (const s of signups) {
-      await sendDm(client, s.discordId, `✅ You're signed up for **${s.tournamentName}** — see you on the Frontier!`);
+      // No EA ID linked = their goals/assists/rating won't attach when the bot
+      // pulls the game from EA. Nudge them right in the confirmation.
+      const eaNote = s.eaLinked
+        ? ''
+        : `\n\n⚠️ **Link your EA ID** at ${siteUrl}/settings so your match stats count — without it, your goals, assists and rating won't attach.`;
+      await sendDm(client, s.discordId, `✅ You're signed up for **${s.tournamentName}** — see you on the Frontier!${eaNote}`);
     }
     console.log(`[notifier] sent ${signups.length} signup DM${signups.length === 1 ? '' : 's'}`);
   }

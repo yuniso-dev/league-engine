@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTournamentDetail, isSignedUp, runResilient } from '@inazuma/db';
 import { auth } from '@/auth';
+import { getCachedUserByDiscordId } from '@/lib/user';
 import { glass, REALMS, T, FONT_D, FONT_B, FONT_M, rgba } from '@/lib/realm-colors';
 import { STAGE_LABELS, STATUS_COLORS } from '@/lib/tournament-ui';
 import { BackPill } from '@/components/ui/BackPill';
@@ -36,10 +37,14 @@ export default async function FrontierDetailPage({ params }: Props) {
   const accent = REALMS[0].accent;
 
   const isLoggedIn = Boolean(session?.user?.discordId);
-  // Button state only — never let it take the page down.
+  // Button state + EA-link nudge only — never let either take the page down.
+  const me = session?.user?.discordId
+    ? await getCachedUserByDiscordId(session.user.discordId).catch(() => null)
+    : null;
   const signedUp = session?.user?.discordId
     ? await runResilient(() => isSignedUp(session.user.discordId!, tournament.id)).catch(() => false)
     : false;
+  const eaLinked = Boolean(me?.eaName && me.eaName.trim());
 
   const groupStages = matchesByStage.filter(s => s.stage === 'group');
   const knockoutStages = matchesByStage.filter(s => s.stage !== 'group');
@@ -147,6 +152,7 @@ export default async function FrontierDetailPage({ params }: Props) {
           status={tournament.status}
           isLoggedIn={isLoggedIn}
           signedUp={signedUp}
+          eaLinked={eaLinked}
           signups={signups}
         />
 

@@ -18,6 +18,8 @@ type Props = {
   status: 'upcoming' | 'live' | 'completed';
   isLoggedIn: boolean;
   signedUp: boolean;
+  /** False when the signed-in player has no EA ID — their stats won't attach. */
+  eaLinked: boolean;
   signups: PublicSignup[];
 };
 
@@ -84,10 +86,11 @@ function WithdrawForm({ tournamentId }: { tournamentId: string }) {
   );
 }
 
-export function SignupCard({ tournamentId, status, isLoggedIn, signedUp, signups }: Props) {
+export function SignupCard({ tournamentId, status, isLoggedIn, signedUp, eaLinked, signups }: Props) {
   const inVoice = signups.filter(s => s.inVoice).length;
   const open = status === 'upcoming';
   if (!open && signups.length === 0) return null;
+  const showEaWarning = open && isLoggedIn && !eaLinked;
 
   return (
     <div style={{
@@ -171,6 +174,27 @@ export function SignupCard({ tournamentId, status, isLoggedIn, signedUp, signups
         <p style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, margin: '14px 0 0', letterSpacing: 0.5, position: 'relative' }}>
           Nobody yet. Be the first name on the teamsheet.
         </p>
+      )}
+
+      {/* EA ID nudge — without it, this player's match stats never attach */}
+      {showEaWarning && (
+        <div style={{
+          marginTop: 16, position: 'relative',
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+          background: rgba('#E5A83B', 0.1), border: `1px solid ${rgba('#E5A83B', 0.4)}`,
+          borderRadius: 12, padding: '10px 14px',
+        }}>
+          <span style={{ fontFamily: FONT_B, fontSize: 12.5, color: T.text, flex: 1, minWidth: 200 }}>
+            ⚠️ <b>Link your EA ID</b> or your goals, assists and rating won&apos;t count — the bot reads stats from your EA persona.
+          </span>
+          <Link href="/settings" style={{
+            fontFamily: FONT_M, fontSize: 11, letterSpacing: 1, color: '#E5A83B',
+            border: `1px solid ${rgba('#E5A83B', 0.55)}`, borderRadius: 999, padding: '5px 12px',
+            textDecoration: 'none', whiteSpace: 'nowrap',
+          }}>
+            ✎ LINK EA ID
+          </Link>
+        </div>
       )}
 
       {/* CTA */}
