@@ -76,6 +76,11 @@ export default function TeamClubLink({ teamId, tournamentId, eaClubId }: {
       {state.error && (
         <p style={{ fontFamily: FONT_B, fontSize: 11, color: T.loss, margin: '6px 0 0' }}>{state.error}</p>
       )}
+      {state.ok && (
+        <p style={{ fontFamily: FONT_B, fontSize: 11, color: LIVE, margin: '6px 0 0' }}>
+          {state.message ?? '✓ Saved'}
+        </p>
+      )}
     </form>
   );
 }

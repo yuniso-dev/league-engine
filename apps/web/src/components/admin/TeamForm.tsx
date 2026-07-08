@@ -12,12 +12,12 @@ type Props = {
   takenPublicIds: string[];
 };
 
-function SubmitButton({ disabled }: { disabled: boolean }) {
+function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
-      disabled={pending || disabled}
+      disabled={pending}
       style={{
         padding: '11px 20px',
         background: ADMIN_ACCENT,
@@ -27,8 +27,8 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
         fontFamily: FONT_D,
         fontSize: 13,
         letterSpacing: 1.5,
-        cursor: pending || disabled ? 'not-allowed' : 'pointer',
-        opacity: pending || disabled ? 0.6 : 1,
+        cursor: pending ? 'not-allowed' : 'pointer',
+        opacity: pending ? 0.6 : 1,
       }}
     >
       {pending ? 'CREATING…' : 'CREATE TEAM'}
@@ -101,6 +101,9 @@ export default function TeamForm({ tournamentId, takenPublicIds }: Props) {
           </p>
         </div>
 
+        <label style={{ ...labelStyle, marginBottom: 6 }}>
+          Players <span style={{ color: T.dim, textTransform: 'none', letterSpacing: 0 }}>(optional — you can draft them in later)</span>
+        </label>
         <PlayerPicker
           key={resetKey}
           mode="multi"
@@ -112,9 +115,11 @@ export default function TeamForm({ tournamentId, takenPublicIds }: Props) {
         />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 14 }}>
-          <SubmitButton disabled={selected.size === 0} />
+          <SubmitButton />
           <span style={{ fontFamily: FONT_B, fontSize: 13, color: T.dim }}>
-            {selected.size} player{selected.size === 1 ? '' : 's'} selected
+            {selected.size === 0
+              ? 'empty team — assign a captain + roster on the Draft Board'
+              : `${selected.size} player${selected.size === 1 ? '' : 's'} selected`}
           </span>
           {state.error && (
             <span style={{ fontFamily: FONT_B, color: T.loss, fontSize: 13 }}>{state.error}</span>

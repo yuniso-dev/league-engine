@@ -74,6 +74,14 @@ function str(formData: FormData, key: string): string {
   return ((formData.get(key) as string) ?? '').trim();
 }
 
+/** The tournament form sends kickoff as a browser-resolved ISO instant (or ''
+ *  when blank). Returns the Date, null when unset, or 'invalid' on garbage. */
+function parseStartTime(raw: string): Date | null | 'invalid' {
+  if (!raw) return null;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? 'invalid' : d;
+}
+
 export async function createTournamentAction(
   _prev: AdminFormState,
   formData: FormData,
@@ -88,11 +96,15 @@ export async function createTournamentAction(
     const season = parseInt(str(formData, 'season'), 10);
     if (!Number.isInteger(season) || season < 1) return { error: 'Season must be a positive number.' };
 
+    const startTime = parseStartTime(str(formData, 'startTime'));
+    if (startTime === 'invalid') return { error: 'Kickoff time looks wrong — pick it again.' };
+
     id = await createTournament(admin.discordId, {
       name,
       season,
       ranked: formData.get('ranked') === 'on',
-      date: str(formData, 'date') || null,
+      date: startTime ? startTime.toISOString().slice(0, 10) : null,
+      startTime,
     });
     // New Frontier opens as 'upcoming' with signups live — announce it.
     await announceSignupsOpen({ id, name, season });
@@ -117,11 +129,15 @@ export async function updateTournamentAction(
     const season = parseInt(str(formData, 'season'), 10);
     if (!Number.isInteger(season) || season < 1) return { error: 'Season must be a positive number.' };
 
+    const startTime = parseStartTime(str(formData, 'startTime'));
+    if (startTime === 'invalid') return { error: 'Kickoff time looks wrong — pick it again.' };
+
     await updateTournament(admin.discordId, tournamentId, {
       name,
       season,
       ranked: formData.get('ranked') === 'on',
-      date: str(formData, 'date') || null,
+      date: startTime ? startTime.toISOString().slice(0, 10) : null,
+      startTime,
     });
   } catch (e) {
     return { error: message(e) };
@@ -234,7 +250,7 @@ export async function setTeamClubAction(
 
     await setTeamEaClub(admin.discordId, teamId, eaClubIdRaw || null);
     revalidatePath(`/admin/tournaments/${tournamentId}`);
-    return { ok: true };
+    return { ok: true, message: eaClubIdRaw ? `✓ Linked club ${eaClubIdRaw}` : '✓ Club cleared' };
   } catch (e) {
     return { error: message(e) };
   }

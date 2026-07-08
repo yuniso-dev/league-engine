@@ -36,6 +36,7 @@ export async function getLatestOpenTournament(): Promise<{
   name: string;
   season: number;
   status: 'upcoming' | 'live';
+  startTime: Date | null;
 } | null> {
   const [row] = await getDb()
     .select({
@@ -43,6 +44,7 @@ export async function getLatestOpenTournament(): Promise<{
       name: tournaments.name,
       season: tournaments.season,
       status: tournaments.status,
+      startTime: tournaments.startTime,
     })
     .from(tournaments)
     .where(ne(tournaments.status, 'completed'))

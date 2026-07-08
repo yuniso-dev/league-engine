@@ -46,6 +46,12 @@ export async function handleFrontierIntro(
     `# ⚡ ${tournament.name.toUpperCase()} — SEASON ${tournament.season}`,
   ];
 
+  // Discord renders a unix timestamp in each viewer's own timezone.
+  if (tournament.startTime) {
+    const unix = Math.floor(tournament.startTime.getTime() / 1000);
+    paragraphs.push(`🗓️ **Kicks off:** <t:${unix}:F> (<t:${unix}:R>)`);
+  }
+
   if (captained.length > 0) {
     paragraphs.push(
       '**Captains**\n' + captained.map(t => `⚔️ **${t.teamName}** — <@${t.captainId}>`).join('\n'),
@@ -60,7 +66,7 @@ export async function handleFrontierIntro(
     '**Rules**\n' + (cfg.frontierRules?.trim() || '_Set the standing rules block in Admin → Settings and re-run /frontierintro._'),
   );
 
-  paragraphs.push(`**Sign up:** ${siteUrl}/frontier`, '||@everyone||');
+  paragraphs.push(`**Sign up:** ${siteUrl}/frontier/${tournament.id}`, '||@everyone||');
 
   const [first, ...rest] = chunk(paragraphs);
   // Draft-for-review: mentions and @everyone must render but never ping.

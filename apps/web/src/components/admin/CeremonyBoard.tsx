@@ -297,9 +297,9 @@ export default function CeremonyBoard({
       {/* ── The form: numeral + voted honours + GRANT ALL ── */}
       <form action={action} style={glass({ padding: 18, display: 'flex', flexDirection: 'column', gap: 16 })}>
         <input type="hidden" name="tournamentId" value={sheet.tournament.id} />
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 140 }}>
-            <span style={label}>EDITION NUMERAL</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={label}>EDITION NUMERAL — NAMES ALL 7 HONOURS</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <input
               name="numeral"
               value={numeral}
@@ -308,7 +308,9 @@ export default function CeremonyBoard({
               style={{ ...inputBase, width: 120, borderColor: numeral && !numeralOk ? rgba(T.loss, 0.6) : undefined }}
             />
             <span style={{ fontFamily: FONT_M, fontSize: 11, color: numeral && !numeralOk ? T.loss : T.faint }}>
-              {numeral && !numeralOk ? 'not a valid roman numeral' : 'awards mint as “Blaze’s Boot XVII”'}
+              {numeral && !numeralOk
+                ? 'not a valid roman numeral'
+                : `mints “Blaze’s Boot ${numeral || 'XVII'}”, “Xavier Frost ${numeral || 'XVII'}”, and every other honour`}
             </span>
           </div>
           {votedPicker("🧱 WALLSIDE'S AWARD", 'winner of the defender poll', defenderId, setDefenderId, 'defenderPublicId')}

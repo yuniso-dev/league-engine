@@ -84,6 +84,8 @@ create table tournaments (
     status          tournament_status not null default 'upcoming',
     ranked          boolean not null default true,
     start_date      date,
+    start_time      timestamptz,
+    reminder_sent   boolean not null default false,
     end_date        date,
     winner_team_id  uuid,
     created_at      timestamptz not null default now(),
@@ -101,6 +103,7 @@ create table event_signups (
     signed_up_at    timestamptz not null default now(),
     source          text not null default 'discord',
     attended        boolean,
+    notified        boolean not null default false,
     unique (tournament_id, user_id)
 );
 
