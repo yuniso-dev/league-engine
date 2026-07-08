@@ -55,6 +55,7 @@ import {
   type MatchStage,
 } from '@inazuma/db';
 import { HONOURS, isRomanNumeral } from '@inazuma/core';
+import { pickTeamOfTournament } from '@/lib/tott';
 import { requireAdminAction } from '@/lib/admin';
 import {
   announceAward,
@@ -484,6 +485,21 @@ export async function runCeremonyAction(
       return { error: 'Xavier Frost pick must be one of the top-4 rated players.' };
     }
 
+    // Mr Inazuma: the admin picks the champion's captain from the winning
+    // roster (defaults to the team's set captain, but a team may not have one).
+    const mrInazumaPublicId = str(formData, 'mrInazumaPublicId');
+    const championMembers = sheet.championTeam?.members ?? [];
+    if (mrInazumaPublicId && !championMembers.some(m => m.publicId === mrInazumaPublicId)) {
+      return { error: 'Mr Inazuma must be a member of the winning team.' };
+    }
+    const mrInazuma = mrInazumaPublicId
+      ? championMembers.filter(m => m.publicId === mrInazumaPublicId)
+      : sheet.championTeam?.captain ? [sheet.championTeam.captain] : [];
+
+    // Team of the Tournament — the same best-XI the page shows — now grants an
+    // award to each named player (recomputed server-side, never trusted from the client).
+    const tottPlayers = pickTeamOfTournament(sheet.ratedPlayers).flatMap(line => line.players);
+
     // Winners per honour key; empty honours are skipped, ties grant to all.
     // Wallside's Award and the Golden Glove are now fully computed (min 3 games).
     const glove = sheet.gkTable[0] ?? null;
@@ -494,8 +510,9 @@ export async function runCeremonyAction(
       bestDefender: sheet.bestDefenders,
       pott: pottPublicId
         ? sheet.pottNominees.filter(p => p.publicId === pottPublicId) : [],
-      champion: sheet.championTeam?.members ?? [],
-      mrInazuma: sheet.championTeam?.captain ? [sheet.championTeam.captain] : [],
+      champion: championMembers,
+      mrInazuma,
+      tott: tottPlayers,
     };
 
     const season = sheet.tournament.season;
@@ -515,9 +532,10 @@ export async function runCeremonyAction(
         });
         if (!result) { skipped++; continue; }
         granted++;
-        // Webhook the individual honours; the champion team's 5-8 grants would
-        // be embed spam — the copy-box announcement covers the team moment.
-        if (h.key !== 'champion') {
+        // Webhook the individual honours; the champion team's and Team of the
+        // Tournament's 5-7 grants would be embed spam — the copy-box
+        // announcement covers those group moments.
+        if (h.key !== 'champion' && h.key !== 'tott') {
           await announceAward({
             awardName: result.awardName,
             icon: result.awardIcon,

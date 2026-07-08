@@ -62,10 +62,11 @@ describe('parseEdition', () => {
 });
 
 describe('HONOURS', () => {
-  test('carries the seven league honours in ceremony order', () => {
+  test('carries the league honours in ceremony order', () => {
     expect(HONOURS.map(h => h.base)).toEqual([
       "Blaze's Boot", "Sharp's Award", "Evan's Golden Glove",
       "Wallside's Award", 'Xavier Frost', 'Inazuma Frontier', 'Mr Inazuma',
+      'Team of the Tournament',
     ]);
   });
 });
