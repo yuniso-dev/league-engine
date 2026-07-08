@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { frontierFormat } from '@inazuma/core';
-import { computeGroupTable, getAdminTournament, listPendingMatches } from '@inazuma/db';
+import { computeGroupTable, getAdminTournament, listPendingMatches, type AdminMatch } from '@inazuma/db';
 import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, FONT_M, T, glass, rgba } from '@/lib/realm-colors';
-import { ADMIN_ACCENT, STAGE_LABELS, STATUS_COLORS } from '@/components/admin/ui';
+import { ADMIN_ACCENT, STATUS_COLORS, stageLabel } from '@/components/admin/ui';
 import StatusControls from '@/components/admin/StatusControls';
 import TeamForm from '@/components/admin/TeamForm';
 import TeamClubLink from '@/components/admin/TeamClubLink';
@@ -52,6 +52,11 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
   const groupComplete = groupMatches.length > 0 &&
     groupMatches.every(m => m.homeScore !== null && m.awayScore !== null);
   const fmt = frontierFormat(teams.length);
+  // Number the best-of-5 series games chronologically (the match list is
+  // newest-first, so reverse it) → "Best of 5 · Game 2" instead of "Group".
+  const seriesGameNo = new Map<string, number>();
+  matches.filter(m => m.stage === 'group').reverse().forEach((m, i) => seriesGameNo.set(m.id, i + 1));
+  const labelFor = (m: AdminMatch) => stageLabel(m.stage, teams.length, seriesGameNo.get(m.id));
   const table = groupMatches.length > 0 ? await computeGroupTable(tournament.id) : null;
 
   return (
@@ -260,6 +265,7 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
                   key={m.id}
                   tournamentId={tournament.id}
                   match={m}
+                  stageLabel={labelFor(m)}
                   homeMembers={membersOf(m.homeTeamId)}
                   awayMembers={membersOf(m.awayTeamId)}
                 />
@@ -334,7 +340,7 @@ export default async function AdminTournamentPage({ params }: { params: { id: st
               flexWrap: 'wrap',
             })}>
               <span style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, minWidth: 86 }}>
-                {STAGE_LABELS[m.stage]}
+                {labelFor(m)}
               </span>
               <span style={{ fontFamily: FONT_B, fontSize: 14, color: T.text, flex: 1, minWidth: 200 }}>
                 {m.homeTeamName}

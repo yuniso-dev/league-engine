@@ -125,12 +125,18 @@ export default function CeremonyBoard({
   const [state, action] = useFormState<AdminFormState, FormData>(runCeremonyAction, {});
   const [numeral, setNumeral] = useState(defaultNumeral);
   const [pottId, setPottId] = useState('');
+  // Mr Inazuma defaults to the team's set captain, but the admin can pick any
+  // member of the winning roster (a team may have no captain assigned).
+  const [mrInazumaId, setMrInazumaId] = useState(sheet.championTeam?.captain?.publicId ?? '');
   const [copied, setCopied] = useState(false);
 
   const numeralOk = isRomanNumeral(numeral);
   const byNominee = (publicId: string) => sheet.pottNominees.find(p => p.publicId === publicId) ?? null;
+  const championMembers = sheet.championTeam?.members ?? [];
+  const mrInazuma = championMembers.find(m => m.publicId === mrInazumaId) ?? null;
   const glove = sheet.gkTable[0] ?? null;
   const defender = sheet.defenderTable[0] ?? null;
+  const tott = useMemo(() => pickTeamOfTournament(sheet.ratedPlayers), [sheet]);
 
   // The grant preview + announcement recompute from CURRENT inputs — what you
   // see is exactly what GRANT ALL mints.
@@ -148,12 +154,11 @@ export default function CeremonyBoard({
     add('bestDefender', sheet.bestDefenders.map(w => w.displayName));
     add('pott', pottId ? [byNominee(pottId)?.displayName ?? ''] : []);
     add('champion', sheet.championTeam?.members.map(m => m.displayName) ?? []);
-    add('mrInazuma', sheet.championTeam?.captain ? [sheet.championTeam.captain.displayName] : []);
+    add('mrInazuma', mrInazuma ? [mrInazuma.displayName] : []);
+    add('tott', tott.flatMap(t => t.players.map(p => p.displayName)));
     return rows;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [numeral, pottId, sheet]);
-
-  const tott = useMemo(() => pickTeamOfTournament(sheet.ratedPlayers), [sheet]);
+  }, [numeral, pottId, mrInazumaId, sheet, tott]);
 
   const draft = useMemo(() => buildCeremonyAnnouncement({
     tournamentName: sheet.tournament.name,
@@ -168,7 +173,7 @@ export default function CeremonyBoard({
       ? {
           teamName: sheet.championTeam.name,
           memberDiscordIds: sheet.championTeam.members.map(m => m.discordId),
-          captainDiscordId: sheet.championTeam.captain?.discordId ?? null,
+          captainDiscordId: mrInazuma?.discordId ?? null,
         }
       : null,
     tott: tott.map(t => ({
@@ -177,7 +182,7 @@ export default function CeremonyBoard({
       players: t.players.map(p => ({ discordId: p.discordId, value: p.value })),
     })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [numeral, pottId, sheet, tott]);
+  }), [numeral, pottId, mrInazumaId, sheet, tott]);
 
   const pottPicker = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 220 }}>
@@ -194,6 +199,21 @@ export default function CeremonyBoard({
         {sheet.pottNominees.length === 0
           ? 'no players with 3+ rated games yet — fills as the Frontier is played'
           : 'run /awardpoll to vote across these four, then lock the winner in here'}
+      </span>
+    </div>
+  );
+
+  const mrInazumaPicker = sheet.championTeam && (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 220 }}>
+      <span style={label}>🎖️ MR INAZUMA — WINNING CAPTAIN</span>
+      <select name="mrInazumaPublicId" value={mrInazumaId} onChange={e => setMrInazumaId(e.target.value)} style={inputBase}>
+        <option value="">— not decided —</option>
+        {championMembers.map(m => (
+          <option key={m.publicId} value={m.publicId}>{m.displayName}</option>
+        ))}
+      </select>
+      <span style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint }}>
+        pick the captain of {sheet.championTeam.name} (defaults to the team&apos;s set captain)
       </span>
     </div>
   );
@@ -269,8 +289,8 @@ export default function CeremonyBoard({
             {statRow('🏆', 'Inazuma Frontier',
               `${sheet.championTeam.name} — ${sheet.championTeam.members.map(m => m.displayName).join(', ')}`)}
             {statRow('🎖️', 'Mr Inazuma',
-              sheet.championTeam.captain?.displayName ?? '',
-              'team has no captain set — assign one on the draft board')}
+              mrInazuma?.displayName ?? '',
+              'pick the winning captain below (🎖️ Mr Inazuma)')}
           </>
         ) : (
           <p style={{ fontFamily: FONT_B, fontSize: 13.5, color: T.faint, margin: 0 }}>
@@ -299,7 +319,7 @@ export default function CeremonyBoard({
             ))}
             <p style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, margin: '10px 0 0' }}>
               Slots follow each player&apos;s most-played EA position (fix a wrong one via the match&apos;s ⚽ STATS editor).
-              This block is informational and goes into the announcement draft — no award is granted for it.
+              <b style={{ color: T.dim }}> Everyone named here is granted the ⭐ Team of the Tournament award</b> when you GRANT ALL.
             </p>
           </>
         )}
@@ -339,6 +359,7 @@ export default function CeremonyBoard({
             </span>
           </div>
           {pottPicker}
+          {mrInazumaPicker}
         </div>
 
         {willGrant.length > 0 && (

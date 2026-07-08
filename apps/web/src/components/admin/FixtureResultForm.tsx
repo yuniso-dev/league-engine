@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import type { AdminMatch, AdminPlayerOption } from '@inazuma/db';
 import { FONT_B, FONT_D, FONT_M, T, glass, rgba } from '@/lib/realm-colors';
-import { ADMIN_ACCENT, STAGE_LABELS, inputBase, labelStyle } from '@/components/admin/ui';
+import { ADMIN_ACCENT, inputBase, labelStyle } from '@/components/admin/ui';
 import { recordMatchResultAction, deleteMatchAction, type AdminFormState } from '@/app/admin/actions';
 import DeleteButton from '@/components/admin/DeleteButton';
 
@@ -14,6 +14,8 @@ import DeleteButton from '@/components/admin/DeleteButton';
 type Props = {
   tournamentId: string;
   match: AdminMatch;
+  /** Precomputed stage label (e.g. "Best of 5 · Game 2" for a series). */
+  stageLabel: string;
   homeMembers: AdminPlayerOption[];
   awayMembers: AdminPlayerOption[];
 };
@@ -87,7 +89,7 @@ function RosterTicks({
   );
 }
 
-export default function FixtureResultForm({ tournamentId, match, homeMembers, awayMembers }: Props) {
+export default function FixtureResultForm({ tournamentId, match, stageLabel, homeMembers, awayMembers }: Props) {
   const [state, action] = useFormState<AdminFormState, FormData>(recordMatchResultAction, {});
   const [homeSel, setHomeSel] = useState<Set<string>>(new Set(homeMembers.map(m => m.publicId)));
   const [awaySel, setAwaySel] = useState<Set<string>>(new Set(awayMembers.map(m => m.publicId)));
@@ -105,7 +107,7 @@ export default function FixtureResultForm({ tournamentId, match, homeMembers, aw
     <div style={glass({ padding: '12px 16px', border: `1px solid ${rgba(ADMIN_ACCENT, 0.25)}` })}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <span style={{ fontFamily: FONT_M, fontSize: 10, letterSpacing: 1, color: ADMIN_ACCENT }}>
-          {STAGE_LABELS[match.stage] ?? match.stage}
+          {stageLabel}
         </span>
         <span style={{ fontFamily: FONT_B, fontSize: 14, color: T.text, flex: 1, minWidth: 180 }}>
           {match.homeTeamName} <span style={{ color: T.faint }}>vs</span> {match.awayTeamName}

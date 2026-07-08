@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 import { FONT_B, T } from '@/lib/realm-colors';
 
-export { STAGE_LABELS, STATUS_COLORS } from '@/lib/tournament-ui';
+export { STAGE_LABELS, STATUS_COLORS, stageLabel } from '@/lib/tournament-ui';
 
 export const ADMIN_ACCENT = '#3D8BFF';
 

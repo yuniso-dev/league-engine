@@ -70,6 +70,7 @@ export const HONOURS = [
   { key: 'pott', icon: '❄️', base: 'Xavier Frost', description: 'Top voted player of the tournament' },
   { key: 'champion', icon: '🏆', base: 'Inazuma Frontier', description: 'Won the Inazuma Frontier' },
   { key: 'mrInazuma', icon: '🎖️', base: 'Mr Inazuma', description: 'Captain of the Frontier winners' },
+  { key: 'tott', icon: '⭐', base: 'Team of the Tournament', description: 'Named in the Team of the Tournament' },
 ] as const;
 
 export type Honour = (typeof HONOURS)[number];
