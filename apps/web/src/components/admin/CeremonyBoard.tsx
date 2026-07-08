@@ -124,13 +124,13 @@ export default function CeremonyBoard({
 }) {
   const [state, action] = useFormState<AdminFormState, FormData>(runCeremonyAction, {});
   const [numeral, setNumeral] = useState(defaultNumeral);
-  const [defenderId, setDefenderId] = useState(''); // publicId or ''
   const [pottId, setPottId] = useState('');
   const [copied, setCopied] = useState(false);
 
   const numeralOk = isRomanNumeral(numeral);
-  const byPublicId = (publicId: string) => sheet.voterPool.find(p => p.publicId === publicId) ?? null;
+  const byNominee = (publicId: string) => sheet.pottNominees.find(p => p.publicId === publicId) ?? null;
   const glove = sheet.gkTable[0] ?? null;
+  const defender = sheet.defenderTable[0] ?? null;
 
   // The grant preview + announcement recompute from CURRENT inputs — what you
   // see is exactly what GRANT ALL mints.
@@ -145,13 +145,13 @@ export default function CeremonyBoard({
     add('topScorer', sheet.topScorers.map(w => w.displayName));
     add('topAssister', sheet.topAssisters.map(w => w.displayName));
     add('goldenGlove', glove ? [glove.displayName] : []);
-    add('bestDefender', defenderId ? [byPublicId(defenderId)?.displayName ?? ''] : []);
-    add('pott', pottId ? [byPublicId(pottId)?.displayName ?? ''] : []);
+    add('bestDefender', sheet.bestDefenders.map(w => w.displayName));
+    add('pott', pottId ? [byNominee(pottId)?.displayName ?? ''] : []);
     add('champion', sheet.championTeam?.members.map(m => m.displayName) ?? []);
     add('mrInazuma', sheet.championTeam?.captain ? [sheet.championTeam.captain.displayName] : []);
     return rows;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [numeral, defenderId, pottId, sheet]);
+  }, [numeral, pottId, sheet]);
 
   const tott = useMemo(() => pickTeamOfTournament(sheet.ratedPlayers), [sheet]);
 
@@ -162,8 +162,8 @@ export default function CeremonyBoard({
     topScorers: sheet.topScorers.map(w => ({ discordId: w.discordId, value: w.value })),
     topAssisters: sheet.topAssisters.map(w => ({ discordId: w.discordId, value: w.value })),
     goldenGlove: glove ? { discordId: glove.discordId, value: glove.value } : null,
-    bestDefender: defenderId ? { discordId: byPublicId(defenderId)?.discordId ?? '' } : null,
-    pott: pottId ? { discordId: byPublicId(pottId)?.discordId ?? '' } : null,
+    bestDefenders: sheet.bestDefenders.map(w => ({ discordId: w.discordId, value: w.value })),
+    pott: pottId ? { discordId: byNominee(pottId)?.discordId ?? '' } : null,
     champion: sheet.championTeam
       ? {
           teamName: sheet.championTeam.name,
@@ -177,20 +177,24 @@ export default function CeremonyBoard({
       players: t.players.map(p => ({ discordId: p.discordId, value: p.value })),
     })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [numeral, defenderId, pottId, sheet, tott]);
+  }), [numeral, pottId, sheet, tott]);
 
-  const votedPicker = (
-    title: string, hint: string, value: string, onChange: (v: string) => void, name: string,
-  ) => (
+  const pottPicker = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 220 }}>
-      <span style={label}>{title}</span>
-      <select name={name} value={value} onChange={e => onChange(e.target.value)} style={inputBase}>
+      <span style={label}>❄️ XAVIER FROST — POLL WINNER (TOP 4 BY RATING)</span>
+      <select name="pottPublicId" value={pottId} onChange={e => setPottId(e.target.value)} style={inputBase}>
         <option value="">— not decided —</option>
-        {sheet.voterPool.map(p => (
-          <option key={p.publicId} value={p.publicId}>{p.displayName}</option>
+        {sheet.pottNominees.map(p => (
+          <option key={p.publicId} value={p.publicId}>
+            {p.displayName} · {p.value.toFixed(2)} avg ({p.appearances} apps)
+          </option>
         ))}
       </select>
-      <span style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint }}>{hint}</span>
+      <span style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint }}>
+        {sheet.pottNominees.length === 0
+          ? 'no players with 3+ rated games yet — fills as the Frontier is played'
+          : 'run /awardpoll to vote across these four, then lock the winner in here'}
+      </span>
     </div>
   );
 
@@ -217,7 +221,7 @@ export default function CeremonyBoard({
           'no assists recorded yet')}
         {statRow('🧤', "Evan's Golden Glove",
           glove ? `${glove.displayName} (${glove.value.toFixed(2)} avg, ${glove.appearances} apps)` : '',
-          'no goalkeeper with 2+ rated appearances — EA auto-ingest fills this')}
+          'no goalkeeper with 3+ rated appearances — EA auto-ingest fills this')}
         {sheet.gkTable.length > 1 && (
           <div style={{ marginTop: 10 }}>
             <div style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, marginBottom: 4 }}>GK TABLE</div>
@@ -230,6 +234,27 @@ export default function CeremonyBoard({
                 <span style={{ flex: 1 }}>{g.displayName}</span>
                 <span>{g.value.toFixed(2)} avg</span>
                 <span style={{ color: T.faint }}>{g.appearances} apps</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {statRow('🧱', "Wallside's Award",
+          sheet.bestDefenders.length > 0
+            ? `${sheet.bestDefenders.map(w => w.displayName).join(', ')} (${defender ? defender.value.toFixed(2) : '—'} avg)`
+            : '',
+          'no defender (CB/FB) with 3+ rated appearances — EA auto-ingest fills this')}
+        {sheet.defenderTable.length > 1 && (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, marginBottom: 4 }}>DEFENDER TABLE</div>
+            {sheet.defenderTable.map((d, i) => (
+              <div key={d.publicId} style={{
+                display: 'flex', gap: 10, fontFamily: FONT_B, fontSize: 13, padding: '3px 0',
+                color: i === 0 ? T.gold : T.dim,
+              }}>
+                <span style={{ fontFamily: FONT_M, minWidth: 18 }}>{i + 1}</span>
+                <span style={{ flex: 1 }}>{d.displayName}</span>
+                <span>{d.value.toFixed(2)} avg</span>
+                <span style={{ color: T.faint }}>{d.appearances} apps</span>
               </div>
             ))}
           </div>
@@ -313,8 +338,7 @@ export default function CeremonyBoard({
                 : `mints “Blaze’s Boot ${numeral || 'XVII'}”, “Xavier Frost ${numeral || 'XVII'}”, and every other honour`}
             </span>
           </div>
-          {votedPicker("🧱 WALLSIDE'S AWARD", 'winner of the defender poll', defenderId, setDefenderId, 'defenderPublicId')}
-          {votedPicker('❄️ XAVIER FROST', 'winner of the POTT poll', pottId, setPottId, 'pottPublicId')}
+          {pottPicker}
         </div>
 
         {willGrant.length > 0 && (

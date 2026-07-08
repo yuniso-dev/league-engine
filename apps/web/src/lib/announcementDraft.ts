@@ -13,7 +13,8 @@ export type CeremonyDraftInput = {
   topScorers: { discordId: string; value: number }[];
   topAssisters: { discordId: string; value: number }[];
   goldenGlove: { discordId: string; value: number } | null;
-  bestDefender: { discordId: string } | null;
+  /** Computed: highest avg-rated defender(s) with ≥3 games. */
+  bestDefenders: { discordId: string; value: number }[];
   pott: { discordId: string } | null;
   champion: {
     teamName: string;
@@ -52,8 +53,9 @@ export function buildCeremonyAnnouncement(input: CeremonyDraftInput): string {
     lines.push(line('goldenGlove', n,
       `${mention(input.goldenGlove.discordId)} (${input.goldenGlove.value.toFixed(2)} avg rating)`));
   }
-  if (input.bestDefender) {
-    lines.push(line('bestDefender', n, `${mention(input.bestDefender.discordId)} — voted by the league`));
+  if (input.bestDefenders.length > 0) {
+    lines.push(line('bestDefender', n,
+      `${input.bestDefenders.map(w => mention(w.discordId)).join(', ')} (${input.bestDefenders[0].value.toFixed(2)} avg rating)`));
   }
   if (input.pott) {
     lines.push(line('pott', n, `${mention(input.pott.discordId)} — voted by the league`));

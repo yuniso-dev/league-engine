@@ -477,22 +477,23 @@ export async function runCeremonyAction(
     const sheet = await getCeremonySheet(tournamentId);
     if (!sheet) return { error: 'Tournament not found.' };
 
-    const inPool = (publicId: string) => sheet.voterPool.some(p => p.publicId === publicId);
-    const defenderPublicId = str(formData, 'defenderPublicId');
+    // Xavier Frost is the only voted honour left; its winner must be one of the
+    // computed top-4 nominees (the same four the poll ran across).
     const pottPublicId = str(formData, 'pottPublicId');
-    if (defenderPublicId && !inPool(defenderPublicId)) return { error: 'Defender pick is not on a roster.' };
-    if (pottPublicId && !inPool(pottPublicId)) return { error: 'POTT pick is not on a roster.' };
+    if (pottPublicId && !sheet.pottNominees.some(p => p.publicId === pottPublicId)) {
+      return { error: 'Xavier Frost pick must be one of the top-4 rated players.' };
+    }
 
     // Winners per honour key; empty honours are skipped, ties grant to all.
+    // Wallside's Award and the Golden Glove are now fully computed (min 3 games).
     const glove = sheet.gkTable[0] ?? null;
     const winners: Record<string, { publicId: string; displayName: string }[]> = {
       topScorer: sheet.topScorers,
       topAssister: sheet.topAssisters,
       goldenGlove: glove ? [glove] : [],
-      bestDefender: defenderPublicId
-        ? sheet.voterPool.filter(p => p.publicId === defenderPublicId) : [],
+      bestDefender: sheet.bestDefenders,
       pott: pottPublicId
-        ? sheet.voterPool.filter(p => p.publicId === pottPublicId) : [],
+        ? sheet.pottNominees.filter(p => p.publicId === pottPublicId) : [],
       champion: sheet.championTeam?.members ?? [],
       mrInazuma: sheet.championTeam?.captain ? [sheet.championTeam.captain] : [],
     };

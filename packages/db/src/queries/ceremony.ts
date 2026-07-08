@@ -22,8 +22,16 @@ export type CeremonySheet = {
   topScorers: CeremonyPlayer[];
   /** Everyone tied at the top assist count. */
   topAssisters: CeremonyPlayer[];
-  /** Goalkeepers by average match rating, best first (min 2 appearances). */
+  /** Goalkeepers by average match rating, best first (min 3 appearances). */
   gkTable: (CeremonyPlayer & { appearances: number })[];
+  /** Defenders (CB/FB) by average match rating, best first (min 3 apps) —
+   *  Wallside's Award is now COMPUTED from this, no longer a vote. */
+  defenderTable: (CeremonyPlayer & { appearances: number })[];
+  /** The Wallside winner(s): everyone tied at the top defender avg rating. */
+  bestDefenders: CeremonyPlayer[];
+  /** Top 4 players by average rating (min 3 apps, any position) — the Xavier
+   *  Frost poll runs across these; can include the Wallside/Glove winner. */
+  pottNominees: (CeremonyPlayer & { appearances: number })[];
   /** Everyone with ≥2 rated appearances, best avg rating first, with their
    *  most-played EA position bucket — the Team of the Tournament pool. */
   ratedPlayers: (CeremonyPlayer & { appearances: number; bucket: string | null })[];
@@ -106,7 +114,28 @@ export async function getCeremonySheet(tournamentId: string): Promise<CeremonySh
       sql`lower(${matchParticipants.position}) in ('goalkeeper', 'gk')`,
     ))
     .groupBy(users.publicId, users.discordId, users.displayName)
-    .having(sql`count(*) >= 2`)
+    .having(sql`count(*) >= 3`)
+    .orderBy(desc(sql`avg(${matchParticipants.rating})`));
+
+  // ── Defender table — Wallside's Award (CB/FB, best avg rating, min 3) ───────
+  const defRows = await db
+    .select({
+      publicId: users.publicId,
+      discordId: users.discordId,
+      displayName: users.displayName,
+      avgRating: sql<number>`avg(${matchParticipants.rating})::float`,
+      appearances: sql<number>`count(*)::int`,
+    })
+    .from(matchParticipants)
+    .innerJoin(matches, eq(matchParticipants.matchId, matches.id))
+    .innerJoin(users, eq(matchParticipants.userId, users.discordId))
+    .where(and(
+      eq(matches.tournamentId, tournamentId),
+      isNotNull(matchParticipants.rating),
+      sql`lower(${matchParticipants.position}) in ('defender', 'cb', 'lcb', 'rcb', 'lb', 'rb', 'lwb', 'rwb', 'fb')`,
+    ))
+    .groupBy(users.publicId, users.discordId, users.displayName)
+    .having(sql`count(*) >= 3`)
     .orderBy(desc(sql`avg(${matchParticipants.rating})`));
 
   // ── Rating table with position buckets (Team of the Tournament pool) ───────
@@ -156,6 +185,43 @@ export async function getCeremonySheet(tournamentId: string): Promise<CeremonySh
     }
   }
 
+  // ── Derived rating lists (built here so pott nominees can reuse them) ──────
+  const withRating = <T extends { publicId: string | null; discordId: string; displayName: string; avgRating: number; appearances: number }>(rows: T[]) =>
+    rows
+      .filter((r): r is T & { publicId: string } => r.publicId != null && !excluded.has(r.discordId))
+      .map(r => ({
+        publicId: r.publicId,
+        discordId: r.discordId,
+        displayName: r.displayName,
+        value: r.avgRating,
+        appearances: r.appearances,
+      }));
+
+  const defenderTable = withRating(defRows);
+  const topDefValue = defenderTable[0]?.value ?? null;
+  const bestDefenders = topDefValue === null
+    ? []
+    : defenderTable
+        .filter(d => Math.abs(d.value - topDefValue) < 1e-9)
+        .map(({ publicId, discordId, displayName, value }) => ({ publicId, discordId, displayName, value }));
+
+  const ratedPlayers = ratedRows
+    .filter((r): r is typeof r & { publicId: string } => r.publicId != null && !excluded.has(r.discordId))
+    .map(r => ({
+      publicId: r.publicId,
+      discordId: r.discordId,
+      displayName: r.displayName,
+      value: r.avgRating,
+      appearances: r.appearances,
+      bucket: r.bucket,
+    }));
+
+  // Top 4 by avg rating with at least 3 games — the Xavier Frost poll pool.
+  const pottNominees = ratedPlayers
+    .filter(p => p.appearances >= 3)
+    .slice(0, 4)
+    .map(({ publicId, discordId, displayName, value, appearances }) => ({ publicId, discordId, displayName, value, appearances }));
+
   // ── Voter pool: every rostered player in the tournament ────────────────────
   const poolRows = await db
     .selectDistinct({ publicId: users.publicId, discordId: users.discordId, displayName: users.displayName })
@@ -173,27 +239,55 @@ export async function getCeremonySheet(tournamentId: string): Promise<CeremonySh
     topAssisters: maxAssists > 0
       ? withPublicId.filter(r => r.assists === maxAssists).map(r => toPlayer(r, r.assists))
       : [],
-    gkTable: gkRows
-      .filter((r): r is typeof r & { publicId: string } => r.publicId != null && !excluded.has(r.discordId))
-      .map(r => ({
-        publicId: r.publicId,
-        discordId: r.discordId,
-        displayName: r.displayName,
-        value: r.avgRating,
-        appearances: r.appearances,
-      })),
-    ratedPlayers: ratedRows
-      .filter((r): r is typeof r & { publicId: string } => r.publicId != null && !excluded.has(r.discordId))
-      .map(r => ({
-        publicId: r.publicId,
-        discordId: r.discordId,
-        displayName: r.displayName,
-        value: r.avgRating,
-        appearances: r.appearances,
-        bucket: r.bucket,
-      })),
+    gkTable: withRating(gkRows),
+    defenderTable,
+    bestDefenders,
+    pottNominees,
+    ratedPlayers,
     championTeam,
     voterPool: poolRows.filter((p): p is typeof p & { publicId: string } => p.publicId != null),
     exclusions: await listTournamentExclusions(tournamentId),
   };
+}
+
+/** The Xavier Frost poll pool for the bot: the most recent tournament that has
+ *  rated games, and its top 4 players by average rating (min 3 apps, any
+ *  position, rule-violators excluded). The same top-4 the ceremony page shows. */
+export async function getPottNominees(): Promise<{
+  tournamentId: string;
+  tournamentName: string;
+  nominees: { discordId: string; displayName: string; avgRating: number }[];
+} | null> {
+  const db = getDb();
+
+  // Newest tournament with at least one rated participant.
+  const [t] = await db
+    .selectDistinct({ id: tournaments.id, name: tournaments.name, createdAt: tournaments.createdAt })
+    .from(tournaments)
+    .innerJoin(matches, eq(matches.tournamentId, tournaments.id))
+    .innerJoin(matchParticipants, and(
+      eq(matchParticipants.matchId, matches.id),
+      isNotNull(matchParticipants.rating),
+    ))
+    .orderBy(desc(tournaments.createdAt))
+    .limit(1);
+  if (!t) return null;
+
+  const excluded = await getExcludedDiscordIds(t.id);
+  const rows = await db
+    .select({
+      discordId: users.discordId,
+      displayName: users.displayName,
+      avgRating: sql<number>`avg(${matchParticipants.rating})::float`,
+    })
+    .from(matchParticipants)
+    .innerJoin(matches, eq(matchParticipants.matchId, matches.id))
+    .innerJoin(users, eq(matchParticipants.userId, users.discordId))
+    .where(and(eq(matches.tournamentId, t.id), isNotNull(matchParticipants.rating)))
+    .groupBy(users.discordId, users.displayName)
+    .having(sql`count(*) >= 3`)
+    .orderBy(desc(sql`avg(${matchParticipants.rating})`));
+
+  const nominees = rows.filter(r => !excluded.has(r.discordId)).slice(0, 4);
+  return { tournamentId: t.id, tournamentName: t.name, nominees };
 }
