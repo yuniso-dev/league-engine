@@ -170,8 +170,16 @@ export type {
 } from './queries/awards';
 export { getCeremonySheet } from './queries/ceremony';
 export type { CeremonySheet, CeremonyPlayer } from './queries/ceremony';
-export { getAdminDiscordIds, getNewAwardGrants, getNewSignups, getTeamMemberKeys } from './queries/notifier';
-export type { NewAwardGrant, NewSignup, TeamMemberKey } from './queries/notifier';
+export {
+  getAdminDiscordIds,
+  getNewAwardGrants,
+  getUnnotifiedSignups,
+  markSignupsNotified,
+  getDueReminders,
+  markReminderSent,
+  getTeamMemberKeys,
+} from './queries/notifier';
+export type { NewAwardGrant, NewSignup, DueReminder, TeamMemberKey } from './queries/notifier';
 export { getAdminStats } from './queries/adminStats';
 export type { AdminStats } from './queries/adminStats';
 export {

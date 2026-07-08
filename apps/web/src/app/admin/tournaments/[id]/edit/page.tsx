@@ -20,6 +20,7 @@ export default async function EditTournamentPage({ params }: { params: { id: str
         season: tournament.season,
         ranked: tournament.ranked,
         date: tournament.startDate,
+        startTime: tournament.startTime ? tournament.startTime.toISOString() : null,
       }}
     />
   );

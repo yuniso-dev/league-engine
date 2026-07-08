@@ -46,6 +46,8 @@ export type PublicBracketMatch = {
 
 export type PublicTournamentDetail = {
   tournament: PublicTournament;
+  /** Kickoff time shown to players (null until an admin sets it). */
+  startTime: Date | null;
   teams: PublicBracketTeam[];
   matchesByStage: { stage: MatchStage; matches: PublicBracketMatch[] }[];
   /** Group-stage league table — null until group fixtures exist. */
@@ -147,6 +149,7 @@ export async function getTournamentDetail(tournamentId: string): Promise<PublicT
     table,
     stats,
     signups,
+    startTime: row.tournament.startTime,
     tournament: toPublicTournament(row.tournament, row.winnerName),
     teams: teamRows.map(t => ({
       id: t.id,

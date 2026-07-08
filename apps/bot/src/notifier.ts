@@ -1,11 +1,14 @@
 import type { Client } from 'discord.js';
 import {
   SANCTION_LABELS,
+  getDueReminders,
   getLatestOpenTournament,
   getNewAwardGrants,
-  getNewSignups,
+  getUnnotifiedSignups,
   getTeamMemberKeys,
   listActiveSanctions,
+  markReminderSent,
+  markSignupsNotified,
   type PlayerSanction,
 } from '@inazuma/db';
 
@@ -16,7 +19,6 @@ import {
 // ceremonies run after a Frontier completes.
 
 let awardsSince = new Date();
-let signupsSince = new Date();
 /** `${teamId}:${userId}` roster snapshot; null = needs (re)seeding, so the
  *  first pass after boot or a new tournament never DMs the whole roster. */
 let teamKeys: Set<string> | null = null;
@@ -82,20 +84,32 @@ export async function pollNotifier(client: Client<true>, siteUrl: string): Promi
     sanctions = activeNow;
   }
 
-  // ── Signups + drafts only matter while a Frontier is open ───────────────
-  const open = await getLatestOpenTournament();
-  if (!open) {
-    teamKeys = null; // next tournament reseeds silently instead of DM-flooding its roster
-    return;
-  }
-
-  const signups = await getNewSignups(signupsSince);
+  // ── Signup confirmations — one DM per signup, ever (notified flag) ──────
+  // Marked BEFORE sending so a mid-batch crash can't re-DM the whole list.
+  const signups = await getUnnotifiedSignups();
   if (signups.length > 0) {
-    signupsSince = signups[signups.length - 1].signedUpAt;
+    await markSignupsNotified(signups.map(s => s.signupId));
     for (const s of signups) {
       await sendDm(client, s.discordId, `✅ You're signed up for **${s.tournamentName}** — see you on the Frontier!`);
     }
     console.log(`[notifier] sent ${signups.length} signup DM${signups.length === 1 ? '' : 's'}`);
+  }
+
+  // ── Kickoff reminders — fired once, ~15 min before start_time ───────────
+  const reminders = await getDueReminders();
+  for (const r of reminders) {
+    await markReminderSent(r.tournamentId);
+    for (const discordId of r.discordIds) {
+      await sendDm(client, discordId, `⏰ **${r.tournamentName}** kicks off in ~15 minutes — get in the Discord voice channel!`);
+    }
+    console.log(`[notifier] sent ${r.discordIds.length} kickoff reminder${r.discordIds.length === 1 ? '' : 's'} for ${r.tournamentName}`);
+  }
+
+  // ── Drafts only matter while a Frontier is open ─────────────────────────
+  const open = await getLatestOpenTournament();
+  if (!open) {
+    teamKeys = null; // next tournament reseeds silently instead of DM-flooding its roster
+    return;
   }
 
   // team_members has no timestamp — diff roster snapshots instead. New keys

@@ -1,4 +1,4 @@
-import { asc, eq, gt, inArray, ne, and } from 'drizzle-orm';
+import { asc, eq, gt, inArray, lte, ne, and } from 'drizzle-orm';
 import { getDb } from '../client';
 import { awards, eventSignups, teamMembers, teams, tournaments, userAwards, users } from '../schema';
 
@@ -44,24 +44,80 @@ export async function getNewAwardGrants(since: Date): Promise<NewAwardGrant[]> {
 }
 
 export type NewSignup = {
+  signupId: string;
   /** event_signups.user_id IS the discordId. */
   discordId: string;
   tournamentName: string;
-  signedUpAt: Date;
 };
 
-/** Signups after `since` on any non-completed tournament, oldest first. */
-export async function getNewSignups(since: Date): Promise<NewSignup[]> {
+/** Signups that still need a confirmation DM (notified = false) on a
+ *  non-completed tournament. A per-row flag — not a timestamp watermark — so a
+ *  signup is DM'd exactly once ever, even across bot restarts. */
+export async function getUnnotifiedSignups(): Promise<NewSignup[]> {
   return getDb()
     .select({
+      signupId: eventSignups.id,
       discordId: eventSignups.userId,
       tournamentName: tournaments.name,
-      signedUpAt: eventSignups.signedUpAt,
     })
     .from(eventSignups)
     .innerJoin(tournaments, eq(eventSignups.tournamentId, tournaments.id))
-    .where(and(gt(eventSignups.signedUpAt, since), ne(tournaments.status, 'completed')))
+    .where(and(eq(eventSignups.notified, false), ne(tournaments.status, 'completed')))
     .orderBy(asc(eventSignups.signedUpAt));
+}
+
+/** Mark signups as DM'd — called right after the confirmations go out. */
+export async function markSignupsNotified(signupIds: string[]): Promise<void> {
+  if (signupIds.length === 0) return;
+  await getDb()
+    .update(eventSignups)
+    .set({ notified: true })
+    .where(inArray(eventSignups.id, signupIds));
+}
+
+export type DueReminder = {
+  tournamentId: string;
+  tournamentName: string;
+  discordIds: string[];
+};
+
+/** Tournaments whose kickoff is within the next 15 minutes and haven't sent
+ *  their reminder yet — one "starts soon" DM to everyone signed up. The lower
+ *  bound (start_time > now) means a reminder never fires for a Frontier that
+ *  already kicked off (e.g. after a bot restart). */
+export async function getDueReminders(): Promise<DueReminder[]> {
+  const db = getDb();
+  const now = new Date();
+  const soon = new Date(now.getTime() + 15 * 60_000);
+
+  const due = await db
+    .select({ id: tournaments.id, name: tournaments.name })
+    .from(tournaments)
+    .where(and(
+      eq(tournaments.reminderSent, false),
+      ne(tournaments.status, 'completed'),
+      gt(tournaments.startTime, now),
+      lte(tournaments.startTime, soon),
+    ));
+  if (due.length === 0) return [];
+
+  const out: DueReminder[] = [];
+  for (const t of due) {
+    const rows = await db
+      .select({ userId: eventSignups.userId })
+      .from(eventSignups)
+      .where(eq(eventSignups.tournamentId, t.id));
+    out.push({ tournamentId: t.id, tournamentName: t.name, discordIds: [...new Set(rows.map(r => r.userId))] });
+  }
+  return out;
+}
+
+/** Flip a tournament's reminder flag so it only ever fires once. */
+export async function markReminderSent(tournamentId: string): Promise<void> {
+  await getDb()
+    .update(tournaments)
+    .set({ reminderSent: true })
+    .where(eq(tournaments.id, tournamentId));
 }
 
 export type TeamMemberKey = {

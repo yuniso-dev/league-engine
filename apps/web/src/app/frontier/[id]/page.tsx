@@ -5,6 +5,7 @@ import { auth } from '@/auth';
 import { glass, REALMS, T, FONT_D, FONT_B, FONT_M, rgba } from '@/lib/realm-colors';
 import { STAGE_LABELS, STATUS_COLORS } from '@/lib/tournament-ui';
 import { BackPill } from '@/components/ui/BackPill';
+import { LocalTime } from '@/components/ui/LocalTime';
 import { LeagueTable } from '@/components/LeagueTable';
 import { StatLeaderList } from '@/components/StatLeaderList';
 import { SignupCard } from '@/components/SignupCard';
@@ -31,7 +32,7 @@ export default async function FrontierDetailPage({ params }: Props) {
   ]);
   if (!detail) notFound();
 
-  const { tournament, teams, matchesByStage, table, stats, signups } = detail;
+  const { tournament, teams, matchesByStage, table, stats, signups, startTime } = detail;
   const accent = REALMS[0].accent;
 
   const isLoggedIn = Boolean(session?.user?.discordId);
@@ -117,9 +118,13 @@ export default async function FrontierDetailPage({ params }: Props) {
               </div>
               <div style={{ fontFamily: FONT_B, fontSize: 14, color: T.faint, marginTop: 4 }}>
                 Season {tournament.season}
-                {tournament.startDate && ` · ${tournament.startDate}`}
                 {tournament.winnerName && ` · 🏆 ${tournament.winnerName}`}
               </div>
+              {startTime && tournament.status !== 'completed' && (
+                <div style={{ fontFamily: FONT_M, fontSize: 12.5, color: accent, marginTop: 8, letterSpacing: 0.3 }}>
+                  🗓️ Kicks off <LocalTime iso={startTime.toISOString()} />
+                </div>
+              )}
             </div>
             <span style={{
               fontFamily: FONT_M,

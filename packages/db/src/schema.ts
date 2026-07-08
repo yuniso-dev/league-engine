@@ -81,6 +81,8 @@ export const tournaments = pgTable('tournaments', {
   status:        tournamentStatusEnum('status').notNull().default('upcoming'),
   ranked:        boolean('ranked').notNull().default(true),
   startDate:     date('start_date'),
+  startTime:     timestamp('start_time', { withTimezone: true }), // kickoff time shown to players + drives the reminder
+  reminderSent:  boolean('reminder_sent').notNull().default(false),
   endDate:       date('end_date'),
   winnerTeamId:  uuid('winner_team_id'),
   createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -94,6 +96,7 @@ export const eventSignups = pgTable('event_signups', {
   signedUpAt:   timestamp('signed_up_at', { withTimezone: true }).notNull().defaultNow(),
   source:       text('source').notNull().default('discord'),
   attended:     boolean('attended'),
+  notified:     boolean('notified').notNull().default(false), // signup-confirmation DM sent
 });
 
 export const teams = pgTable('teams', {

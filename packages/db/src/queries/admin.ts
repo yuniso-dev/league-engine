@@ -84,7 +84,7 @@ export async function listAdminTournaments(): Promise<TournamentRow[]> {
 // end_date is kept in the schema but always written as null going forward.
 export async function createTournament(
   adminId: string,
-  data: { name: string; season: number; ranked: boolean; date: string | null },
+  data: { name: string; season: number; ranked: boolean; date: string | null; startTime: Date | null },
 ): Promise<string> {
   const [row] = await getDb()
     .insert(tournaments)
@@ -93,6 +93,7 @@ export async function createTournament(
       season: data.season,
       ranked: data.ranked,
       startDate: data.date,
+      startTime: data.startTime,
       endDate: null,
     })
     .returning({ id: tournaments.id });
@@ -113,8 +114,17 @@ export async function getTournamentById(tournamentId: string): Promise<Tournamen
 export async function updateTournament(
   adminId: string,
   tournamentId: string,
-  data: { name: string; season: number; ranked: boolean; date: string | null },
+  data: { name: string; season: number; ranked: boolean; date: string | null; startTime: Date | null },
 ): Promise<void> {
+  // Re-arm the "starts soon" reminder whenever the kickoff time actually
+  // changes, so editing the schedule lets the reminder fire again.
+  const [current] = await getDb()
+    .select({ startTime: tournaments.startTime })
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1);
+  const timeChanged = (current?.startTime?.getTime() ?? null) !== (data.startTime?.getTime() ?? null);
+
   await getDb()
     .update(tournaments)
     .set({
@@ -122,6 +132,8 @@ export async function updateTournament(
       season: data.season,
       ranked: data.ranked,
       startDate: data.date,
+      startTime: data.startTime,
+      ...(timeChanged && { reminderSent: false }),
       endDate: null,
       updatedAt: new Date(),
     })
