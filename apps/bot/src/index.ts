@@ -3,11 +3,13 @@
 // reveal, /leaderboard + auto-updating rankings message, /profile.
 // Needs an always-on host (see SETUP.md) — cannot run on Vercel.
 
-// Before anything touches the DB: this process runs 24/7 against a
-// memory-tight free-tier database, and every permanent connection costs it.
-// The shared client default (4) suits bursty serverless, not us. Railway's
-// DB_POOL_MAX env var still overrides.
-process.env.DB_POOL_MAX ??= '2';
+// Before anything touches the DB: this process runs 24/7 and fires several
+// background jobs on the same cadence (notifier + role sync every 60s, etc.).
+// A pool of 2 meant two jobs could hold both connections and leave nothing for
+// a slash command's query — so the command hung past Discord's window. 5 gives
+// headroom so interactions always get a connection. Railway's DB_POOL_MAX
+// env var still overrides. (Supabase's pgBouncer pooler handles this easily.)
+process.env.DB_POOL_MAX ??= '5';
 
 import { Client, Events, GatewayIntentBits, type Guild } from 'discord.js';
 import { closeDb, getConfig } from '@inazuma/db';
@@ -68,10 +70,21 @@ process.on('uncaughtException', e => {
   process.exit(1);
 });
 
-/** Interval bodies must never kill the timer or the process on a transient error. */
+/** Interval bodies must never kill the timer or the process on a transient
+ *  error — and must never STACK: if a pass is still running when the next tick
+ *  fires (e.g. the notifier mid-way through a big DM burst), skip it rather
+ *  than run two copies that fight over DB connections. */
 function every(ms: number, label: string, fn: () => Promise<void>): void {
+  let running = false;
   timers.push(setInterval(() => {
-    fn().catch(e => console.error(`[bot] ${label} failed —`, e));
+    if (running) {
+      console.log(`[bot] ${label} still running — skipping this tick`);
+      return;
+    }
+    running = true;
+    fn()
+      .catch(e => console.error(`[bot] ${label} failed —`, e))
+      .finally(() => { running = false; });
   }, ms));
 }
 

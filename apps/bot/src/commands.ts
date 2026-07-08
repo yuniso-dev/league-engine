@@ -96,29 +96,13 @@ const definitions = [
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder()
     .setName('awardpoll')
-    .setDescription('Admin: run the voted-honour polls (Xavier Frost / Wallside’s Award)')
+    .setDescription('Admin: run the Xavier Frost poll (auto-nominates the top 4 by rating)')
     .addSubcommand(s =>
       s.setName('start')
-        .setDescription('Post a 24h native poll for a voted honour in this channel')
-        .addStringOption(o =>
-          o.setName('kind').setDescription('Which honour').setRequired(true)
-            .addChoices(
-              { name: 'Xavier Frost — Player of the Tournament', value: 'pott' },
-              { name: "Wallside's Award — Best Defender", value: 'defender' },
-            ))
-        .addUserOption(o => o.setName('nominee1').setDescription('First nominee').setRequired(true))
-        .addUserOption(o => o.setName('nominee2').setDescription('Second nominee').setRequired(true))
-        .addUserOption(o => o.setName('nominee3').setDescription('Third nominee'))
-        .addUserOption(o => o.setName('nominee4').setDescription('Fourth nominee')))
+        .setDescription('Post a 24h poll across the top 4 players by average rating'))
     .addSubcommand(s =>
       s.setName('close')
-        .setDescription('End the poll and announce the winner')
-        .addStringOption(o =>
-          o.setName('kind').setDescription('Which honour').setRequired(true)
-            .addChoices(
-              { name: 'Xavier Frost — Player of the Tournament', value: 'pott' },
-              { name: "Wallside's Award — Best Defender", value: 'defender' },
-            )))
+        .setDescription('End the poll and announce the winner'))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder()
     .setName('spinorder')

@@ -168,7 +168,7 @@ export type {
   AdminAwardDetail,
   PublicAward,
 } from './queries/awards';
-export { getCeremonySheet } from './queries/ceremony';
+export { getCeremonySheet, getPottNominees } from './queries/ceremony';
 export type { CeremonySheet, CeremonyPlayer } from './queries/ceremony';
 export {
   getAdminDiscordIds,
