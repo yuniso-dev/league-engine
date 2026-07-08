@@ -1,4 +1,4 @@
-import { asc, eq, gt, inArray, lte, ne, and } from 'drizzle-orm';
+import { asc, eq, gt, inArray, lte, ne, and, sql } from 'drizzle-orm';
 import { getDb } from '../client';
 import { awards, eventSignups, teamMembers, teams, tournaments, userAwards, users } from '../schema';
 
@@ -48,6 +48,8 @@ export type NewSignup = {
   /** event_signups.user_id IS the discordId. */
   discordId: string;
   tournamentName: string;
+  /** False → the confirmation DM nudges them to link their EA ID so stats attach. */
+  eaLinked: boolean;
 };
 
 /** Signups that still need a confirmation DM (notified = false) on a
@@ -59,9 +61,11 @@ export async function getUnnotifiedSignups(): Promise<NewSignup[]> {
       signupId: eventSignups.id,
       discordId: eventSignups.userId,
       tournamentName: tournaments.name,
+      eaLinked: sql<boolean>`(${users.eaName} is not null and length(trim(${users.eaName})) > 0)`,
     })
     .from(eventSignups)
     .innerJoin(tournaments, eq(eventSignups.tournamentId, tournaments.id))
+    .innerJoin(users, eq(eventSignups.userId, users.discordId))
     .where(and(eq(eventSignups.notified, false), ne(tournaments.status, 'completed')))
     .orderBy(asc(eventSignups.signedUpAt));
 }
