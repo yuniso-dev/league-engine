@@ -4,7 +4,7 @@ import { getTournamentDetail, isSignedUp, runResilient } from '@inazuma/db';
 import { auth } from '@/auth';
 import { getCachedUserByDiscordId } from '@/lib/user';
 import { glass, REALMS, T, FONT_D, FONT_B, FONT_M, rgba } from '@/lib/realm-colors';
-import { STAGE_LABELS, STATUS_COLORS } from '@/lib/tournament-ui';
+import { STATUS_COLORS, stageLabel } from '@/lib/tournament-ui';
 import { BackPill } from '@/components/ui/BackPill';
 import { LocalTime } from '@/components/ui/LocalTime';
 import { LeagueTable } from '@/components/LeagueTable';
@@ -57,7 +57,7 @@ export default async function FrontierDetailPage({ params }: Props) {
         fontFamily: FONT_M, fontSize: 11, letterSpacing: 1.5,
         textTransform: 'uppercase', color: accent, marginBottom: 8,
       }}>
-        {STAGE_LABELS[stage.stage]}
+        {stageLabel(stage.stage, teams.length)}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {stage.matches.map(m => {
