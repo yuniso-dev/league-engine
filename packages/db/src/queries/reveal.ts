@@ -1,20 +1,30 @@
-import { and, asc, desc, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNotNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import { matchDeltas, DEFAULT_ELO_CONFIG, type EloConfig } from '@inazuma/core';
+import {
+  matchDeltas,
+  awardBonusForName,
+  AWARD_BONUS_CAP_PER_REVEAL,
+  DEFAULT_ELO_CONFIG,
+  type EloConfig,
+} from '@inazuma/core';
 import { getDb } from '../client';
 import {
   adminActions,
+  awards,
   config,
   matches,
   matchParticipants,
   ratingHistory,
   teams,
   tournaments,
+  userAwards,
   users,
 } from '../schema';
 
 // Weekly reveal: apply the Elo engine to every unprocessed ranked match in
-// chronological order, then re-rank the ladder. previewReveal() and
+// chronological order — each participant's recorded match stats personalise
+// their slice of the team swing — then pay one-off Elo bonuses for honours
+// granted since the last reveal, and re-rank the ladder. previewReveal() and
 // commitReveal() share computeReveal() so what the admin sees is exactly
 // what gets committed.
 
@@ -43,11 +53,21 @@ export type RevealPlayerPreview = {
   newGames: number;
   wasProvisional: boolean;
   nowProvisional: boolean;
+  /** One-off Elo from honours granted since the last reveal (already inside delta). */
+  awardBonus: number;
+};
+
+export type RevealAwardPreview = {
+  displayName: string;
+  awardName: string;
+  awardIcon: string | null;
+  bonus: number;
 };
 
 export type RevealPreview = {
   matches: RevealMatchPreview[];
   players: RevealPlayerPreview[];
+  awardGrants: RevealAwardPreview[];
   lastRevealAt: Date | null;
 };
 
@@ -74,6 +94,7 @@ type ComputeResult = {
   matchIds: string[];
   matchPreviews: RevealMatchPreview[];
   participantUpdates: ParticipantUpdate[];
+  awardGrants: RevealAwardPreview[];
   /** Final per-player state after all pending matches, keyed by discordId. */
   players: Map<string, {
     publicId: string | null;
@@ -83,6 +104,7 @@ type ComputeResult = {
     oldGames: number;
     newGames: number;
     wasProvisional: boolean;
+    awardBonus: number;
   }>;
 };
 
@@ -137,6 +159,10 @@ async function computeReveal(db: Queryable): Promise<ComputeResult> {
           matchId: matchParticipants.matchId,
           userId: matchParticipants.userId,
           teamId: matchParticipants.teamId,
+          rating: matchParticipants.rating,
+          goals: matchParticipants.goals,
+          assists: matchParticipants.assists,
+          tackles: matchParticipants.tackles,
           elo: users.elo,
           gamesPlayed: users.gamesPlayed,
           provisional: users.provisional,
@@ -158,7 +184,14 @@ async function computeReveal(db: Queryable): Promise<ComputeResult> {
   // Working state carries ratings forward match-by-match within the reveal.
   const state = new Map<string, { elo: number; games: number }>();
   const players: ComputeResult['players'] = new Map();
-  const seed = (p: (typeof parts)[number]) => {
+  const seed = (p: {
+    userId: string;
+    elo: string | null;
+    gamesPlayed: number;
+    provisional: boolean;
+    publicId: string | null;
+    displayName: string;
+  }) => {
     if (!state.has(p.userId)) {
       state.set(p.userId, { elo: num(p.elo), games: p.gamesPlayed });
       players.set(p.userId, {
@@ -169,6 +202,7 @@ async function computeReveal(db: Queryable): Promise<ComputeResult> {
         oldGames: p.gamesPlayed,
         newGames: p.gamesPlayed,
         wasProvisional: p.provisional,
+        awardBonus: 0,
       });
     }
   };
@@ -186,10 +220,23 @@ async function computeReveal(db: Queryable): Promise<ComputeResult> {
 
     [...home, ...away].forEach(seed);
 
+    // Per-player stats ride along so teammates with a better match rating /
+    // more goal involvement earn a bigger slice of the team swing.
+    const toEloPlayer = (p: (typeof parts)[number]) => ({
+      elo: state.get(p.userId)!.elo,
+      gamesPlayed: state.get(p.userId)!.games,
+      stats: {
+        rating: p.rating == null ? null : num(p.rating),
+        goals: p.goals,
+        assists: p.assists,
+        tackles: p.tackles,
+      },
+    });
+
     const deltas = matchDeltas(
       {
-        home: home.map(p => ({ elo: state.get(p.userId)!.elo, gamesPlayed: state.get(p.userId)!.games })),
-        away: away.map(p => ({ elo: state.get(p.userId)!.elo, gamesPlayed: state.get(p.userId)!.games })),
+        home: home.map(toEloPlayer),
+        away: away.map(toEloPlayer),
         homeScore: m.homeScore!,
         awayScore: m.awayScore!,
       },
@@ -227,7 +274,71 @@ async function computeReveal(db: Queryable): Promise<ComputeResult> {
     });
   }
 
-  return { cfg, lastRevealAt, matchIds, matchPreviews, participantUpdates, players };
+  // ── Award bonuses ── honours granted since the last reveal pay a one-off
+  // Elo boost, applied AFTER the matches (the ceremony follows the games).
+  // Scoped by the lastRevealAt watermark, so each grant pays exactly once.
+  const grants = await db
+    .select({
+      userId: userAwards.userId,
+      awardName: awards.name,
+      awardIcon: awards.icon,
+    })
+    .from(userAwards)
+    .innerJoin(awards, eq(userAwards.awardId, awards.id))
+    .where(lastRevealAt ? gt(userAwards.awardedAt, lastRevealAt) : undefined)
+    .orderBy(asc(userAwards.awardedAt));
+
+  const awardGrants: RevealAwardPreview[] = [];
+  const bonusByUser = new Map<string, { total: number; rows: { awardName: string; awardIcon: string | null; bonus: number }[] }>();
+  for (const g of grants) {
+    const bonus = awardBonusForName(g.awardName);
+    if (bonus === 0) continue;
+    const entry = bonusByUser.get(g.userId) ?? { total: 0, rows: [] };
+    entry.total += bonus;
+    entry.rows.push({ awardName: g.awardName, awardIcon: g.awardIcon, bonus });
+    bonusByUser.set(g.userId, entry);
+  }
+
+  if (bonusByUser.size > 0) {
+    // Winners who have no pending match this reveal still need seeding.
+    const missing = [...bonusByUser.keys()].filter(id => !state.has(id));
+    if (missing.length > 0) {
+      const rows = await db
+        .select({
+          userId: users.discordId,
+          elo: users.elo,
+          gamesPlayed: users.gamesPlayed,
+          provisional: users.provisional,
+          publicId: users.publicId,
+          displayName: users.displayName,
+        })
+        .from(users)
+        .where(inArray(users.discordId, missing));
+      rows.forEach(seed);
+    }
+
+    for (const [userId, entry] of bonusByUser) {
+      const s = state.get(userId);
+      const summary = players.get(userId);
+      if (!s || !summary) continue; // award row without a users row — skip
+      // Capped per reveal so a full sweep can't run away with the ladder.
+      const applied = Math.min(entry.total, AWARD_BONUS_CAP_PER_REVEAL);
+      const scale = applied / entry.total;
+      s.elo = Math.round((s.elo + applied) * 100) / 100;
+      summary.newElo = s.elo;
+      summary.awardBonus = Math.round(applied * 100) / 100;
+      for (const r of entry.rows) {
+        awardGrants.push({
+          displayName: summary.displayName,
+          awardName: r.awardName,
+          awardIcon: r.awardIcon,
+          bonus: Math.round(r.bonus * scale * 100) / 100,
+        });
+      }
+    }
+  }
+
+  return { cfg, lastRevealAt, matchIds, matchPreviews, participantUpdates, awardGrants, players };
 }
 
 export async function previewReveal(): Promise<RevealPreview> {
@@ -243,10 +354,16 @@ export async function previewReveal(): Promise<RevealPreview> {
       newGames: p.newGames,
       wasProvisional: p.wasProvisional,
       nowProvisional: p.newGames < result.cfg.placementGames,
+      awardBonus: p.awardBonus,
     }))
     .sort((a, b) => b.delta - a.delta);
 
-  return { matches: result.matchPreviews, players, lastRevealAt: result.lastRevealAt };
+  return {
+    matches: result.matchPreviews,
+    players,
+    awardGrants: result.awardGrants,
+    lastRevealAt: result.lastRevealAt,
+  };
 }
 
 export async function commitReveal(adminId: string): Promise<{ matches: number; players: number }> {
@@ -254,7 +371,11 @@ export async function commitReveal(adminId: string): Promise<{ matches: number; 
 
   const counts = await db.transaction(async tx => {
     const result = await computeReveal(tx);
-    if (result.matchIds.length === 0) return { matches: 0, players: 0 };
+    // Award-only reveals are valid: a ceremony after the last reveal pays its
+    // bonuses even when no new matches are pending.
+    if (result.matchIds.length === 0 && result.players.size === 0) {
+      return { matches: 0, players: 0 };
+    }
 
     const now = new Date();
     const weekOf = now.toISOString().slice(0, 10);
@@ -277,10 +398,12 @@ export async function commitReveal(adminId: string): Promise<{ matches: number; 
         .where(eq(matchParticipants.id, u.participantId));
     }
 
-    await tx
-      .update(matches)
-      .set({ processed: true, processedAt: now })
-      .where(inArray(matches.id, result.matchIds));
+    if (result.matchIds.length > 0) {
+      await tx
+        .update(matches)
+        .set({ processed: true, processedAt: now })
+        .where(inArray(matches.id, result.matchIds));
+    }
 
     for (const [discordId, p] of result.players) {
       await tx
@@ -373,7 +496,7 @@ export async function commitReveal(adminId: string): Promise<{ matches: number; 
     return { matches: result.matchIds.length, players: result.players.size };
   });
 
-  if (counts.matches > 0) {
+  if (counts.matches > 0 || counts.players > 0) {
     await getDb().insert(adminActions).values({
       adminId,
       action: 'reveal.commit',

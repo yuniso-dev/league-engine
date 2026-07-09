@@ -354,7 +354,10 @@ export async function commitRevealAction(
     const admin = await requireAdminAction();
 
     const { matches, players } = await commitReveal(admin.discordId);
-    if (matches === 0) return { error: 'Nothing to process — no pending ranked matches.' };
+    // Award-only reveals (players moved, no matches) are valid commits.
+    if (matches === 0 && players === 0) {
+      return { error: 'Nothing to process — no pending ranked matches or award bonuses.' };
+    }
 
     revalidatePath('/admin/reveal');
     revalidatePath('/');

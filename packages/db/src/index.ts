@@ -236,6 +236,7 @@ export type {
   RevealPreview,
   RevealPlayerPreview,
   RevealMatchPreview,
+  RevealAwardPreview,
   RatingPoint,
 } from './queries/reveal';
 export { toPublicPlayer, toPublicTournament } from './dto';
