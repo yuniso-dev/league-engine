@@ -107,7 +107,7 @@ export default function TournamentForm(props: Props) {
               <input
                 name="season"
                 type="number"
-                min={1}
+                min={0}
                 defaultValue={values.season}
                 required
                 style={inputBase}

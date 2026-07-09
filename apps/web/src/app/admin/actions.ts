@@ -29,6 +29,8 @@ import {
   grantAward,
   grantAwardIfAbsent,
   recomputeRanks,
+  resetSeasonRatings,
+  setPlayerElo,
   applyPendingMatch,
   discardPendingMatch,
   removeTournamentExclusion,
@@ -96,7 +98,8 @@ export async function createTournamentAction(
     if (!name) return { error: 'Name is required.' };
 
     const season = parseInt(str(formData, 'season'), 10);
-    if (!Number.isInteger(season) || season < 1) return { error: 'Season must be a positive number.' };
+    // Season 0 is allowed — it's the "Beta" label for the test frontier.
+    if (!Number.isInteger(season) || season < 0) return { error: 'Season must be 0 or greater.' };
 
     const startTime = parseStartTime(str(formData, 'startTime'));
     if (startTime === 'invalid') return { error: 'Kickoff time looks wrong — pick it again.' };
@@ -130,7 +133,8 @@ export async function updateTournamentAction(
     if (!name) return { error: 'Name is required.' };
 
     const season = parseInt(str(formData, 'season'), 10);
-    if (!Number.isInteger(season) || season < 1) return { error: 'Season must be a positive number.' };
+    // Season 0 is allowed — it's the "Beta" label for the test frontier.
+    if (!Number.isInteger(season) || season < 0) return { error: 'Season must be 0 or greater.' };
 
     const startTime = parseStartTime(str(formData, 'startTime'));
     if (startTime === 'invalid') return { error: 'Kickoff time looks wrong — pick it again.' };
@@ -646,6 +650,67 @@ export async function recalcRanksAction(
       ok: true,
       message: 'Ladder normalised — participation floor applied, never-played unranked, ties share a rank.',
     };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function resetSeasonAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+
+    // Type-to-confirm guard — this wipes the whole ladder.
+    if (str(formData, 'confirm').toUpperCase() !== 'RESET') {
+      return { error: 'Type RESET to confirm — this clears every player\'s Elo, games and ranks.' };
+    }
+    const newSeason = parseInt(str(formData, 'newSeason'), 10);
+    if (!Number.isInteger(newSeason) || newSeason < 1) return { error: 'New season must be 1 or greater.' };
+
+    const { players } = await resetSeasonRatings(admin.discordId, { newSeason });
+
+    revalidatePath('/');
+    revalidatePath('/admin/players');
+    revalidatePath('/admin/settings');
+    revalidatePublicData();
+    return {
+      ok: true,
+      message: `Season reset — ${players} player${players === 1 ? '' : 's'} back to base Elo, ladder cleared, now Season ${newSeason}.`,
+    };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function setPlayerEloAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+
+    const publicId = str(formData, 'publicId');
+    if (!publicId) return { error: 'Missing player.' };
+
+    const elo = parseFloat(str(formData, 'elo'));
+    if (!Number.isFinite(elo) || elo < 0 || elo > 9999) return { error: 'Elo must be between 0 and 9999.' };
+
+    const gamesRaw = str(formData, 'gamesPlayed');
+    let gamesPlayed: number | undefined;
+    if (gamesRaw) {
+      const g = parseInt(gamesRaw, 10);
+      if (!Number.isInteger(g) || g < 0) return { error: 'Games played must be 0 or greater.' };
+      gamesPlayed = g;
+    }
+
+    await setPlayerElo(admin.discordId, publicId, { elo, gamesPlayed });
+
+    revalidatePath(`/admin/players/${publicId}`);
+    revalidatePath(`/p/${publicId}`);
+    revalidatePublicData();
+    return { ok: true, message: `Elo set to ${Math.round(elo)}. Ranks refresh on the next reveal or recalc.` };
   } catch (e) {
     return { error: message(e) };
   }
