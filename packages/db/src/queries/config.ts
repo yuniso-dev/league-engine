@@ -25,6 +25,8 @@ const DEFAULT_CONFIG: ConfigRow = {
   frontierRules: null,
   signupRoleId: null,
   punishedRoleId: null,
+  legacyRoleId: null,
+  betaRoleId: null,
   updatedAt: new Date(),
 };
 
@@ -49,6 +51,8 @@ export async function updateConfig(
     frontierRules?: string | null;
     signupRoleId?: string | null;
     punishedRoleId?: string | null;
+    legacyRoleId?: string | null;
+    betaRoleId?: string | null;
   },
 ): Promise<void> {
   const now = new Date();
@@ -66,6 +70,8 @@ export async function updateConfig(
     ...(data.frontierRules !== undefined && { frontierRules: data.frontierRules }),
     ...(data.signupRoleId !== undefined && { signupRoleId: data.signupRoleId }),
     ...(data.punishedRoleId !== undefined && { punishedRoleId: data.punishedRoleId }),
+    ...(data.legacyRoleId !== undefined && { legacyRoleId: data.legacyRoleId }),
+    ...(data.betaRoleId !== undefined && { betaRoleId: data.betaRoleId }),
     updatedAt: now,
   };
 
