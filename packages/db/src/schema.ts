@@ -344,3 +344,19 @@ export const casualMatchPlayers = pgTable('casual_match_players', {
 }, (table) => ({
   pk: primaryKey({ columns: [table.matchId, table.eaName] }),
 }));
+
+// Pre-website archive: the old Frontier editions (I–XVI) and their honours,
+// imported from a pasted Discord history. Winners are stored by Discord ID
+// only (no users FK — many are ex-members), and resolved to names/profiles
+// with a LEFT JOIN when the person still has an account.
+export const legacyEditions = pgTable('legacy_editions', {
+  edition: integer('edition').primaryKey(), // 1 → "Frontier I" … 16 → "Frontier XVI"
+  label:   text('label').notNull(),
+});
+
+export const legacyAwardWinners = pgTable('legacy_award_winners', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  edition:   integer('edition').notNull().references(() => legacyEditions.edition, { onDelete: 'cascade' }),
+  category:  text('category').notNull(), // champion | golden_boot | wallside | sharps | xavier_frost
+  discordId: text('discord_id').notNull(),
+});

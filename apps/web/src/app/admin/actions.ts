@@ -31,6 +31,7 @@ import {
   recomputeRanks,
   resetSeasonRatings,
   setPlayerElo,
+  importLegacy,
   applyPendingMatch,
   discardPendingMatch,
   removeTournamentExclusion,
@@ -57,7 +58,7 @@ import {
   updateTournamentStatus,
   type MatchStage,
 } from '@inazuma/db';
-import { HONOURS, isRomanNumeral } from '@inazuma/core';
+import { HONOURS, isRomanNumeral, parseLegacyArchive } from '@inazuma/core';
 import { pickTeamOfTournament } from '@/lib/tott';
 import { requireAdminAction } from '@/lib/admin';
 import {
@@ -711,6 +712,35 @@ export async function setPlayerEloAction(
     revalidatePath(`/p/${publicId}`);
     revalidatePublicData();
     return { ok: true, message: `Elo set to ${Math.round(elo)}. Ranks refresh on the next reveal or recalc.` };
+  } catch (e) {
+    return { error: message(e) };
+  }
+}
+
+export async function importLegacyAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  try {
+    const admin = await requireAdminAction();
+
+    const text = str(formData, 'archive');
+    if (!text) return { error: 'Paste the awards history first.' };
+
+    const editions = parseLegacyArchive(text);
+    if (editions.length === 0) {
+      return { error: 'No Frontier editions found — check the format (a "## Frontier IX" heading, then lines like "🏆 Winners: <@id> …").' };
+    }
+
+    const { editions: e, winners } = await importLegacy(admin.discordId, editions);
+
+    revalidatePath('/hall-of-fame');
+    revalidatePath('/admin/legacy');
+    revalidatePublicData();
+    return {
+      ok: true,
+      message: `Imported ${e} edition${e === 1 ? '' : 's'} and ${winners} honour${winners === 1 ? '' : 's'}. It's live on the Hall of Fame → Legacy.`,
+    };
   } catch (e) {
     return { error: message(e) };
   }

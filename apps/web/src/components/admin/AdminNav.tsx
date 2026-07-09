@@ -16,6 +16,7 @@ const TABS: { href: string; label: string; match: (p: string) => boolean }[] = [
   { href: '/admin/players', label: '👥 Players', match: p => p.startsWith('/admin/players') },
   { href: '/admin/clubs', label: '📡 Clubs', match: p => p.startsWith('/admin/clubs') },
   { href: '/admin/awards', label: '🏅 Awards', match: p => p.startsWith('/admin/awards') },
+  { href: '/admin/legacy', label: '📜 Legacy', match: p => p.startsWith('/admin/legacy') },
   { href: '/admin/reveal', label: '⚡ Reveal', match: p => p.startsWith('/admin/reveal') },
   { href: '/admin/settings', label: '⚙ Settings', match: p => p.startsWith('/admin/settings') },
 ];

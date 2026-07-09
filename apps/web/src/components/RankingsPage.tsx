@@ -4,6 +4,7 @@ import type { PublicPlayer } from '@inazuma/db';
 import { Bolt } from '@/components/ui/Bolt';
 import { Avatar } from '@/components/ui/Avatar';
 import { FlagIcon } from '@/components/ui/FlagIcon';
+import { TagChips } from '@/components/ui/TagChips';
 import { REALMS, T, FONT_D, FONT_B, FONT_M, rankColor, rgba, lighten, glass } from '@/lib/realm-colors';
 
 type Props = {
@@ -257,6 +258,7 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
                     <FlagIcon code={p.country} size={17} />
                   </span>
                   {p.tier === 'premium' && <Bolt size={9} color={T.gold} />}
+                  <TagChips tags={p.tags} compact />
                   {p.title && (
                     <span style={{
                       color: T.gold, fontSize: 9, fontFamily: FONT_M,

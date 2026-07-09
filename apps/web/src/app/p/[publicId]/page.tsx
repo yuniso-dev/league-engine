@@ -21,6 +21,7 @@ import { AwardShowcase } from '@/components/AwardShowcase';
 import { RecentMatchesCard } from '@/components/RecentMatchesCard';
 import { glass, T, FONT_D, FONT_B, FONT_M, rankColor, rgba, lighten } from '@/lib/realm-colors';
 import { FlagIcon } from '@/components/ui/FlagIcon';
+import { TagChips } from '@/components/ui/TagChips';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -121,6 +122,11 @@ export default async function PublicProfilePage({ params }: Props) {
             {player.country && (
               <div style={{ marginTop: 4 }}>
                 <FlagIcon code={player.country} size={20} />
+              </div>
+            )}
+            {player.tags && player.tags.length > 0 && (
+              <div style={{ display: 'flex', gap: 5, marginTop: 7, flexWrap: 'wrap' }}>
+                <TagChips tags={player.tags} />
               </div>
             )}
           </div>

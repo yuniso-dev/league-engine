@@ -4,6 +4,8 @@ import type { users, tournaments } from './schema';
 type UserRow = InferSelectModel<typeof users>;
 type TournamentRow = InferSelectModel<typeof tournaments>;
 
+export type PlayerTag = 'legacy' | 'beta';
+
 // Fields safe to expose to the browser.
 // NEVER expose: discordId, role, isBlacklisted, initialised, initialisedAt,
 //               lastActiveAt, createdAt, updatedAt, or any internal timestamps.
@@ -32,6 +34,9 @@ export type PublicPlayer = {
   accentColor: string | null;
   tier: 'free' | 'premium';
   eventsAttended: number;
+  /** Profile tags — legacy (won in the old version) / beta (played the test frontier).
+   *  Attached by the rankings + profile queries; absent means "not computed here". */
+  tags?: PlayerTag[];
   /** Ladder extras — only populated by getRankings. */
   awardBadges?: { name: string; icon: string | null; imageUrl: string | null }[];
   wins?: number;

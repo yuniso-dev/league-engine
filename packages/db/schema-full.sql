@@ -426,3 +426,19 @@ $$ language plpgsql;
 
 create trigger trg_users_updated        before update on users       for each row execute function set_updated_at();
 create trigger trg_tournaments_updated  before update on tournaments for each row execute function set_updated_at();
+
+-- Legacy archive (pre-website Frontier editions + honours, imported from Discord history).
+create table if not exists legacy_editions (
+  edition integer primary key,
+  label   text not null
+);
+
+create table if not exists legacy_award_winners (
+  id         uuid primary key default gen_random_uuid(),
+  edition    integer not null references legacy_editions(edition) on delete cascade,
+  category   text not null,
+  discord_id text not null
+);
+
+create index if not exists legacy_award_winners_edition_idx on legacy_award_winners (edition);
+create index if not exists legacy_award_winners_discord_idx  on legacy_award_winners (discord_id);

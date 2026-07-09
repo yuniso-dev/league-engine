@@ -10,6 +10,16 @@ export type { NicknamePlayer } from './queries/bot';
 export * from './schema';
 export { getRankings, searchRankings, recomputeRanks } from './queries/rankings';
 export { resetSeasonRatings, setPlayerElo } from './queries/season';
+export {
+  importLegacy,
+  getLegacyHall,
+  getLegacyTaggedDiscordIds,
+  getBetaDiscordIds,
+  getTagSets,
+  getTagsForDiscordId,
+} from './queries/legacy';
+export type { LegacyHallEdition, LegacyHallWinner } from './queries/legacy';
+export type { PlayerTag } from './dto';
 export { getTournaments, getLatestOpenTournament, getTournamentCaptains } from './queries/tournaments';
 export type { TournamentCaptain } from './queries/tournaments';
 export {
