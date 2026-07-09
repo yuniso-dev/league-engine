@@ -114,6 +114,12 @@ export default function SettingsForm({ config }: Props) {
           <Field label="Punished role ID" caption="Role the bot gives players with an active suspension (/punish, or the player page below) — removed automatically when the ban is served or pardoned. Blank = off.">
             <input name="punishedRoleId" defaultValue={config.punishedRoleId ?? ''} autoComplete="off" style={inputBase} />
           </Field>
+          <Field label="Legacy role ID" caption="Role the bot gives everyone in the imported Legacy archive (Admin → 📜 Legacy). The bot's role must sit above it. Blank = off.">
+            <input name="legacyRoleId" defaultValue={config.legacyRoleId ?? ''} autoComplete="off" style={inputBase} />
+          </Field>
+          <Field label="Beta role ID" caption="Role the bot gives everyone who played the Season 0 (test) frontier. The bot's role must sit above it. Blank = off.">
+            <input name="betaRoleId" defaultValue={config.betaRoleId ?? ''} autoComplete="off" style={inputBase} />
+          </Field>
         </div>
       </div>
 

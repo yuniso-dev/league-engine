@@ -1,12 +1,21 @@
 import type { Guild, Role } from 'discord.js';
-import { getConfig, getLatestOpenTournament, getSignupDiscordIds, listActiveSanctions } from '@inazuma/db';
+import {
+  getBetaDiscordIds,
+  getConfig,
+  getLatestOpenTournament,
+  getLegacyTaggedDiscordIds,
+  getSignupDiscordIds,
+  listActiveSanctions,
+} from '@inazuma/db';
 
-// Keeps two Discord roles mirroring the database, reconciling every minute:
+// Keeps Discord roles mirroring the database, reconciling every minute:
 //   • signed-up role — exactly who's signed up for the open Frontier; empties
 //     itself when the Frontier completes (or when nothing is open)
 //   • punished role  — exactly who's currently suspended
+//   • legacy role    — everyone in the imported pre-website archive
+//   • beta role      — everyone who played the Season 0 (test) frontier
 // Only the diff is touched, so the steady state costs zero Discord API calls.
-// Both roles are optional — configured in Admin → Settings.
+// Every role is optional — configured in Admin → Settings.
 
 /** Role IDs already warned about (missing / above the bot) — warn once, not every minute. */
 const warned = new Set<string>();
@@ -73,7 +82,7 @@ async function reconcile(guild: Guild, role: Role, want: Set<string>, label: str
 /** 60s tick (also called right after /punish and /pardon for instant feedback). */
 export async function syncRoles(guild: Guild): Promise<void> {
   const cfg = await getConfig();
-  if (!cfg.signupRoleId && !cfg.punishedRoleId) return;
+  if (!cfg.signupRoleId && !cfg.punishedRoleId && !cfg.legacyRoleId && !cfg.betaRoleId) return;
 
   if (cfg.signupRoleId) {
     const role = await resolveRole(guild, cfg.signupRoleId, 'signed-up');
@@ -89,6 +98,24 @@ export async function syncRoles(guild: Guild): Promise<void> {
     if (role) {
       const want = new Set((await listActiveSanctions()).map(s => s.discordId));
       await reconcile(guild, role, want, 'punished');
+    }
+  }
+
+  // Legacy + Beta mirror the honours archive and the Season 0 test roster.
+  // These sets rarely change, so the steady state is zero API calls.
+  if (cfg.legacyRoleId) {
+    const role = await resolveRole(guild, cfg.legacyRoleId, 'legacy');
+    if (role) {
+      const want = await getLegacyTaggedDiscordIds();
+      await reconcile(guild, role, want, 'legacy');
+    }
+  }
+
+  if (cfg.betaRoleId) {
+    const role = await resolveRole(guild, cfg.betaRoleId, 'beta');
+    if (role) {
+      const want = await getBetaDiscordIds();
+      await reconcile(guild, role, want, 'beta');
     }
   }
 }

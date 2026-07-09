@@ -787,10 +787,12 @@ export async function updateConfigAction(
     // FRONTIER: the standing rules block /frontierintro pastes into its draft.
     const frontierRules = str(formData, 'frontierRules').slice(0, 4000) || null;
 
-    // Discord roles the bot mirrors (signed-up roster / active suspensions).
+    // Discord roles the bot mirrors (signed-up roster / active suspensions / legacy / beta).
     const signupRoleId = str(formData, 'signupRoleId') || null;
     const punishedRoleId = str(formData, 'punishedRoleId') || null;
-    for (const [label, id] of [['Signed-up', signupRoleId], ['Punished', punishedRoleId]] as const) {
+    const legacyRoleId = str(formData, 'legacyRoleId') || null;
+    const betaRoleId = str(formData, 'betaRoleId') || null;
+    for (const [label, id] of [['Signed-up', signupRoleId], ['Punished', punishedRoleId], ['Legacy', legacyRoleId], ['Beta', betaRoleId]] as const) {
       if (id && !/^\d{5,25}$/.test(id)) {
         return { error: `${label} role ID must be a numeric Discord role ID (right-click the role → Copy Role ID).` };
       }
@@ -799,6 +801,7 @@ export async function updateConfigAction(
     await updateConfig(admin.discordId, {
       currentSeason, eloBase, kPlacement, kEstablished, placementGames, movMultiplierCap,
       guildId, rankingsMessageId, eaClubIds, eaPlatform, frontierRules, signupRoleId, punishedRoleId,
+      legacyRoleId, betaRoleId,
     });
 
     revalidatePath('/admin/settings');

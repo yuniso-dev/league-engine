@@ -200,6 +200,8 @@ export const config = pgTable('config', {
   frontierRules:      text('frontier_rules'), // standing rules block for /frontierintro
   signupRoleId:       text('signup_role_id'),   // Discord role mirroring the open Frontier's signups
   punishedRoleId:     text('punished_role_id'), // Discord role mirroring active suspensions
+  legacyRoleId:       text('legacy_role_id'),   // Discord role for everyone in the pre-website archive
+  betaRoleId:         text('beta_role_id'),      // Discord role for everyone who played the Season 0 test
   updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
