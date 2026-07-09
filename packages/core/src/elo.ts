@@ -72,6 +72,31 @@ export function climbAssist(elo: number, baseline: number): number {
   return 1 + CLIMB_ASSIST_MAX * t;
 }
 
+// ── Participation floor ────────────────────────────────────────────────────
+// Playing should be rewarded over sitting at the untouched baseline: a player
+// who turns up and loses a whole Frontier still ends up above someone who
+// never played. So a player's rating can't fall below a floor that RISES with
+// games played, up to a ceiling reached only after several Frontiers of play —
+// so participation keeps paying off for a while, not just for one tournament.
+// Winners are unaffected (they're above the floor); it only catches the bottom
+// of the ladder near the baseline.
+
+/** Floor added per game played — one Frontier (~6 games) ≈ +48. */
+export const FLOOR_PER_GAME = 8;
+
+/** Ceiling on the floor bonus — the most participation ALONE can hold you
+ *  above the baseline (baseline + this ≈ 1150 by default), reached after
+ *  FLOOR_MAX_BONUS / FLOOR_PER_GAME (~19) games, i.e. several Frontiers. */
+export const FLOOR_MAX_BONUS = 150;
+
+/** Lowest Elo a player with `gamesPlayed` games can hold, given `baseline`.
+ *  baseline for the never-played (a no-op), rising FLOOR_PER_GAME per game up
+ *  to baseline + FLOOR_MAX_BONUS. */
+export function participationFloor(gamesPlayed: number, baseline: number): number {
+  const games = Math.max(0, gamesPlayed);
+  return baseline + Math.min(FLOOR_MAX_BONUS, FLOOR_PER_GAME * games);
+}
+
 export type PlayerStats = {
   /** EA average match rating (0–10) for THIS match; null when not recorded. */
   rating: number | null;

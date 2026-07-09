@@ -636,7 +636,10 @@ export async function recalcRanksAction(
     await recomputeRanks();
     revalidatePath('/');
     revalidatePath('/admin/players');
-    return { ok: true, message: 'Ranks recalculated — equal Elo shares the same rank.' };
+    return {
+      ok: true,
+      message: 'Ladder normalised — participation floor applied, never-played unranked, ties share a rank.',
+    };
   } catch (e) {
     return { error: message(e) };
   }

@@ -111,6 +111,9 @@ export default async function RevealPage() {
                       {p.awardBonus > 0 && (
                         <span style={{ color: T.gold, marginRight: 8 }}>🏅 +{Math.round(p.awardBonus)}</span>
                       )}
+                      {p.participationLift > 0 && (
+                        <span style={{ color: T.win, marginRight: 8 }}>🎫 +{Math.round(p.participationLift)}</span>
+                      )}
                       {p.wasProvisional && !p.nowProvisional && (
                         <span style={{ color: ADMIN_ACCENT }}>PLACES ⚡</span>
                       )}

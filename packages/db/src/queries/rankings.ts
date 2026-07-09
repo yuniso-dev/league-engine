@@ -1,6 +1,7 @@
 import { getDb } from '../client';
-import { awards, matchParticipants, userAwards, users } from '../schema';
-import { asc, desc, eq, and, ilike, inArray, or, sql } from 'drizzle-orm';
+import { awards, config, matchParticipants, userAwards, users } from '../schema';
+import { asc, desc, eq, and, gt, ilike, inArray, or, sql } from 'drizzle-orm';
+import { participationFloor, DEFAULT_ELO_CONFIG } from '@inazuma/core';
 import { toPublicPlayer, type PublicPlayer } from '../dto';
 
 const baseWhere = () =>
@@ -72,13 +73,40 @@ export async function getRankings(): Promise<PublicPlayer[]> {
   });
 }
 
-/** Tie-aware ladder ranks for every active player who has PLAYED at least one
- *  game: equal Elo shares the same rank (standard competition ranking, e.g.
- *  1,1,1,4). Never-played players sit untouched at the base Elo, so ranking
- *  them there would put them above people who played and dropped below it —
- *  they're left unranked (rank = null) and sort below on the ladder. */
+/** Normalise the ladder: apply the participation floor to everyone who has
+ *  played, then assign tie-aware ranks. Equal Elo shares the same rank
+ *  (standard competition ranking, e.g. 1,1,1,4). Never-played players sit
+ *  untouched at the base Elo, so ranking them there would put them above
+ *  people who played and dropped below it — they're left unranked (rank =
+ *  null) and sort below on the ladder. The floor pass here lets the admin
+ *  "recalc ranks" button lift already-committed players who fell below their
+ *  earned floor, without waiting for their next reveal. */
 export async function recomputeRanks(): Promise<number> {
-  await getDb().execute(sql`
+  const db = getDb();
+
+  // Participation floor: playing lifts your rating toward a ceiling, so
+  // veterans who show up aren't stuck below newcomers. Reuses the engine
+  // function so reveal and this path can never disagree. Idempotent — a
+  // player already at/above their floor is untouched.
+  const [cfgRow] = await db.select({ eloBase: config.eloBase }).from(config).limit(1);
+  const baseline = cfgRow ? parseFloat(cfgRow.eloBase) : DEFAULT_ELO_CONFIG.baseline;
+  const played = await db
+    .select({ discordId: users.discordId, elo: users.elo, gamesPlayed: users.gamesPlayed })
+    .from(users)
+    .where(and(
+      eq(users.initialised, true),
+      eq(users.isBlacklisted, false),
+      eq(users.isInactive, false),
+      gt(users.gamesPlayed, 0),
+    ));
+  for (const p of played) {
+    const floor = participationFloor(p.gamesPlayed, baseline);
+    if (parseFloat(p.elo) < floor) {
+      await db.update(users).set({ elo: floor.toFixed(2) }).where(eq(users.discordId, p.discordId));
+    }
+  }
+
+  await db.execute(sql`
     with ladder as (
       select discord_id, rank() over (order by elo desc) as new_rank
         from users

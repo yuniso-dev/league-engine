@@ -5,9 +5,12 @@ import {
   CLIMB_ASSIST_BAND,
   CLIMB_ASSIST_MAX,
   DEFAULT_ELO_CONFIG,
+  FLOOR_MAX_BONUS,
+  FLOOR_PER_GAME,
   PERF_WEIGHT,
   awardBonusForName,
   climbAssist,
+  participationFloor,
   expectedScore,
   kFor,
   matchDeltas,
@@ -393,5 +396,39 @@ describe('matchDeltas — climb assist near the baseline', () => {
       elo += home[0];
     }
     expect(elo).toBeGreaterThan(1000);
+  });
+});
+
+describe('participationFloor', () => {
+  const B = 1000;
+
+  test('never-played sits exactly at the baseline (no lift)', () => {
+    expect(participationFloor(0, B)).toBe(B);
+  });
+
+  test('rises FLOOR_PER_GAME per game', () => {
+    expect(participationFloor(1, B)).toBe(B + FLOOR_PER_GAME);
+    expect(participationFloor(5, B)).toBe(B + 5 * FLOOR_PER_GAME);
+  });
+
+  test('a single Frontier of losses still lands above the baseline', () => {
+    // ~6 games ≈ +48 — a whole-Frontier loser floors near 1048, above newcomers.
+    expect(participationFloor(6, B)).toBe(B + 48);
+    expect(participationFloor(6, B)).toBeGreaterThan(B);
+  });
+
+  test('caps at baseline + FLOOR_MAX_BONUS after enough games', () => {
+    const capGames = FLOOR_MAX_BONUS / FLOOR_PER_GAME; // ~19
+    expect(participationFloor(capGames, B)).toBe(B + FLOOR_MAX_BONUS);
+    expect(participationFloor(capGames + 50, B)).toBe(B + FLOOR_MAX_BONUS);
+    expect(participationFloor(1000, B)).toBe(B + FLOOR_MAX_BONUS); // never runs away
+  });
+
+  test('the ceiling is ~1150 for the default baseline', () => {
+    expect(participationFloor(9999, 1000)).toBe(1150);
+  });
+
+  test('grinding many Frontiers earns more floor than one Frontier', () => {
+    expect(participationFloor(18, B)).toBeGreaterThan(participationFloor(6, B));
   });
 });
