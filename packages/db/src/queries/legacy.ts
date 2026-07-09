@@ -54,6 +54,13 @@ export type LegacyHallEdition = {
   winners: LegacyHallWinner[];
 };
 
+/** True for "relation does not exist" (42P01) — lets the legacy reads degrade
+ *  gracefully to empty when the 0016 migration hasn't been run yet, so a
+ *  deploy-before-migrate never breaks the ladder or profiles. */
+function isMissingTable(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && (e as { code?: string }).code === '42P01';
+}
+
 /** The whole archive, newest edition first, each winner resolved to a
  *  name/profile where the account still exists (else name/publicId null). */
 export async function getLegacyHall(): Promise<LegacyHallEdition[]> {
@@ -62,7 +69,8 @@ export async function getLegacyHall(): Promise<LegacyHallEdition[]> {
   const editions = await db
     .select({ edition: legacyEditions.edition, label: legacyEditions.label })
     .from(legacyEditions)
-    .orderBy(desc(legacyEditions.edition));
+    .orderBy(desc(legacyEditions.edition))
+    .catch(e => { if (isMissingTable(e)) return []; throw e; });
   if (editions.length === 0) return [];
 
   const winners = await db
@@ -101,7 +109,8 @@ export async function getLegacyHall(): Promise<LegacyHallEdition[]> {
 export async function getLegacyTaggedDiscordIds(): Promise<Set<string>> {
   const rows = await getDb()
     .selectDistinct({ discordId: legacyAwardWinners.discordId })
-    .from(legacyAwardWinners);
+    .from(legacyAwardWinners)
+    .catch(e => { if (isMissingTable(e)) return []; throw e; });
   return new Set(rows.map(r => r.discordId));
 }
 
@@ -126,7 +135,8 @@ export async function getTagSets(): Promise<{ legacy: Set<string>; beta: Set<str
 export async function getTagsForDiscordId(discordId: string): Promise<PlayerTag[]> {
   const db = getDb();
   const [legacyRow, betaRow] = await Promise.all([
-    db.select({ x: sql`1` }).from(legacyAwardWinners).where(eq(legacyAwardWinners.discordId, discordId)).limit(1),
+    db.select({ x: sql`1` }).from(legacyAwardWinners).where(eq(legacyAwardWinners.discordId, discordId)).limit(1)
+      .catch(e => { if (isMissingTable(e)) return []; throw e; }),
     db
       .select({ x: sql`1` })
       .from(matchParticipants)
