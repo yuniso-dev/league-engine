@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/admin';
 import { FONT_B, FONT_D, T } from '@/lib/realm-colors';
 import SettingsForm from '@/components/admin/SettingsForm';
 import RecalcRanksButton from '@/components/admin/RecalcRanksButton';
+import ResetSeasonCard from '@/components/admin/ResetSeasonCard';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -24,6 +25,7 @@ export default async function AdminSettingsPage() {
 
       <SettingsForm config={config} />
       <RecalcRanksButton />
+      <ResetSeasonCard currentSeason={config.currentSeason} />
     </>
   );
 }

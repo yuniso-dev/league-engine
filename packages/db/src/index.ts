@@ -9,6 +9,7 @@ export {
 export type { NicknamePlayer } from './queries/bot';
 export * from './schema';
 export { getRankings, searchRankings, recomputeRanks } from './queries/rankings';
+export { resetSeasonRatings, setPlayerElo } from './queries/season';
 export { getTournaments, getLatestOpenTournament, getTournamentCaptains } from './queries/tournaments';
 export type { TournamentCaptain } from './queries/tournaments';
 export {

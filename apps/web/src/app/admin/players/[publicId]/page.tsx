@@ -15,6 +15,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { FlagIcon } from '@/components/ui/FlagIcon';
 import AdminPlayerProfileForm from '@/components/admin/AdminPlayerProfileForm';
 import AdminPlayerIdentityForm from '@/components/admin/AdminPlayerIdentityForm';
+import PlayerEloForm from '@/components/admin/PlayerEloForm';
 import PlayerAwardGrantForm from '@/components/admin/PlayerAwardGrantForm';
 import SanctionForm from '@/components/admin/SanctionForm';
 import DeleteButton from '@/components/admin/DeleteButton';
@@ -104,6 +105,9 @@ export default async function AdminPlayerPage({ params }: { params: { publicId: 
           View public profile ↗
         </Link>
       </div>
+
+      <h2 style={sectionTitle}>ELO</h2>
+      <PlayerEloForm publicId={player.publicId} elo={player.elo} gamesPlayed={player.gamesPlayed} />
 
       <h2 style={sectionTitle}>PROFILE</h2>
       <AdminPlayerProfileForm player={player} />
