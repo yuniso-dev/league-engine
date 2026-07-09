@@ -117,6 +117,7 @@ async function loadEloConfig(db: Queryable): Promise<{ cfg: EloConfig; lastRevea
       kEstablished: row.kEstablished,
       placementGames: row.placementGames,
       movMultiplierCap: num(row.movMultiplierCap),
+      baseline: num(row.eloBase),
     },
     lastRevealAt: row.lastRevealAt,
   };
@@ -418,9 +419,11 @@ export async function commitReveal(adminId: string): Promise<{ matches: number; 
         .where(eq(users.discordId, discordId));
     }
 
-    // Re-rank the ladder: every active player (provisional included), best
-    // rating first. Standard competition ranking — equal Elo shares the same
-    // rank (1,1,1,4), so an untouched league is all #1 until ratings move.
+    // Re-rank the ladder: every active player who has PLAYED at least one game,
+    // best rating first. Standard competition ranking — equal Elo shares the
+    // same rank (1,1,1,4). Never-played players sit untouched at the baseline;
+    // ranking them there would put them above people who played and dropped
+    // below it, so they're left unranked (rank = null) and sorted below.
     const ladder = await tx
       .select({
         discordId: users.discordId,
@@ -437,39 +440,46 @@ export async function commitReveal(adminId: string): Promise<{ matches: number; 
       ))
       .orderBy(desc(users.elo), desc(users.gamesPlayed), asc(users.discordId));
 
-    const ranks: number[] = [];
-    for (let i = 0; i < ladder.length; i++) {
-      // Same Elo as the player above → same rank; otherwise position (1-based).
-      ranks.push(i > 0 && num(ladder[i].elo) === num(ladder[i - 1].elo) ? ranks[i - 1] : i + 1);
+    // Rank only the played players; number them densely (ties share a rank).
+    const played = ladder.filter(u => u.gamesPlayed > 0);
+    const rankOf = new Map<string, number>();
+    for (let i = 0; i < played.length; i++) {
+      const r = i > 0 && num(played[i].elo) === num(played[i - 1].elo)
+        ? rankOf.get(played[i - 1].discordId)!
+        : i + 1;
+      rankOf.set(played[i].discordId, r);
     }
 
-    for (let i = 0; i < ladder.length; i++) {
-      const u = ladder[i];
-      const rank = ranks[i];
+    for (const u of ladder) {
+      const rank = rankOf.get(u.discordId) ?? null; // null → never played, unranked
       const elo = num(u.elo);
       const peakElo = u.peakElo == null ? elo : Math.max(num(u.peakElo), elo);
-      const peakRank = u.peakRank == null ? rank : Math.min(u.peakRank, rank);
+      // Peak rank only advances on a real (non-null) rank.
+      const peakRank = rank == null
+        ? u.peakRank
+        : u.peakRank == null ? rank : Math.min(u.peakRank, rank);
       await tx
         .update(users)
         .set({ rank, peakElo: fx2(peakElo), peakRank })
         .where(eq(users.discordId, u.discordId));
     }
 
-    // One history row per ladder player per reveal — every active player has
-    // a rank now, so this covers provisional players who featured too.
-    const newRank = new Map(ladder.map((u, i) => [u.discordId, ranks[i]]));
+    // One history row per ladder player per reveal — rank is null for the
+    // never-played, so their line records Elo without a phantom rank.
+    const newRank = new Map(ladder.map(u => [u.discordId, rankOf.get(u.discordId) ?? null]));
     const historyRows = [
-      ...ladder.map((u, i) => {
+      ...ladder.map(u => {
         const played = result.players.get(u.discordId);
+        const rank = rankOf.get(u.discordId) ?? null;
         const prev = oldRank.get(u.discordId) ?? null;
         return {
           userId: u.discordId,
           elo: fx2(played ? played.newElo : num(u.elo)),
-          rank: ranks[i],
+          rank,
           gamesPlayed: u.gamesPlayed,
           weekOf,
           eloChange: fx2(played ? played.newElo - played.oldElo : 0),
-          rankChange: prev == null ? null : prev - ranks[i],
+          rankChange: prev == null || rank == null ? null : prev - rank,
         };
       }),
       ...[...result.players.entries()]

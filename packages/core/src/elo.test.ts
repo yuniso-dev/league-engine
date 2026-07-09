@@ -2,9 +2,12 @@ import { describe, expect, test } from 'vitest';
 import {
   AWARD_BONUS_CAP_PER_REVEAL,
   AWARD_ELO_BONUS,
+  CLIMB_ASSIST_BAND,
+  CLIMB_ASSIST_MAX,
   DEFAULT_ELO_CONFIG,
   PERF_WEIGHT,
   awardBonusForName,
+  climbAssist,
   expectedScore,
   kFor,
   matchDeltas,
@@ -15,7 +18,12 @@ import {
   type PlayerStats,
 } from './elo';
 
-const cfg = DEFAULT_ELO_CONFIG;
+// Core Elo-math suites run with the climb assist neutralised (baseline shoved
+// off the board so every test player is far above baseline+band → factor 1),
+// keeping the pure-math assertions exact. The climb assist is tested on its
+// own with the real baseline below.
+const cfg = { ...DEFAULT_ELO_CONFIG, baseline: -1e6 };
+const assistCfg = DEFAULT_ELO_CONFIG; // baseline 1000, climb assist live
 const established = (elo: number): EloPlayer => ({ elo, gamesPlayed: 20 });
 const placement = (elo: number): EloPlayer => ({ elo, gamesPlayed: 0 });
 const withStats = (elo: number, stats: Partial<PlayerStats>): EloPlayer => ({
@@ -321,5 +329,69 @@ describe('award Elo bonuses', () => {
       + AWARD_ELO_BONUS['Team of the Tournament'];
     expect(sweep).toBeGreaterThan(AWARD_BONUS_CAP_PER_REVEAL);
     expect(Math.min(sweep, AWARD_BONUS_CAP_PER_REVEAL)).toBe(AWARD_BONUS_CAP_PER_REVEAL);
+  });
+});
+
+describe('climbAssist', () => {
+  const B = 1000;
+
+  test('full boost at and below the baseline', () => {
+    expect(climbAssist(B, B)).toBeCloseTo(1 + CLIMB_ASSIST_MAX);
+    expect(climbAssist(B - 300, B)).toBeCloseTo(1 + CLIMB_ASSIST_MAX);
+  });
+
+  test('fades to 1 by baseline + band, then stays 1', () => {
+    expect(climbAssist(B + CLIMB_ASSIST_BAND, B)).toBeCloseTo(1);
+    expect(climbAssist(B + CLIMB_ASSIST_BAND + 500, B)).toBeCloseTo(1);
+  });
+
+  test('halfway up the band is half the boost', () => {
+    expect(climbAssist(B + CLIMB_ASSIST_BAND / 2, B)).toBeCloseTo(1 + CLIMB_ASSIST_MAX / 2);
+  });
+
+  test('monotonically non-increasing as Elo rises', () => {
+    const a = climbAssist(1000, B);
+    const b = climbAssist(1075, B);
+    const c = climbAssist(1150, B);
+    expect(a).toBeGreaterThan(b);
+    expect(b).toBeGreaterThan(c);
+  });
+});
+
+describe('matchDeltas — climb assist near the baseline', () => {
+  test('a win at the baseline pays more than the same win up high', () => {
+    const atBase = matchDeltas(
+      { home: [established(1000)], away: [established(1000)], homeScore: 1, awayScore: 0 },
+      assistCfg,
+    );
+    const upHigh = matchDeltas(
+      { home: [established(1400)], away: [established(1400)], homeScore: 1, awayScore: 0 },
+      assistCfg,
+    );
+    expect(atBase.home[0]).toBeGreaterThan(upHigh.home[0]);
+    expect(atBase.home[0]).toBeCloseTo(upHigh.home[0] * (1 + CLIMB_ASSIST_MAX), 1);
+  });
+
+  test('losses are NOT assisted — a loss at the baseline is the plain loss', () => {
+    const { away } = matchDeltas(
+      { home: [established(1000)], away: [established(1000)], homeScore: 1, awayScore: 0 },
+      assistCfg,
+    );
+    // Loser sits at the baseline but drops the un-assisted amount.
+    expect(away[0]).toBeCloseTo(-assistCfg.kEstablished / 2, 1);
+  });
+
+  test('assist rewards playing: two even wins clear the baseline', () => {
+    // A fresh player who plays and wins should climb off 1000; the never-played
+    // stay exactly at 1000 (and are unranked in the ladder).
+    let elo = 1000;
+    for (let i = 0; i < 2; i++) {
+      const { home } = matchDeltas(
+        { home: [{ elo, gamesPlayed: 10 }], away: [established(1000)], homeScore: 1, awayScore: 0 },
+        assistCfg,
+      );
+      elo += home[0];
+    }
+    expect(elo).toBeGreaterThan(1000);
   });
 });

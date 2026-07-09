@@ -72,17 +72,20 @@ export async function getRankings(): Promise<PublicPlayer[]> {
   });
 }
 
-/** Tie-aware ladder ranks for EVERY active player (provisional included):
- *  equal Elo shares the same rank (standard competition ranking, e.g. 1,1,1,4)
- *  — so a fresh league where everyone sits at the base Elo is all #1. */
+/** Tie-aware ladder ranks for every active player who has PLAYED at least one
+ *  game: equal Elo shares the same rank (standard competition ranking, e.g.
+ *  1,1,1,4). Never-played players sit untouched at the base Elo, so ranking
+ *  them there would put them above people who played and dropped below it —
+ *  they're left unranked (rank = null) and sort below on the ladder. */
 export async function recomputeRanks(): Promise<number> {
-  const rows = await getDb().execute(sql`
+  await getDb().execute(sql`
     with ladder as (
       select discord_id, rank() over (order by elo desc) as new_rank
         from users
        where initialised = true
          and is_blacklisted = false
          and is_inactive = false
+         and games_played > 0
     )
     update users u
        set rank = l.new_rank
@@ -90,7 +93,17 @@ export async function recomputeRanks(): Promise<number> {
      where u.discord_id = l.discord_id
        and (u.rank is distinct from l.new_rank)
   `);
-  return Array.isArray(rows) ? rows.length : 0;
+  // Anyone who hasn't played (or is no longer active) loses their rank.
+  const cleared = await getDb().execute(sql`
+    update users
+       set rank = null
+     where rank is not null
+       and (games_played = 0
+            or initialised = false
+            or is_blacklisted = true
+            or is_inactive = true)
+  `);
+  return Array.isArray(cleared) ? cleared.length : 0;
 }
 
 export async function searchRankings(q: string): Promise<PublicPlayer[]> {
