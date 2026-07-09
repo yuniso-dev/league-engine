@@ -1,13 +1,9 @@
 // CASUAL realm bootstrap: the leaderboard, the linked-player picker list, and
 // who "you" are (so history/performance preselect yourself). Fetched by the
 // Casual tab when it's first opened — keeps the homepage payload untouched.
-import {
-  getCasualLeaderboard,
-  getUserByDiscordId,
-  listLinkedCasualPlayers,
-  runResilient,
-} from '@inazuma/db';
+import { getUserByDiscordId, runResilient } from '@inazuma/db';
 import { auth } from '@/auth';
+import { cachedCasualLeaderboard, cachedCasualPlayers } from '@/lib/cache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,9 +12,11 @@ export const maxDuration = 30;
 export async function GET() {
   try {
     const session = await auth();
+    // Shared leaderboard + picker come from the ≤60s public cache; only the
+    // "who am I" lookup is per-request.
     const [leaderboard, players, me] = await Promise.all([
-      runResilient(() => getCasualLeaderboard()),
-      runResilient(() => listLinkedCasualPlayers()),
+      cachedCasualLeaderboard(),
+      cachedCasualPlayers(),
       session?.user?.discordId
         ? runResilient(() => getUserByDiscordId(session.user.discordId!)).catch(() => null)
         : Promise.resolve(null),

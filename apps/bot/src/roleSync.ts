@@ -11,6 +11,12 @@ import { getConfig, getLatestOpenTournament, getSignupDiscordIds, listActiveSanc
 /** Role IDs already warned about (missing / above the bot) — warn once, not every minute. */
 const warned = new Set<string>();
 
+// Cap Discord role writes per tick so a Frontier kickoff (≈25 members getting
+// the signed-up role at once) can't saturate the rate limit and stall slash
+// commands. Role sync recomputes the diff every 60s, so the remainder just
+// converges over the next couple of ticks.
+const MAX_ROLE_CHANGES_PER_TICK = 12;
+
 async function resolveRole(guild: Guild, roleId: string, label: string): Promise<Role | null> {
   const role = guild.roles.cache.get(roleId) ?? await guild.roles.fetch(roleId).catch(() => null);
   if (!role) {
@@ -34,9 +40,11 @@ async function resolveRole(guild: Guild, roleId: string, label: string): Promise
 async function reconcile(guild: Guild, role: Role, want: Set<string>, label: string): Promise<void> {
   let added = 0;
   let removed = 0;
+  let capped = false;
 
   for (const [id, member] of role.members) {
     if (want.has(id)) continue;
+    if (added + removed >= MAX_ROLE_CHANGES_PER_TICK) { capped = true; break; }
     try {
       await member.roles.remove(role, 'INAZUMA role sync');
       removed++;
@@ -46,6 +54,7 @@ async function reconcile(guild: Guild, role: Role, want: Set<string>, label: str
   }
 
   for (const id of want) {
+    if (added + removed >= MAX_ROLE_CHANGES_PER_TICK) { capped = true; break; }
     const member = guild.members.cache.get(id) ?? await guild.members.fetch(id).catch(() => null);
     if (!member || member.roles.cache.has(role.id)) continue;
     try {
@@ -56,7 +65,9 @@ async function reconcile(guild: Guild, role: Role, want: Set<string>, label: str
     }
   }
 
-  if (added + removed > 0) console.log(`[roles] ${label}: +${added} / −${removed}`);
+  if (added + removed > 0) {
+    console.log(`[roles] ${label}: +${added} / −${removed}${capped ? ' (capped — more next tick)' : ''}`);
+  }
 }
 
 /** 60s tick (also called right after /punish and /pardon for instant feedback). */

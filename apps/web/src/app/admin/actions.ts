@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import { revalidatePublicData } from '@/lib/cache';
 import {
   MATCH_STAGES,
   addTeamMember,
@@ -109,6 +110,7 @@ export async function createTournamentAction(
     });
     // New Frontier opens as 'upcoming' with signups live — announce it.
     await announceSignupsOpen({ id, name, season });
+    revalidatePublicData(); // show the new Frontier on the public site at once
   } catch (e) {
     return { error: message(e) };
   }
@@ -202,6 +204,7 @@ export async function updateTournamentStatusAction(
     revalidatePath(`/admin/tournaments/${tournamentId}`);
     revalidatePath('/admin');
     revalidatePath('/hall-of-fame');
+    revalidatePublicData(); // status change (live/completed + champion) shows now
     return { ok: true };
   } catch (e) {
     return { error: message(e) };
@@ -361,6 +364,7 @@ export async function commitRevealAction(
 
     revalidatePath('/admin/reveal');
     revalidatePath('/');
+    revalidatePublicData(); // new ratings/ranks live on the public ladder now
     return {
       ok: true,
       message: `Reveal committed — ${matches} match${matches === 1 ? '' : 'es'}, ${players} player${players === 1 ? '' : 's'} updated.`,
@@ -555,6 +559,7 @@ export async function runCeremonyAction(
     revalidatePath(`/admin/tournaments/${tournamentId}/awards`);
     revalidatePath('/admin/awards');
     revalidatePath('/hall-of-fame');
+    revalidatePublicData(); // new honours on the ladder + hall of fame at once
     return {
       ok: true,
       message: `Granted ${granted} honour${granted === 1 ? '' : 's'}${skipped > 0 ? ` (${skipped} already held — skipped)` : ''}.`,
@@ -636,6 +641,7 @@ export async function recalcRanksAction(
     await recomputeRanks();
     revalidatePath('/');
     revalidatePath('/admin/players');
+    revalidatePublicData(); // refreshed ladder live on the public site
     return {
       ok: true,
       message: 'Ladder normalised — participation floor applied, never-played unranked, ties share a rank.',

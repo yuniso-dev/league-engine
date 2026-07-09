@@ -1,16 +1,14 @@
-import {
-  getConfig,
-  getCurrentSeason,
-  getFrontierStatBoards,
-  getRankings,
-  getTournaments,
-  getVoiceNow,
-  resetDb,
-  toPublicPlayer,
-} from '@inazuma/db';
+import { getVoiceNow, resetDb, toPublicPlayer } from '@inazuma/db';
 import type { FrontierStatBoards, PublicPlayer, PublicTournament, VoiceNowEntry } from '@inazuma/db';
 import { auth } from '@/auth';
 import { getCachedUserByDiscordId } from '@/lib/user';
+import {
+  cachedAllTimeBoards,
+  cachedRankings,
+  cachedSeasonBoards,
+  cachedSeasonInfo,
+  cachedTournaments,
+} from '@/lib/cache';
 import StormShell from '@/components/StormShell';
 
 export const dynamic = 'force-dynamic';
@@ -78,16 +76,19 @@ export default async function HomePage() {
   // Budgets sit just under the DB's 15s statement_timeout: a cold serverless
   // start pays connection setup + several query waves, and giving up at 8s
   // was tripping the "reconnecting" banner on renders that would have made it.
+  // Public data (ladder, tournaments, boards, season) is served from a ≤60s
+  // cache so repeat navigation is instant; only the per-request bits (live
+  // voice presence + the viewer's own session) actually hit the DB each load.
   const [r, t, v, s, se, re, li] = await Promise.all([
-    settle('rankings', getRankings(), 14_000),
-    settle('tournaments', getTournaments(), 14_000),
+    settle('rankings', cachedRankings(), 14_000),
+    settle('tournaments', cachedTournaments(), 14_000),
     settle('voice', getVoiceNow(), 8000),
     settle('auth', auth(), 8000),
-    // Full config row — season for the banner, placementGames for profiles.
-    settle('config', getConfig(), 8000),
-    settle('allTimeStats', getFrontierStatBoards(null), 9000),
+    // Season + placementGames for the banner and profiles.
+    settle('config', cachedSeasonInfo(), 8000),
+    settle('allTimeStats', cachedAllTimeBoards(), 9000),
     // Season-scoped boards need the season number first — one chained trip.
-    settle('liveStats', getCurrentSeason().then(sn => getFrontierStatBoards(sn)), 9000),
+    settle('liveStats', cachedSeasonInfo().then(info => cachedSeasonBoards(info.currentSeason)), 9000),
   ]);
 
   const rankings: PublicPlayer[] = r.ok ? r.value : [];
