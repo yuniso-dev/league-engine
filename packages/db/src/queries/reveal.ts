@@ -3,6 +3,7 @@ import { alias } from 'drizzle-orm/pg-core';
 import {
   matchDeltas,
   awardBonusForName,
+  participationFloor,
   AWARD_BONUS_CAP_PER_REVEAL,
   DEFAULT_ELO_CONFIG,
   type EloConfig,
@@ -55,6 +56,8 @@ export type RevealPlayerPreview = {
   nowProvisional: boolean;
   /** One-off Elo from honours granted since the last reveal (already inside delta). */
   awardBonus: number;
+  /** Elo lifted by the participation floor this reveal (already inside delta). */
+  participationLift: number;
 };
 
 export type RevealAwardPreview = {
@@ -105,6 +108,7 @@ type ComputeResult = {
     newGames: number;
     wasProvisional: boolean;
     awardBonus: number;
+    participationLift: number;
   }>;
 };
 
@@ -204,6 +208,7 @@ async function computeReveal(db: Queryable): Promise<ComputeResult> {
         newGames: p.gamesPlayed,
         wasProvisional: p.provisional,
         awardBonus: 0,
+        participationLift: 0,
       });
     }
   };
@@ -339,6 +344,21 @@ async function computeReveal(db: Queryable): Promise<ComputeResult> {
     }
   }
 
+  // ── Participation floor ── applied last, after matches and award bonuses.
+  // A player who featured this reveal can't end below the floor their games
+  // earn them, so turning up and losing still beats sitting at the baseline.
+  for (const [userId, summary] of players) {
+    if (summary.newGames === 0) continue;
+    const s = state.get(userId);
+    if (!s) continue;
+    const floor = participationFloor(summary.newGames, cfg.baseline);
+    if (s.elo < floor) {
+      summary.participationLift = Math.round((floor - s.elo) * 100) / 100;
+      s.elo = floor;
+      summary.newElo = floor;
+    }
+  }
+
   return { cfg, lastRevealAt, matchIds, matchPreviews, participantUpdates, awardGrants, players };
 }
 
@@ -356,6 +376,7 @@ export async function previewReveal(): Promise<RevealPreview> {
       wasProvisional: p.wasProvisional,
       nowProvisional: p.newGames < result.cfg.placementGames,
       awardBonus: p.awardBonus,
+      participationLift: p.participationLift,
     }))
     .sort((a, b) => b.delta - a.delta);
 
