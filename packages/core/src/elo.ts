@@ -12,6 +12,9 @@ export type EloConfig = {
   placementGames: number;
   /** Upper bound on the margin-of-victory multiplier. */
   movMultiplierCap: number;
+  /** Starting Elo everyone shares — the "played nothing yet" baseline. Gains
+   *  near it are assisted (see climbAssist) so playing separates you from it. */
+  baseline: number;
 };
 
 export const DEFAULT_ELO_CONFIG: EloConfig = {
@@ -21,6 +24,7 @@ export const DEFAULT_ELO_CONFIG: EloConfig = {
   // tournament completes placement and gets a player ranked.
   placementGames: 3,
   movMultiplierCap: 1.75,
+  baseline: 1000,
 };
 
 // ── Per-player personalisation ─────────────────────────────────────────────
@@ -46,6 +50,27 @@ export const PERF_SPREAD = 2;
 export const GOAL_WEIGHT = 0.5;
 export const ASSIST_WEIGHT = 0.3;
 export const TACKLE_WEIGHT = 0.1;
+
+// ── Climb assist near the baseline ─────────────────────────────────────────
+// Everyone starts at the baseline (1000). To reward playing over sitting at
+// the untouched baseline, Elo GAINS are amplified when you're near or below
+// it, fading to nothing once you've climbed a band above. Side effect by
+// design: it also slows runaway leaders (no assist up high), matching the
+// "don't get too far ahead" goal. Losses are never touched.
+
+/** Extra fraction added to a gain at/below the baseline (0.4 → +40%). */
+export const CLIMB_ASSIST_MAX = 0.4;
+
+/** Elo above the baseline over which the assist fades from full to zero. */
+export const CLIMB_ASSIST_BAND = 150;
+
+/** Gain multiplier for a player rated `elo`, given the league `baseline`.
+ *  1 + CLIMB_ASSIST_MAX at/below baseline, ramping down to 1 by
+ *  baseline + CLIMB_ASSIST_BAND, and 1 above it. */
+export function climbAssist(elo: number, baseline: number): number {
+  const t = Math.min(1, Math.max(0, (baseline + CLIMB_ASSIST_BAND - elo) / CLIMB_ASSIST_BAND));
+  return 1 + CLIMB_ASSIST_MAX * t;
+}
 
 export type PlayerStats = {
   /** EA average match rating (0–10) for THIS match; null when not recorded. */
@@ -146,7 +171,9 @@ export function performanceScores(players: EloPlayer[]): number[] {
  * personalises it: play above your side's level and a win pays more / a
  * loss costs less; play below it and the reverse. The term scales with the
  * match's stakes (±PERF_WEIGHT × |base|), so it can never flip a result's
- * sign — a winner always gains, a loser always drops.
+ * sign — a winner always gains, a loser always drops. Finally, gains near
+ * the baseline are lifted by climbAssist so active players separate from
+ * the untouched starting pack.
  */
 export function matchDeltas(input: MatchInput, cfg: EloConfig): MatchDeltas {
   const homeAvg = teamRating(input.home);
@@ -162,7 +189,10 @@ export function matchDeltas(input: MatchInput, cfg: EloConfig): MatchDeltas {
 
   const personalised = (p: EloPlayer, result: number, perf: number): number => {
     const base = kFor(p.gamesPlayed, cfg) * mov * result;
-    return round2(base + Math.abs(base) * PERF_WEIGHT * perf);
+    const withPerf = base + Math.abs(base) * PERF_WEIGHT * perf;
+    // Only gains are assisted; a loss (or a zeroed draw) is left as-is.
+    const assisted = withPerf > 0 ? withPerf * climbAssist(p.elo, cfg.baseline) : withPerf;
+    return round2(assisted);
   };
 
   return {

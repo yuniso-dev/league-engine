@@ -1,5 +1,5 @@
 'use client';
-import { memo, useState } from 'react';
+import { Fragment, memo, useState } from 'react';
 import type { PublicPlayer } from '@inazuma/db';
 import { Bolt } from '@/components/ui/Bolt';
 import { Avatar } from '@/components/ui/Avatar';
@@ -106,6 +106,12 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
       )
     : players;
 
+  // Players arrive ranked-first (getRankings sorts NULLS LAST), so the first
+  // null-rank row marks where the "hasn't played yet" tail begins.
+  const rankedCount = players.filter(p => p.rank != null).length;
+  const unrankedCount = players.length - rankedCount;
+  const firstUnranked = list.findIndex(p => p.rank == null);
+
   return (
     <div className="rank-wrap" style={{ padding: '28px 18px 96px', margin: '0 auto' }}>
       {/* header */}
@@ -140,7 +146,8 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
             SEASON {season ?? 1}
           </div>
           <div style={{ fontFamily: FONT_M, fontSize: 10, letterSpacing: 1.5, color: T.dim }}>
-            INAZUMA FRONTIER · {players.length} PLAYERS
+            INAZUMA FRONTIER · {rankedCount} RANKED
+            {unrankedCount > 0 && ` · ${unrankedCount} AWAITING FIRST GAME`}
           </div>
         </div>
       </div>
@@ -186,8 +193,25 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
               : null;
           const rs = roleStat(p);
           return (
+            <Fragment key={p.publicId ?? p.displayName + i}>
+            {/* Divider between the ranked ladder and the players who haven't
+                played a game yet — only when both groups are on screen. */}
+            {i === firstUnranked && i > 0 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                margin: '14px 2px 4px',
+              }}>
+                <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
+                <span style={{
+                  fontFamily: FONT_M, fontSize: 9.5, letterSpacing: 1.5,
+                  color: T.faint, whiteSpace: 'nowrap',
+                }}>
+                  UNRANKED · HASN&apos;T PLAYED YET
+                </span>
+                <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
+              </div>
+            )}
             <div
-              key={p.publicId ?? p.displayName + i}
               className="rise tap"
               onClick={() => onOpen(p)}
               style={{
@@ -198,7 +222,8 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
                   cursor: 'pointer',
                   position: 'relative',
                   overflow: 'hidden',
-                  borderLeft: `3px solid ${isTop3 ? rc : rgba(accent, 0.4)}`,
+                  opacity: showRank ? 1 : 0.6,
+                  borderLeft: `3px solid ${isTop3 ? rc : showRank ? rgba(accent, 0.4) : 'rgba(255,255,255,0.12)'}`,
                   ...(isTop3
                     ? {
                         background: `linear-gradient(100deg, ${rgba(rc, 0.14)}, rgba(255,255,255,0.05) 58%)`,
@@ -277,6 +302,7 @@ export const RankingsPage = memo(function RankingsPage({ players, onOpen, season
                 <StatBlock label="ELO" value={Math.round(p.elo)} color={accent2} />
               </div>
             </div>
+            </Fragment>
           );
         })}
       </div>
