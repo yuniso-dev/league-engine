@@ -5,6 +5,7 @@ import { cleanDisplayName } from '@inazuma/core';
 import { getDb } from '../client';
 import { users, blacklistedUsers } from '../schema';
 import { toPublicPlayer, type PublicPlayer } from '../dto';
+import { getTagsForDiscordId } from './legacy';
 
 export type UserRow = InferSelectModel<typeof users>;
 
@@ -74,7 +75,9 @@ export async function getUserByPublicId(publicId: string): Promise<PublicPlayer 
     .where(eq(users.publicId, publicId))
     .limit(1);
   if (!row || !row.initialised || row.isBlacklisted) return null;
-  return toPublicPlayer(row);
+  const player = toPublicPlayer(row);
+  player.tags = await getTagsForDiscordId(row.discordId);
+  return player;
 }
 
 /**

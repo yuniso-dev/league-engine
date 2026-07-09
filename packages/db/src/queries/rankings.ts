@@ -2,7 +2,8 @@ import { getDb } from '../client';
 import { awards, config, matchParticipants, userAwards, users } from '../schema';
 import { asc, desc, eq, and, gt, ilike, inArray, or, sql } from 'drizzle-orm';
 import { participationFloor, DEFAULT_ELO_CONFIG } from '@inazuma/core';
-import { toPublicPlayer, type PublicPlayer } from '../dto';
+import { toPublicPlayer, type PlayerTag, type PublicPlayer } from '../dto';
+import { getTagSets } from './legacy';
 
 const baseWhere = () =>
   and(
@@ -24,8 +25,8 @@ export async function getRankings(): Promise<PublicPlayer[]> {
 
   const ids = rows.map(r => r.discordId);
 
-  // Award badges + stat totals for the ladder rows, two round trips for the lot.
-  const [awardRows, statRows] = await Promise.all([
+  // Award badges + stat totals + tag sets for the ladder rows.
+  const [awardRows, statRows, tagSets] = await Promise.all([
     db
       .select({
         userId: userAwards.userId,
@@ -49,7 +50,15 @@ export async function getRankings(): Promise<PublicPlayer[]> {
       .from(matchParticipants)
       .where(inArray(matchParticipants.userId, ids))
       .groupBy(matchParticipants.userId),
+    getTagSets(),
   ]);
+
+  const tagsFor = (discordId: string): PlayerTag[] => {
+    const t: PlayerTag[] = [];
+    if (tagSets.legacy.has(discordId)) t.push('legacy');
+    if (tagSets.beta.has(discordId)) t.push('beta');
+    return t;
+  };
 
   const badges = new Map<string, { name: string; icon: string | null; imageUrl: string | null }[]>();
   for (const a of awardRows) {
@@ -63,6 +72,7 @@ export async function getRankings(): Promise<PublicPlayer[]> {
     const s = statsOf.get(r.discordId);
     return {
       ...toPublicPlayer(r),
+      tags: tagsFor(r.discordId),
       awardBadges: badges.get(r.discordId) ?? [],
       wins: s?.wins ?? 0,
       played: s?.played ?? 0,
