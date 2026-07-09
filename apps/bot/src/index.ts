@@ -5,11 +5,13 @@
 
 // Before anything touches the DB: this process runs 24/7 and fires several
 // background jobs on the same cadence (notifier + role sync every 60s, etc.).
-// A pool of 2 meant two jobs could hold both connections and leave nothing for
-// a slash command's query — so the command hung past Discord's window. 5 gives
-// headroom so interactions always get a connection. Railway's DB_POOL_MAX
-// env var still overrides. (Supabase's pgBouncer pooler handles this easily.)
-process.env.DB_POOL_MAX ??= '5';
+// A small pool meant a couple of jobs could hold every connection and leave
+// nothing for a slash command's query — so the command hung past Discord's
+// window. 8 gives ample headroom so interactions always get a connection
+// (the jobs are also phase-staggered below so they don't all fire at once).
+// Railway's DB_POOL_MAX env var still overrides. (Supabase's pgBouncer pooler
+// handles this easily.)
+process.env.DB_POOL_MAX ??= '8';
 
 import { Client, Events, GatewayIntentBits, type Guild } from 'discord.js';
 import { closeDb, getConfig } from '@inazuma/db';
@@ -73,10 +75,14 @@ process.on('uncaughtException', e => {
 /** Interval bodies must never kill the timer or the process on a transient
  *  error — and must never STACK: if a pass is still running when the next tick
  *  fires (e.g. the notifier mid-way through a big DM burst), skip it rather
- *  than run two copies that fight over DB connections. */
-function every(ms: number, label: string, fn: () => Promise<void>): void {
+ *  than run two copies that fight over DB connections.
+ *
+ *  `phaseMs` delays the FIRST tick so same-cadence jobs don't all fire on the
+ *  same instant — e.g. notifier at :00 and role sync at :30 — spreading DB and
+ *  Discord-API load across the minute instead of bunching it. */
+function every(ms: number, label: string, fn: () => Promise<void>, phaseMs = 0): void {
   let running = false;
-  timers.push(setInterval(() => {
+  const tick = (): void => {
     if (running) {
       console.log(`[bot] ${label} still running — skipping this tick`);
       return;
@@ -85,7 +91,11 @@ function every(ms: number, label: string, fn: () => Promise<void>): void {
     fn()
       .catch(e => console.error(`[bot] ${label} failed —`, e))
       .finally(() => { running = false; });
-  }, ms));
+  };
+  timers.push(setTimeout(() => {
+    tick();
+    timers.push(setInterval(tick, ms));
+  }, phaseMs));
 }
 
 async function fullPass(guild: Guild): Promise<void> {
@@ -174,17 +184,22 @@ client.once(Events.ClientReady, async ready => {
 
   // /testfriendly watch tick — strictly read-only, a free no-op unless armed,
   // so it runs even in READ_ONLY test mode.
-  every(60_000, 'friendly test', () => pollFriendlyTest(ready));
+  every(60_000, 'friendly test', () => pollFriendlyTest(ready), 15_000);
 
-  // DM notifier (award wins, later signups/drafts). Gated off in test mode —
-  // DMs to real members are a write we must never make from a dry run.
+  // Jobs on the same cadence are phase-staggered so they never fire on the same
+  // instant and fight over connections / the Discord rate limit during a busy
+  // Frontier kickoff: notifier at :00, role sync at :30 (60s cadence); frontier
+  // sync at :00, club tracker at :60 (120s cadence).
+
+  // DM notifier (award wins, signups, kickoff reminders, drafts). Gated off in
+  // test mode — DMs to real members are a write we must never make from a dry run.
   if (!READ_ONLY) {
     every(60_000, 'notifier', () => pollNotifier(ready, SITE_URL));
   }
 
   // Tracked community clubs (CASUAL → CLUBS): round-robin snapshot refresh.
   if (!READ_ONLY) {
-    every(CLUB_TRACK_MS, 'club tracker', pollClubTracker);
+    every(CLUB_TRACK_MS, 'club tracker', pollClubTracker, 60_000);
   }
 
   // Role mirror: signed-up role tracks the open Frontier's roster, punished
@@ -192,7 +207,7 @@ client.once(Events.ClientReady, async ready => {
   // gated off in test mode like everything else.
   if (!READ_ONLY) {
     await syncRoles(guild).catch(e => console.error('[bot] role sync failed —', e));
-    every(60_000, 'role sync', () => syncRoles(guild));
+    every(60_000, 'role sync', () => syncRoles(guild), 30_000);
   }
 });
 

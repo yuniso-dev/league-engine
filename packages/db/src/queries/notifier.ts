@@ -82,6 +82,10 @@ export async function markSignupsNotified(signupIds: string[]): Promise<void> {
 export type DueReminder = {
   tournamentId: string;
   tournamentName: string;
+  /** Kickoff time — used to render a live Discord timestamp so the DM shows the
+   *  right "in N minutes" per reader even if it fires late. Non-null (the query
+   *  filters start_time > now). */
+  startTime: Date;
   discordIds: string[];
 };
 
@@ -95,7 +99,7 @@ export async function getDueReminders(): Promise<DueReminder[]> {
   const soon = new Date(now.getTime() + 15 * 60_000);
 
   const due = await db
-    .select({ id: tournaments.id, name: tournaments.name })
+    .select({ id: tournaments.id, name: tournaments.name, startTime: tournaments.startTime })
     .from(tournaments)
     .where(and(
       eq(tournaments.reminderSent, false),
@@ -111,7 +115,12 @@ export async function getDueReminders(): Promise<DueReminder[]> {
       .select({ userId: eventSignups.userId })
       .from(eventSignups)
       .where(eq(eventSignups.tournamentId, t.id));
-    out.push({ tournamentId: t.id, tournamentName: t.name, discordIds: [...new Set(rows.map(r => r.userId))] });
+    out.push({
+      tournamentId: t.id,
+      tournamentName: t.name,
+      startTime: t.startTime!, // non-null: filtered by start_time > now above
+      discordIds: [...new Set(rows.map(r => r.userId))],
+    });
   }
   return out;
 }
