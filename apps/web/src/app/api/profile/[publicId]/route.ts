@@ -8,6 +8,7 @@ import {
   getPlayerMilestones,
   getRatingHistoryByPublicId,
   getRecentMatchesForPlayer,
+  getTagsForPublicId,
   listAwardsForPlayer,
   runResilient,
 } from '@inazuma/db';
@@ -23,7 +24,7 @@ export async function GET(
   const vs = new URL(req.url).searchParams.get('vs');
   const wantH2H = vs != null && vs !== '' && vs !== params.publicId;
 
-  const [history, awards, matches, milestones, frontierHistory, headToHead] = await Promise.all([
+  const [history, awards, matches, milestones, frontierHistory, headToHead, tags] = await Promise.all([
     getRatingHistoryByPublicId(params.publicId),
     listAwardsForPlayer(params.publicId),
     getRecentMatchesForPlayer(params.publicId),
@@ -33,6 +34,7 @@ export async function GET(
     wantH2H
       ? runResilient(() => getHeadToHead(vs!, params.publicId)).catch(() => null)
       : Promise.resolve(null),
+    getTagsForPublicId(params.publicId).catch(() => []),
   ]);
-  return Response.json({ history, awards, matches, milestones, frontierHistory, headToHead });
+  return Response.json({ history, awards, matches, milestones, frontierHistory, headToHead, tags });
 }

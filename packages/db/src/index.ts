@@ -17,6 +17,7 @@ export {
   getBetaDiscordIds,
   getTagSets,
   getTagsForDiscordId,
+  getTagsForPublicId,
 } from './queries/legacy';
 export type { LegacyHallEdition, LegacyHallWinner } from './queries/legacy';
 export type { PlayerTag } from './dto';
