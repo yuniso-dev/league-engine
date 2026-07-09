@@ -1,17 +1,28 @@
 import { describe, expect, test } from 'vitest';
 import {
+  AWARD_BONUS_CAP_PER_REVEAL,
+  AWARD_ELO_BONUS,
   DEFAULT_ELO_CONFIG,
+  PERF_WEIGHT,
+  awardBonusForName,
   expectedScore,
   kFor,
   matchDeltas,
   movMultiplier,
+  performanceScores,
   teamRating,
   type EloPlayer,
+  type PlayerStats,
 } from './elo';
 
 const cfg = DEFAULT_ELO_CONFIG;
 const established = (elo: number): EloPlayer => ({ elo, gamesPlayed: 20 });
 const placement = (elo: number): EloPlayer => ({ elo, gamesPlayed: 0 });
+const withStats = (elo: number, stats: Partial<PlayerStats>): EloPlayer => ({
+  elo,
+  gamesPlayed: 20,
+  stats: { rating: null, goals: 0, assists: 0, tackles: 0, ...stats },
+});
 
 describe('expectedScore', () => {
   test('equal ratings → 0.5', () => {
@@ -172,5 +183,143 @@ describe('matchDeltas', () => {
     );
     expect(home[0]).toBeCloseTo(cfg.kEstablished / 2);
     expect(home[0]).toBeCloseTo(home[1]);
+  });
+});
+
+describe('performanceScores', () => {
+  test('no stats anywhere → all zeros (classic shared delta)', () => {
+    expect(performanceScores([established(1000), established(1100)])).toEqual([0, 0]);
+  });
+
+  test('all-zero recorded stats → all zeros too', () => {
+    const side = [withStats(1000, {}), withStats(1000, {})];
+    expect(performanceScores(side)).toEqual([0, 0]);
+  });
+
+  test('higher match rating scores positive, mean-centred', () => {
+    const side = [withStats(1000, { rating: 8.5 }), withStats(1000, { rating: 6.5 })];
+    const [hi, lo] = performanceScores(side);
+    expect(hi).toBeGreaterThan(0);
+    expect(lo).toBeLessThan(0);
+    expect(hi + lo).toBeCloseTo(0);
+  });
+
+  test('clamped to ±1 for extreme gaps', () => {
+    const side = [withStats(1000, { rating: 9.9, goals: 5 }), withStats(1000, { rating: 4.0 })];
+    const [hi, lo] = performanceScores(side);
+    expect(hi).toBe(1);
+    expect(lo).toBe(-1);
+  });
+
+  test('goals/assists/tackles lift a player without any ratings recorded', () => {
+    const side = [withStats(1000, { goals: 2, assists: 1 }), withStats(1000, {})];
+    const [scorer, quiet] = performanceScores(side);
+    expect(scorer).toBeGreaterThan(0);
+    expect(quiet).toBeLessThan(0);
+  });
+
+  test('missing rating is neutral, not punished — counting stats still count', () => {
+    // Two teammates rated 8.0; the unrated one scored twice.
+    const side = [
+      withStats(1000, { rating: 8 }),
+      withStats(1000, { rating: 8 }),
+      withStats(1000, { goals: 2 }),
+    ];
+    const scores = performanceScores(side);
+    expect(scores[2]).toBeGreaterThan(0); // no rating, but the brace counts
+    expect(scores[0]).toBeCloseTo(scores[1]); // rated pair symmetric
+  });
+});
+
+describe('matchDeltas — personalised', () => {
+  const evenTeams = (home: EloPlayer[]) => ({
+    home,
+    away: [established(1000), established(1000)],
+    homeScore: 2,
+    awayScore: 0,
+  });
+
+  test('better-rated teammate gains more from the same win', () => {
+    const { home } = matchDeltas(
+      evenTeams([withStats(1000, { rating: 8.5 }), withStats(1000, { rating: 6.5 })]),
+      cfg,
+    );
+    expect(home[0]).toBeGreaterThan(home[1]);
+    expect(home[0]).toBeGreaterThan(0);
+    expect(home[1]).toBeGreaterThan(0); // a win NEVER costs Elo
+  });
+
+  test('better performer is shielded on a loss', () => {
+    const { home } = matchDeltas(
+      {
+        home: [withStats(1000, { rating: 8.5 }), withStats(1000, { rating: 6.5 })],
+        away: [established(1000), established(1000)],
+        homeScore: 0,
+        awayScore: 2,
+      },
+      cfg,
+    );
+    expect(home[0]).toBeGreaterThan(home[1]); // smaller loss for the 8.5
+    expect(home[0]).toBeLessThan(0); // but a loss ALWAYS costs
+    expect(home[1]).toBeLessThan(0);
+  });
+
+  test('personalisation is bounded by PERF_WEIGHT of the base delta', () => {
+    const { home } = matchDeltas(
+      evenTeams([withStats(1000, { rating: 9.9, goals: 5 }), withStats(1000, { rating: 4.0 })]),
+      cfg,
+    );
+    const base = (home[0] + home[1]) / 2; // mean-centred perf → mean IS the base
+    expect(home[0]).toBeCloseTo(base * (1 + PERF_WEIGHT), 1);
+    expect(home[1]).toBeCloseTo(base * (1 - PERF_WEIGHT), 1);
+  });
+
+  test('side Elo movement is preserved by mean-centring (same K)', () => {
+    const plain = matchDeltas(evenTeams([established(1000), established(1000)]), cfg);
+    const personal = matchDeltas(
+      evenTeams([withStats(1000, { rating: 8.5, goals: 2 }), withStats(1000, { rating: 6.5 })]),
+      cfg,
+    );
+    const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+    expect(sum(personal.home)).toBeCloseTo(sum(plain.home), 1);
+  });
+
+  test('no stats → identical deltas, exactly the old behaviour', () => {
+    const { home } = matchDeltas(evenTeams([established(1000), established(1000)]), cfg);
+    expect(home[0]).toBe(home[1]);
+  });
+});
+
+describe('award Elo bonuses', () => {
+  test('honour names with a numeral pay their bonus', () => {
+    expect(awardBonusForName('Xavier Frost XVII')).toBe(AWARD_ELO_BONUS['Xavier Frost']);
+    expect(awardBonusForName("Wallside's Award IV")).toBe(AWARD_ELO_BONUS["Wallside's Award"]);
+    expect(awardBonusForName('Team of the Tournament II')).toBe(AWARD_ELO_BONUS['Team of the Tournament']);
+  });
+
+  test('bare base names pay too, case-insensitively', () => {
+    expect(awardBonusForName('xavier frost')).toBe(AWARD_ELO_BONUS['Xavier Frost']);
+    expect(awardBonusForName("BLAZE'S BOOT VII")).toBe(AWARD_ELO_BONUS["Blaze's Boot"]);
+  });
+
+  test('champion and unknown awards pay nothing', () => {
+    expect(awardBonusForName('Inazuma Frontier XVII')).toBe(0); // matches already paid
+    expect(awardBonusForName('Community Hero')).toBe(0);
+    expect(awardBonusForName('Xavier Frosty')).toBe(0); // not a numeral suffix
+  });
+
+  test('Xavier Frost outranks a tournament of rating-edge personalisation', () => {
+    // Rough ceiling of teammate separation over a 6-game frontier:
+    // PERF_WEIGHT × K/2 per game × 6 games ≈ 25 — Frost must clear it.
+    const seasonEdge = PERF_WEIGHT * (cfg.kEstablished / 2) * 6;
+    expect(AWARD_ELO_BONUS['Xavier Frost']).toBeGreaterThan(seasonEdge);
+  });
+
+  test('the per-reveal cap stops a full sweep running away', () => {
+    const sweep = AWARD_ELO_BONUS['Xavier Frost']
+      + AWARD_ELO_BONUS["Blaze's Boot"]
+      + AWARD_ELO_BONUS['Team of the Tournament'];
+    expect(sweep).toBeGreaterThan(AWARD_BONUS_CAP_PER_REVEAL);
+    expect(Math.min(sweep, AWARD_BONUS_CAP_PER_REVEAL)).toBe(AWARD_BONUS_CAP_PER_REVEAL);
   });
 });

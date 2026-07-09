@@ -1,6 +1,8 @@
 // Elo calculation engine — pure functions only, no I/O.
 // Parameters mirror the `config` table so the engine is tuned from the DB.
 
+import { HONOURS, isRomanNumeral } from './editions';
+
 export type EloConfig = {
   /** K-factor during placement games. */
   kPlacement: number;
@@ -21,9 +23,44 @@ export const DEFAULT_ELO_CONFIG: EloConfig = {
   movMultiplierCap: 1.75,
 };
 
+// ── Per-player personalisation ─────────────────────────────────────────────
+// Teammates no longer share one delta: each player's recorded match stats
+// shift their slice of the team swing. Constants (not config columns) so the
+// tuning ships without a migration.
+
+/** Max fraction of the base team delta that performance can add or remove.
+ *  0.35 → a win pays between 65% and 135% of the team delta; a loss costs
+ *  between 65% and 135%. Personalisation can never flip the sign of a
+ *  result, so nobody loses Elo for winning — bounded and recoverable. */
+export const PERF_WEIGHT = 0.35;
+
+/** Composite-impact points above/below the team average needed to hit the
+ *  full ±PERF_WEIGHT swing. ~2 ≈ two full rating points, or a brace plus an
+ *  assist over the team norm. */
+export const PERF_SPREAD = 2;
+
+/** Weights folding counting stats into the composite impact score. Rating is
+ *  the primary signal (weight 1 via its deviation); these keep goals worth
+ *  roughly half a rating point each so a scorer without a recorded rating
+ *  still earns their edge. */
+export const GOAL_WEIGHT = 0.5;
+export const ASSIST_WEIGHT = 0.3;
+export const TACKLE_WEIGHT = 0.1;
+
+export type PlayerStats = {
+  /** EA average match rating (0–10) for THIS match; null when not recorded. */
+  rating: number | null;
+  goals: number;
+  assists: number;
+  tackles: number;
+};
+
 export type EloPlayer = {
   elo: number;
   gamesPlayed: number;
+  /** Per-match performance stats; omit when not recorded — the player then
+   *  sits at the team baseline and gets the classic shared delta. */
+  stats?: PlayerStats | null;
 };
 
 export type MatchInput = {
@@ -66,13 +103,50 @@ export function teamRating(players: EloPlayer[]): number {
   return players.reduce((sum, p) => sum + p.elo, 0) / players.length;
 }
 
+const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
+
+/**
+ * Per-player performance score within one side, each in [-1, +1].
+ *
+ * Composite impact = match-rating deviation from the side's average rating
+ * (only among players WITH a rating — a missing rating contributes zero, it
+ * never punishes) + weighted goals/assists/tackles deviation from the side's
+ * average. Mean-centred, so a side's scores roughly sum to zero and total
+ * team Elo movement is preserved; when nobody has stats every score is 0 and
+ * the engine behaves exactly as before.
+ */
+export function performanceScores(players: EloPlayer[]): number[] {
+  const rated = players.filter(p => p.stats?.rating != null);
+  const ratingMean = rated.length
+    ? rated.reduce((sum, p) => sum + p.stats!.rating!, 0) / rated.length
+    : null;
+
+  const statScore = (p: EloPlayer): number => {
+    const s = p.stats;
+    if (!s) return 0;
+    return GOAL_WEIGHT * s.goals + ASSIST_WEIGHT * s.assists + TACKLE_WEIGHT * s.tackles;
+  };
+  const statMean = players.length
+    ? players.reduce((sum, p) => sum + statScore(p), 0) / players.length
+    : 0;
+
+  return players.map(p => {
+    const ratingDev = ratingMean != null && p.stats?.rating != null ? p.stats.rating - ratingMean : 0;
+    const dev = ratingDev + (statScore(p) - statMean);
+    return clamp(dev / PERF_SPREAD, -1, 1);
+  });
+}
+
 /**
  * Elo deltas for one match.
  *
  * Expected score is computed from the average rating of each side; every
- * player on a side shares the same expected/actual score but applies their
- * own K, so placement players swing harder than established ones in the
- * same match.
+ * player on a side shares the same base swing (their own K applies, so
+ * placement players still move harder), then a bounded performance term
+ * personalises it: play above your side's level and a win pays more / a
+ * loss costs less; play below it and the reverse. The term scales with the
+ * match's stakes (±PERF_WEIGHT × |base|), so it can never flip a result's
+ * sign — a winner always gains, a loser always drops.
  */
 export function matchDeltas(input: MatchInput, cfg: EloConfig): MatchDeltas {
   const homeAvg = teamRating(input.home);
@@ -83,8 +157,58 @@ export function matchDeltas(input: MatchInput, cfg: EloConfig): MatchDeltas {
 
   const mov = movMultiplier(input.homeScore - input.awayScore, cfg.movMultiplierCap);
 
-  return {
-    home: input.home.map(p => round2(kFor(p.gamesPlayed, cfg) * mov * (sHome - eHome))),
-    away: input.away.map(p => round2(kFor(p.gamesPlayed, cfg) * mov * ((1 - sHome) - (1 - eHome)))),
+  const perfHome = performanceScores(input.home);
+  const perfAway = performanceScores(input.away);
+
+  const personalised = (p: EloPlayer, result: number, perf: number): number => {
+    const base = kFor(p.gamesPlayed, cfg) * mov * result;
+    return round2(base + Math.abs(base) * PERF_WEIGHT * perf);
   };
+
+  return {
+    home: input.home.map((p, i) => personalised(p, sHome - eHome, perfHome[i])),
+    away: input.away.map((p, i) => personalised(p, (1 - sHome) - (1 - eHome), perfAway[i])),
+  };
+}
+
+// ── Award Elo bonuses ──────────────────────────────────────────────────────
+// Winning an honour at a Frontier ceremony pays a one-off Elo bonus at the
+// next reveal. Deliberately large relative to per-match personalisation
+// (a whole tournament of out-rating a teammate is worth ~15–25) so an award
+// win can leapfrog a higher-rated rival — but one-off and capped, so nobody
+// runs away with the ladder.
+
+/** Bonus per honour, keyed by the award's un-numbered base name (awards are
+ *  minted "<base> <numeral>"). Inazuma Frontier (champion) is absent on
+ *  purpose: winning the tournament already paid full match Elo. */
+export const AWARD_ELO_BONUS: Record<string, number> = {
+  'Xavier Frost': 50,           // player of the tournament — the big one
+  "Wallside's Award": 30,       // best defender
+  "Evan's Golden Glove": 30,    // best goalkeeper
+  "Blaze's Boot": 30,           // top scorer
+  "Sharp's Award": 30,          // top assister
+  'Team of the Tournament': 15, // named in the Best VII
+  'Mr Inazuma': 10,             // winning captain — matches already paid
+};
+
+/** Ceiling on the SUM of award bonuses one player can bank in a single
+ *  reveal — a Frost + Boot + TOTT sweep pays 75, not 95. */
+export const AWARD_BONUS_CAP_PER_REVEAL = 75;
+
+/** Elo bonus for an award name like "Xavier Frost XVII" (or the bare base
+ *  name). Unknown/custom award names pay nothing — only the league honours
+ *  in AWARD_ELO_BONUS move ratings. */
+export function awardBonusForName(name: string): number {
+  const trimmed = name.trim();
+  const lower = trimmed.toLowerCase();
+  for (const h of HONOURS) {
+    const bonus = AWARD_ELO_BONUS[h.base];
+    if (!bonus) continue;
+    const baseLower = h.base.toLowerCase();
+    if (lower === baseLower) return bonus;
+    if (lower.startsWith(`${baseLower} `) && isRomanNumeral(trimmed.slice(h.base.length).trim())) {
+      return bonus;
+    }
+  }
+  return 0;
 }

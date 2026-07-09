@@ -43,10 +43,10 @@ export default async function RevealPage() {
         </p>
       </div>
 
-      {preview.matches.length === 0 ? (
+      {preview.matches.length === 0 && preview.awardGrants.length === 0 ? (
         <div style={glass({ padding: 36, textAlign: 'center', marginTop: 28 })}>
           <p style={{ fontFamily: FONT_B, color: T.dim, margin: 0 }}>
-            No pending ranked matches. Enter results on a tournament page first.
+            No pending ranked matches or award bonuses. Enter results on a tournament page first.
           </p>
         </div>
       ) : (
@@ -106,7 +106,11 @@ export default async function RevealPage() {
                     <td style={{
                       fontFamily: FONT_M, fontSize: 10, textAlign: 'right',
                       padding: '9px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      whiteSpace: 'nowrap',
                     }}>
+                      {p.awardBonus > 0 && (
+                        <span style={{ color: T.gold, marginRight: 8 }}>🏅 +{Math.round(p.awardBonus)}</span>
+                      )}
                       {p.wasProvisional && !p.nowProvisional && (
                         <span style={{ color: ADMIN_ACCENT }}>PLACES ⚡</span>
                       )}
@@ -120,7 +124,42 @@ export default async function RevealPage() {
             </table>
           </div>
 
+          {/* ── Award bonuses ── */}
+          {preview.awardGrants.length > 0 && (
+            <>
+              <h2 style={sectionTitle}>
+                AWARD BONUSES
+                <span style={{ color: T.faint, fontSize: 13, marginLeft: 10 }}>
+                  honours since the last reveal — one-off Elo
+                </span>
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {preview.awardGrants.map((g, i) => (
+                  <div key={`${g.displayName}-${g.awardName}-${i}`} style={glass({
+                    padding: '10px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                  })}>
+                    <span style={{ fontFamily: FONT_B, fontSize: 14, color: T.text, flex: 1, minWidth: 160 }}>
+                      {g.displayName}
+                    </span>
+                    <span style={{ fontFamily: FONT_B, fontSize: 13, color: T.dim }}>
+                      {g.awardIcon ? `${g.awardIcon} ` : ''}{g.awardName}
+                    </span>
+                    <span style={{ fontFamily: FONT_M, fontSize: 13, color: T.gold, minWidth: 48, textAlign: 'right' }}>
+                      +{Math.round(g.bonus)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
           {/* ── Matches in this reveal ── */}
+          {preview.matches.length > 0 && (
+            <>
           <h2 style={sectionTitle}>
             MATCHES IN THIS REVEAL
             <span style={{ color: T.faint, fontSize: 13, marginLeft: 10 }}>{preview.matches.length}</span>
@@ -152,12 +191,15 @@ export default async function RevealPage() {
               </div>
             ))}
           </div>
+            </>
+          )}
 
           {/* ── Commit ── */}
           <div style={{ ...glass({ padding: 24 }), marginTop: 32 }}>
             <p style={{ fontFamily: FONT_B, fontSize: 14, color: T.dim, margin: '0 0 16px', lineHeight: 1.6 }}>
-              Committing applies the ratings above, re-ranks the ladder, writes this week&apos;s
-              rating history and locks these matches. This cannot be undone from the admin panel.
+              Committing applies the ratings and award bonuses above, re-ranks the ladder, writes
+              this week&apos;s rating history and locks these matches. This cannot be undone from
+              the admin panel.
             </p>
             <RevealConfirm matchCount={preview.matches.length} playerCount={preview.players.length} />
           </div>
