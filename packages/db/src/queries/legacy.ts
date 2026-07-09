@@ -131,6 +131,17 @@ export async function getTagSets(): Promise<{ legacy: Set<string>; beta: Set<str
   return { legacy, beta };
 }
 
+/** Tags for a single player by public id — used by the profile payload so the
+ *  Legacy/Beta entries render regardless of how the profile was opened. */
+export async function getTagsForPublicId(publicId: string): Promise<PlayerTag[]> {
+  const [row] = await getDb()
+    .select({ discordId: users.discordId })
+    .from(users)
+    .where(eq(users.publicId, publicId))
+    .limit(1);
+  return row ? getTagsForDiscordId(row.discordId) : [];
+}
+
 /** Tags for a single player — cheap targeted lookups for the profile page. */
 export async function getTagsForDiscordId(discordId: string): Promise<PlayerTag[]> {
   const db = getDb();

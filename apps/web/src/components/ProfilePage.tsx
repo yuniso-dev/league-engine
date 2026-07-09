@@ -1,6 +1,6 @@
 'use client';
 import { memo, useEffect, useState } from 'react';
-import type { FrontierHistoryEntry, HeadToHead, PlayerMilestones, PublicAward, PublicPlayer, PublicRecentMatch, RatingPoint } from '@inazuma/db';
+import type { FrontierHistoryEntry, HeadToHead, PlayerMilestones, PlayerTag, PublicAward, PublicPlayer, PublicRecentMatch, RatingPoint } from '@inazuma/db';
 import { Bolt } from '@/components/ui/Bolt';
 import { Avatar } from '@/components/ui/Avatar';
 import { CountUp } from '@/components/ui/CountUp';
@@ -36,9 +36,16 @@ type ProfileExtras = {
   milestones: PlayerMilestones | null;
   frontierHistory?: FrontierHistoryEntry[];
   headToHead?: HeadToHead | null;
+  tags?: PlayerTag[];
 };
 
-const NO_EXTRAS: ProfileExtras = { history: [], awards: [], matches: [], milestones: null, frontierHistory: [], headToHead: null };
+const NO_EXTRAS: ProfileExtras = { history: [], awards: [], matches: [], milestones: null, frontierHistory: [], headToHead: null, tags: [] };
+
+// Standing tags shown in the right column as named entries (icon + name).
+const TAG_META: Record<PlayerTag, { icon: string; name: string; color: string }> = {
+  legacy: { icon: '🏛️', name: 'Legacy', color: '#d4a017' },
+  beta: { icon: '🧪', name: 'Beta', color: '#7aa2ff' },
+};
 
 // Auto-earned career badges, computed from real match data — no admin input.
 // Locked ones render dimmed so every profile shows what it COULD become.
@@ -71,6 +78,9 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
 
   const [extras, setExtras] = useState<ProfileExtras>(NO_EXTRAS);
   const { history, awards, matches, milestones, frontierHistory, headToHead } = extras;
+  // Standing tags: prefer the freshly-fetched extras, fall back to whatever the
+  // player object was opened with (rankings rows already carry them).
+  const tags: PlayerTag[] = extras.tags?.length ? extras.tags : player?.tags ?? [];
   const publicId = player?.publicId ?? null;
   // "You vs them" only makes sense when a logged-in viewer opens someone else's
   // profile — pass the viewer so the endpoint computes the head-to-head.
@@ -422,6 +432,33 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
         </div>
 
         <div className="pcol">
+          {/* standing — Legacy / Beta tags as named entries */}
+          {tags.length > 0 && (
+            <div style={{ ...glass({ padding: 18 }), order: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <span style={{ fontSize: 13 }}>🎗️</span>
+                <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
+                  STANDING
+                </h3>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {tags.map(t => {
+                  const m = TAG_META[t];
+                  return (
+                    <div key={t} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '9px 12px', borderRadius: 10,
+                      background: `${m.color}14`, border: `1px solid ${m.color}44`,
+                    }}>
+                      <span style={{ fontSize: 18 }}>{m.icon}</span>
+                      <span style={{ fontFamily: FONT_B, fontSize: 14, fontWeight: 700, color: m.color }}>{m.name}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* awards — the cabinet is always on display, even empty */}
           {player.showAwards && (
             <div style={{ ...glass({ padding: 18 }), order: 2 }}>
