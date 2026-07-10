@@ -261,6 +261,27 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
 
           <div style={{ display: 'flex', gap: 18, alignItems: 'center', position: 'relative' }}>
             <Avatar initials={initials(player.displayName)} src={player.avatarUrl} size={82} ring={showRank ? rc : null} />
+            {/* standing pills — top-right of the hero card */}
+            {tags.length > 0 && (
+              <div style={{
+                position: 'absolute', top: 0, right: 0,
+                display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end',
+              }}>
+                {tags.map(t => {
+                  const m = TAG_META[t];
+                  return (
+                    <span key={t} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 7,
+                      padding: '6px 12px', borderRadius: 9,
+                      background: `${m.color}14`, border: `1px solid ${m.color}44`,
+                    }}>
+                      <span style={{ fontSize: 14 }}>{m.icon}</span>
+                      <span style={{ fontFamily: FONT_B, fontSize: 12.5, fontWeight: 700, color: m.color }}>{m.name}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
                 <span style={{ fontFamily: FONT_D, color: T.text, fontSize: 32, letterSpacing: '0.02em' }}>
@@ -432,33 +453,6 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
         </div>
 
         <div className="pcol">
-          {/* standing — Legacy / Beta tags as named entries */}
-          {tags.length > 0 && (
-            <div style={{ ...glass({ padding: 18 }), order: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 13 }}>🎗️</span>
-                <h3 style={{ fontFamily: FONT_D, color: accent, fontSize: 14, letterSpacing: '0.1em', margin: 0 }}>
-                  STANDING
-                </h3>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {tags.map(t => {
-                  const m = TAG_META[t];
-                  return (
-                    <div key={t} style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '9px 12px', borderRadius: 10,
-                      background: `${m.color}14`, border: `1px solid ${m.color}44`,
-                    }}>
-                      <span style={{ fontSize: 18 }}>{m.icon}</span>
-                      <span style={{ fontFamily: FONT_B, fontSize: 14, fontWeight: 700, color: m.color }}>{m.name}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {/* awards — the cabinet is always on display, even empty */}
           {player.showAwards && (
             <div style={{ ...glass({ padding: 18 }), order: 2 }}>
