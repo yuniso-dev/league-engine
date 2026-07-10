@@ -8,7 +8,7 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
 } from 'discord.js';
-import { addTrackedClubs, areClubsTracked, getConfig, getLinkedLiveTournaments, getUserByDiscordId, listAwardsForPlayer } from '@inazuma/db';
+import { addTrackedClubs, areClubsTracked, getConfig, getLinkedLiveTournaments, getUserByDiscordId, listAwardsForPlayer, replaceVoicePresence } from '@inazuma/db';
 import { handleLeaderboard, handlePostLeaderboard } from './leaderboard.js';
 import { resetAllNicknames, syncNicknames } from './nicknameSync.js';
 import { snapshotVoiceChannel } from './voicePresence.js';
@@ -45,6 +45,10 @@ const definitions = [
       o.setName('channel')
         .setDescription('Voice channel to check (defaults to the one you are in)')
         .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice))
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+  new SlashCommandBuilder()
+    .setName('clearvc')
+    .setDescription("Admin: clear the site's LIVE IN VOICE card (e.g. after a Frontier ends)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder()
     .setName('findclub')
@@ -250,6 +254,22 @@ async function handleCheckVc(
     `Open the tournament's **Draft Board** on the site to build teams.`,
   ];
   await interaction.editReply(lines.join('\n'));
+}
+
+async function handleClearVc(
+  interaction: ChatInputCommandInteraction,
+  readOnly: boolean,
+): Promise<void> {
+  if (readOnly) {
+    await interaction.reply({
+      content: 'The bot is in read-only test mode — clearing voice presence is disabled. Unset BOT_READ_ONLY to enable it.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await replaceVoicePresence([]);
+  await interaction.editReply('🧹 Cleared the site\'s **LIVE IN VOICE** card. Run **/checkvc** to snapshot a channel again.');
 }
 
 const rel = (d: Date | null): string => (d ? `<t:${Math.floor(d.getTime() / 1000)}:R>` : '—');
@@ -527,6 +547,9 @@ export async function dispatch(
         break;
       case 'checkvc':
         await handleCheckVc(interaction, ctx);
+        break;
+      case 'clearvc':
+        await handleClearVc(interaction, ctx.readOnly);
         break;
       case 'findclub':
         await handleFindClub(interaction);
