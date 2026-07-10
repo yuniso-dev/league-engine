@@ -1,8 +1,13 @@
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, gt } from 'drizzle-orm';
 import { getDb } from '../client';
 import { users, voicePresence } from '../schema';
 
 // Voice-channel presence: the bot writes it, the website reads it.
+
+// The voice card is a manual /checkvc snapshot — nothing tracks people leaving,
+// so a stale snapshot would otherwise hang around forever. Only surface a check
+// from the last few hours; after that the card empties itself.
+const VOICE_TTL_HOURS = 3;
 
 /** Bot: replace the whole table with the current voice occupancy (startup scan). */
 export async function replaceVoicePresence(
@@ -44,6 +49,7 @@ export type VoiceNowEntry = {
 /** Website: who's in voice right now. */
 export async function getVoiceNow(): Promise<VoiceNowEntry[]> {
   try {
+    const fresh = new Date(Date.now() - VOICE_TTL_HOURS * 60 * 60 * 1000);
     const rows = await getDb()
       .select({
         displayName: users.displayName,
@@ -54,6 +60,7 @@ export async function getVoiceNow(): Promise<VoiceNowEntry[]> {
       })
       .from(voicePresence)
       .innerJoin(users, eq(voicePresence.discordId, users.discordId))
+      .where(gt(voicePresence.joinedAt, fresh))
       .orderBy(asc(voicePresence.channelName), asc(voicePresence.joinedAt));
 
     return rows

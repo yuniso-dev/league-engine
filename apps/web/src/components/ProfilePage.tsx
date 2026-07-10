@@ -204,7 +204,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
 
   const stats: { l: string; v: number; s: string; c: string }[] = [
     { l: 'RANK',   v: player.rank ?? 0,   s: '',  c: showRank ? rc : T.faint },
-    { l: 'ELO',    v: Math.round(player.elo), s: '', c: T.text },
+    { l: 'ELO',    v: Math.round(player.elo), s: '', c: showRank ? T.text : T.faint },
     { l: 'PLAYED', v: player.gamesPlayed,  s: '',  c: aGlow   },
   ];
 
@@ -360,7 +360,7 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
             {stats.map(s => (
               <div key={s.l} style={glass({ padding: '16px 4px', textAlign: 'center' })}>
                 <div style={{ fontFamily: FONT_D, fontSize: 26, color: s.c, lineHeight: 1 }}>
-                  {s.l === 'RANK' && !showRank ? '—' : <CountUp end={s.v} suffix={s.s} />}
+                  {(s.l === 'RANK' || s.l === 'ELO') && !showRank ? '—' : <CountUp end={s.v} suffix={s.s} />}
                 </div>
                 <div style={{ color: T.dim, fontFamily: FONT_M, fontSize: 8, letterSpacing: '0.06em', marginTop: 4 }}>
                   {s.l}
