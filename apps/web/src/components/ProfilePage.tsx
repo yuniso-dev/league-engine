@@ -41,9 +41,10 @@ type ProfileExtras = {
 
 const NO_EXTRAS: ProfileExtras = { history: [], awards: [], matches: [], milestones: null, frontierHistory: [], headToHead: null, tags: [] };
 
-// Standing tags shown in the right column as named entries (icon + name).
-const TAG_META: Record<PlayerTag, { icon: string; name: string; color: string }> = {
-  legacy: { icon: '🏛️', name: 'Legacy', color: '#d4a017' },
+// Standing tags shown inline next to the player's name. Legacy is word-only
+// (a glowing gold dot in place of an emoji); Beta keeps 🧪 (reads as "test").
+const TAG_META: Record<PlayerTag, { icon?: string; name: string; color: string }> = {
+  legacy: { name: 'Legacy', color: '#d4a017' },
   beta: { icon: '🧪', name: 'Beta', color: '#7aa2ff' },
 };
 
@@ -261,33 +262,32 @@ export const ProfilePage = memo(function ProfilePage({ player, isOwn = false, is
 
           <div style={{ display: 'flex', gap: 18, alignItems: 'center', position: 'relative' }}>
             <Avatar initials={initials(player.displayName)} src={player.avatarUrl} size={82} ring={showRank ? rc : null} />
-            {/* standing pills — top-right of the hero card */}
-            {tags.length > 0 && (
-              <div style={{
-                position: 'absolute', top: 0, right: 0,
-                display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end',
-              }}>
-                {tags.map(t => {
-                  const m = TAG_META[t];
-                  return (
-                    <span key={t} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 7,
-                      padding: '6px 12px', borderRadius: 9,
-                      background: `${m.color}14`, border: `1px solid ${m.color}44`,
-                    }}>
-                      <span style={{ fontSize: 14 }}>{m.icon}</span>
-                      <span style={{ fontFamily: FONT_B, fontSize: 12.5, fontWeight: 700, color: m.color }}>{m.name}</span>
-                    </span>
-                  );
-                })}
-              </div>
-            )}
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
                 <span style={{ fontFamily: FONT_D, color: T.text, fontSize: 32, letterSpacing: '0.02em' }}>
                   {player.displayName.toUpperCase()}
                 </span>
                 <FlagIcon code={player.country} size={26} />
+                {/* standing pills — inline, to the right of the name + flag */}
+                {tags.map(t => {
+                  const m = TAG_META[t];
+                  return (
+                    <span key={t} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '5px 11px', borderRadius: 999,
+                      background: `linear-gradient(135deg, ${m.color}30, ${m.color}0d)`,
+                      border: `1px solid ${m.color}59`,
+                      boxShadow: `0 0 12px ${m.color}22, inset 0 1px 0 ${m.color}26`,
+                    }}>
+                      {m.icon
+                        ? <span style={{ fontSize: 13 }}>{m.icon}</span>
+                        : <span style={{ width: 6, height: 6, borderRadius: '50%', background: m.color, boxShadow: `0 0 6px ${m.color}` }} />}
+                      <span style={{ fontFamily: FONT_B, fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: m.color }}>
+                        {m.name}
+                      </span>
+                    </span>
+                  );
+                })}
                 {isOwn && <AccentEditor accentColor={player.accentColor} />}
               </div>
               {player.title && (
