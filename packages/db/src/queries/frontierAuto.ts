@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { getDb } from '../client';
-import { adminActions, eaPendingMatches, matches, matchParticipants, teams, tournaments, users, voidedEaMatches } from '../schema';
+import { adminActions, eaPendingMatches, matches, matchGuestLines, matchParticipants, teams, tournaments, users, voidedEaMatches } from '../schema';
 
 // Frontier automation: teams link the captain's fresh EA club, and the bot
 // fills unscored fixtures from the EA API — scores AND per-player stats — so
@@ -125,6 +125,7 @@ export async function voidMatchResult(
         .onConflictDoNothing();
     }
     await tx.delete(matchParticipants).where(eq(matchParticipants.matchId, matchId));
+    await tx.delete(matchGuestLines).where(eq(matchGuestLines.matchId, matchId));
     await tx
       .update(matches)
       .set({ homeScore: null, awayScore: null, playedAt: null, eaMatchId: null, dnf: false })
@@ -215,9 +216,8 @@ export async function ingestFrontierResult(input: FrontierIngestInput): Promise<
   const idOf = new Map(userRows.map(r => [r.eaName, r.discordId]));
 
   const matched = input.players.filter(p => idOf.has(p.eaName.toLowerCase()));
-  const unmatched = input.players
-    .filter(p => !idOf.has(p.eaName.toLowerCase()))
-    .map(p => p.eaName);
+  const guests = input.players.filter(p => !idOf.has(p.eaName.toLowerCase()));
+  const unmatched = guests.map(p => p.eaName);
 
   const resultOf = (teamId: string): 'win' | 'loss' | 'draw' => {
     const isHome = teamId === match.homeTeamId;
@@ -258,6 +258,35 @@ export async function ingestFrontierResult(input: FrontierIngestInput): Promise<
       );
     }
   });
+
+  // Players with no linked site account keep their stat line as a GUEST row,
+  // so the match centre still shows the full XI. Outside the main transaction
+  // and best-effort: a missing table (migration not yet run) must never break
+  // auto-recording of the result itself.
+  if (guests.length > 0) {
+    await db
+      .insert(matchGuestLines)
+      .values(
+        guests.map(p => ({
+          matchId: input.matchId,
+          teamId: p.teamId,
+          eaName: p.eaName,
+          goals: p.goals,
+          assists: p.assists,
+          tackles: p.tackles,
+          cleanSheet: p.cleanSheet,
+          saves: p.saves,
+          redCards: p.redCards,
+          mom: p.mom,
+          rating: p.rating != null ? p.rating.toFixed(2) : null,
+          position: p.position,
+        })),
+      )
+      .onConflictDoNothing()
+      .catch(e => {
+        console.error('[ingest] guest lines not stored:', e instanceof Error ? e.message : e);
+      });
+  }
 
   return { ok: true, participants: matched.length, unmatched };
 }
@@ -408,7 +437,7 @@ export async function applyPendingMatch(adminId: string, eaMatchId: string): Pro
   });
 
   return outcome.unmatched.length > 0
-    ? `Applied. No site account for: ${outcome.unmatched.join(', ')} — their lines were skipped.`
+    ? `Applied. No site account for: ${outcome.unmatched.join(', ')} — shown as guests on the match page.`
     : 'Applied — score and every stat line are on the fixture.';
 }
 

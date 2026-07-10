@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import { normalizePosition } from '@inazuma/core';
 import { getDb } from '../client';
 import { listTournamentExclusions } from './exclusions';
 import {
@@ -28,7 +29,7 @@ export type MatchStatsEntry = {
   /** EA match rating (auto-ingest) — null when never rated. */
   rating: number | null;
   saves: number;
-  /** EA position bucket: goalkeeper | defender | midfielder | forward. */
+  /** EA position, normalised to the site's buckets (null = no position data). */
   position: string | null;
   redCards: number;
 };
@@ -93,7 +94,9 @@ export async function getMatchStatsEntries(matchId: string): Promise<MatchStatsS
         mom: r.mom,
         rating: r.rating != null ? parseFloat(r.rating) : null, // numeric → string from postgres.js
         saves: r.saves,
-        position: r.position,
+        // Historic rows may hold raw EA codes ("att", "gk") — normalise so the
+        // stats editor's POS dropdown always lands on a real option.
+        position: normalizePosition(r.position),
         redCards: r.redCards,
       })),
   };

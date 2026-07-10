@@ -153,6 +153,24 @@ export const matchParticipants = pgTable('match_participants', {
   eloChange:   numeric('elo_change', { precision: 6, scale: 2 }),
 });
 
+// Guest stat lines — EA players with no linked site account. Kept so the
+// match centre shows the full XI; no Elo, awards or profile ever attach.
+export const matchGuestLines = pgTable('match_guest_lines', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  matchId:     uuid('match_id').notNull().references(() => matches.id, { onDelete: 'cascade' }),
+  teamId:      uuid('team_id').notNull().references(() => teams.id),
+  eaName:      text('ea_name').notNull(),
+  goals:       integer('goals').notNull().default(0),
+  assists:     integer('assists').notNull().default(0),
+  cleanSheet:  boolean('clean_sheet').notNull().default(false),
+  tackles:     integer('tackles').notNull().default(0),
+  mom:         boolean('mom').notNull().default(false),
+  rating:      numeric('rating', { precision: 4, scale: 2 }),
+  saves:       integer('saves').notNull().default(0),
+  position:    text('position'),
+  redCards:    integer('red_cards').notNull().default(0),
+});
+
 export const ratingHistory = pgTable('rating_history', {
   id:          uuid('id').primaryKey().defaultRandom(),
   userId:      text('user_id').notNull().references(() => users.discordId, { onDelete: 'cascade' }),
