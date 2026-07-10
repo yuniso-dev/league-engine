@@ -1,4 +1,5 @@
 import type { Client } from 'discord.js';
+import { normalizePosition } from '@inazuma/core';
 import {
   addPendingMatch,
   autoProgressFrontier,
@@ -146,7 +147,9 @@ export async function syncFrontierMatches(client: Client<true>): Promise<Frontie
                 redCards: eaNum(p.redcards),
                 mom: eaNum(p.mom) > 0,
                 rating: p.rating != null ? eaNum(p.rating) : null,
-                position: p.pos ? String(p.pos) : null,
+                // Normalise EA's mixed formats ("att", "gk", posIds) into the
+                // site's buckets; keep the raw value if EA sends a new one.
+                position: normalizePosition(p.pos) ?? (p.pos ? String(p.pos) : null),
                 secondsPlayed: eaNum(p.secondsPlayed),
               }));
 

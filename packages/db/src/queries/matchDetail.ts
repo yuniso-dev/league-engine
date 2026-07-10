@@ -1,5 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
+import { normalizePosition, type PositionBucket } from '@inazuma/core';
 import { getDb } from '../client';
 import { matchParticipants, matches, teams, tournaments, users } from '../schema';
 import { getExcludedDiscordIds } from './exclusions';
@@ -22,8 +23,8 @@ export type MatchDetailPlayer = {
   redCards: number;
   mom: boolean;
   rating: number | null;
-  /** EA position bucket: goalkeeper | defender | midfielder | forward. */
-  position: string | null;
+  /** EA position, normalised to the site's buckets (null = no position data). */
+  position: PositionBucket | null;
   /** Honours-excluded for this tournament (rule violation) — stats shown, flagged. */
   excluded: boolean;
 };
@@ -113,7 +114,8 @@ export async function getMatchDetail(matchId: string): Promise<MatchDetail | nul
         redCards: r.redCards,
         mom: r.mom,
         rating: r.rating != null ? parseFloat(r.rating) : null,
-        position: r.position,
+        // Historic rows may hold raw EA codes ("att", "gk") — normalise on read.
+        position: normalizePosition(r.position),
         excluded: excluded.has(r.discordId),
       }))
       .sort((a, b) =>

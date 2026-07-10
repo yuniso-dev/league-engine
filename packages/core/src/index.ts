@@ -4,3 +4,4 @@ export * from './flags';
 export * from './editions';
 export * from './frontierFormat';
 export * from './legacy';
+export * from './positions';

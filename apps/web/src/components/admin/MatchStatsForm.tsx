@@ -132,14 +132,16 @@ export default function MatchStatsForm({ matchId, tournamentId }: Props) {
           <input type="hidden" name="matchId" value={matchId} />
           <input type="hidden" name="tournamentId" value={tournamentId} />
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 14, overflowX: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 14 }}>
             {sides.map(({ label, side }) => (
-              <div key={side}>
+              // overflowX + max-content rows: on a narrow window the side
+              // scrolls sideways instead of crushing the name column to zero.
+              <div key={side} style={{ overflowX: 'auto' }}>
                 <div style={{ ...labelStyle, marginBottom: 8 }}>{label}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 'max-content' }}>
                   {/* column headers */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ flex: 1 }} />
+                    <span style={{ width: 130, flexShrink: 0, fontFamily: FONT_M, fontSize: 9, color: T.faint }}>PLAYER</span>
                     <span style={{ width: 44, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>⚽ G</span>
                     <span style={{ width: 44, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>🎯 A</span>
                     <span style={{ width: 44, textAlign: 'center', fontFamily: FONT_M, fontSize: 9, color: T.faint }}>🛡 TKL</span>
@@ -152,10 +154,13 @@ export default function MatchStatsForm({ matchId, tournamentId }: Props) {
                   </div>
                   {sheet.entries.filter(e => e.side === side).map(e => (
                     <div key={e.publicId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{
-                        flex: 1, fontFamily: FONT_B, fontSize: 13, color: T.text,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>
+                      <span
+                        title={e.displayName}
+                        style={{
+                          width: 130, flexShrink: 0, fontFamily: FONT_B, fontSize: 13, color: T.text,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}
+                      >
                         {e.displayName}
                       </span>
                       <input name={`g_${e.publicId}`} type="number" min={0} max={99} defaultValue={e.goals} style={numInput} />

@@ -1,28 +1,19 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { POSITION_BUCKET_LABEL } from '@inazuma/core';
 import { getMatchDetail, runResilient, type MatchDetailPlayer } from '@inazuma/db';
 import { glass, REALMS, T, FONT_D, FONT_B, FONT_M, rgba } from '@/lib/realm-colors';
 import { STAGE_LABELS } from '@/lib/tournament-ui';
 import { Avatar } from '@/components/ui/Avatar';
+import { PitchLineup, ratingColor } from '@/components/PitchLineup';
 
-// The match centre: one recorded game, both lineups, every stat the EA
-// ingest captured — the browsable archive behind each result row.
+// The match centre: one recorded game, both lineups drawn on a pitch, every
+// stat the EA ingest captured — the browsable archive behind each result row.
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 type Props = { params: { id: string } };
-
-const POS_LABEL: Record<string, string> = {
-  goalkeeper: 'GK', defender: 'DEF', midfielder: 'MID', forward: 'FWD',
-};
-
-function ratingColor(rating: number | null): string {
-  if (rating == null) return T.faint;
-  if (rating >= 8) return T.win;
-  if (rating >= 6.5) return T.gold;
-  return T.loss;
-}
 
 function PlayerRow({ p }: { p: MatchDetailPlayer }) {
   const bits = [
@@ -57,7 +48,7 @@ function PlayerRow({ p }: { p: MatchDetailPlayer }) {
       </span>
       {p.position && (
         <span style={{ fontFamily: FONT_M, fontSize: 10, color: T.faint, minWidth: 28, textAlign: 'center' }}>
-          {POS_LABEL[p.position] ?? p.position.slice(0, 3).toUpperCase()}
+          {POSITION_BUCKET_LABEL[p.position]}
         </span>
       )}
       <span style={{ fontFamily: FONT_M, fontSize: 12, color: T.dim, whiteSpace: 'nowrap' }}>
@@ -137,12 +128,16 @@ export default async function MatchCentrePage({ params }: Props) {
                   No player stats on record — players need their EA ID linked for stats to attach.
                 </p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', fontFamily: FONT_M, fontSize: 9, color: T.faint, padding: '0 10px 2px' }}>
-                    RATING
+                <>
+                  {/* the lineup, drawn where EA said everyone played */}
+                  <PitchLineup players={side.players} accent={accent} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', fontFamily: FONT_M, fontSize: 9, color: T.faint, padding: '0 10px 2px' }}>
+                      RATING
+                    </div>
+                    {side.players.map(p => <PlayerRow key={p.publicId} p={p} />)}
                   </div>
-                  {side.players.map(p => <PlayerRow key={p.publicId} p={p} />)}
-                </div>
+                </>
               )}
             </div>
           ))}

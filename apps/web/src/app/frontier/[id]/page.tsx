@@ -79,6 +79,11 @@ export default async function FrontierDetailPage({ params }: Props) {
                     DNF
                   </span>
                 )}
+                {m.homeScore != null && !m.dnf && (
+                  <span style={{ display: 'block', fontSize: 8.5, letterSpacing: 1.5, color: T.faint, marginTop: 2 }}>
+                    LINEUPS →
+                  </span>
+                )}
               </span>
               <span style={{ fontFamily: FONT_B, fontSize: 14, color: T.text, flex: 1 }}>
                 {m.awayTeamName}

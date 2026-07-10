@@ -1,3 +1,4 @@
+import { normalizePosition } from '@inazuma/core';
 import { getConfig, ingestCasualMatches, type CasualMatchInput } from '@inazuma/db';
 import { fetchClubMatches, type EaMatchType, type EaRawMatch } from './eaClient.js';
 
@@ -27,7 +28,7 @@ export function parseEaMatch(raw: EaRawMatch, clubId: string, matchType: EaMatch
     .filter(p => (p.playername ?? '').trim().length > 0)
     .map(p => ({
       eaName: p.playername!.trim(),
-      position: p.pos ? String(p.pos) : null,
+      position: normalizePosition(p.pos) ?? (p.pos ? String(p.pos) : null),
       rating: p.rating != null ? num(p.rating) : null,
       goals: num(p.goals),
       assists: num(p.assists),
