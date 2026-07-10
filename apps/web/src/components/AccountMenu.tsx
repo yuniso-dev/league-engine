@@ -15,6 +15,9 @@ type Props = {
 
 const ACCENT = '#FF7A1A';
 
+// Build-time version injected via next.config.mjs (from apps/web/package.json).
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION;
+
 const itemStyle: React.CSSProperties = {
   display: 'block',
   width: '100%',
@@ -189,6 +192,19 @@ export function AccountMenu({ currentUser, isLoggedIn, isAdmin }: Props) {
                 </button>
               </form>
             </div>
+
+            {APP_VERSION && (
+              <div style={{
+                padding: '6px 14px 3px',
+                textAlign: 'center',
+                fontFamily: FONT_B,
+                fontSize: 10,
+                letterSpacing: '0.04em',
+                color: T.faint,
+              }}>
+                v{APP_VERSION}
+              </div>
+            )}
           </div>
         </>
       )}
