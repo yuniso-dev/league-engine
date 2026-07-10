@@ -85,7 +85,7 @@ function PlayerChip({ p }: { p: MatchDetailPlayer }) {
           </span>
         )}
       </span>
-      <span style={{
+      <span className="pitch-chip-name" style={{
         fontFamily: FONT_B, fontSize: 11, color: guest ? T.dim : T.text, maxWidth: 76, textAlign: 'center',
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
@@ -95,8 +95,8 @@ function PlayerChip({ p }: { p: MatchDetailPlayer }) {
   );
 
   return p.publicId != null
-    ? <Link href={`/p/${p.publicId}`} title={title} style={style}>{body}</Link>
-    : <span title={title} style={style}>{body}</span>;
+    ? <Link className="pitch-chip" href={`/p/${p.publicId}`} title={title} style={style}>{body}</Link>
+    : <span className="pitch-chip" title={title} style={style}>{body}</span>;
 }
 
 export function PitchLineup({ players, accent }: { players: MatchDetailPlayer[]; accent: string }) {

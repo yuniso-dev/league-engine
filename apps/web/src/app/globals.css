@@ -104,6 +104,12 @@ body {
   .rank-chips { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 }
 
+/* Match centre pitch: tighter chips on phones so a full 4–5-man line stays on one row. */
+@media (max-width: 560px) {
+  .pitch-chip { width: 56px !important; }
+  .pitch-chip-name { font-size: 10px !important; max-width: 56px !important; }
+}
+
 /* Frontier detail: stacked on phones; table+groups left, knockout+leaders right on PC. */
 .fr-grid { display: flex; flex-direction: column; gap: 0; }
 .fr-col { min-width: 0; }
