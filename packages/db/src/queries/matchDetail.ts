@@ -2,7 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { normalizePosition, type PositionBucket } from '@inazuma/core';
 import { getDb } from '../client';
-import { matchParticipants, matches, teams, tournaments, users } from '../schema';
+import { matchGuestLines, matchParticipants, matches, teams, tournaments, users } from '../schema';
 import { getExcludedDiscordIds } from './exclusions';
 import type { MatchStage } from './admin';
 
@@ -12,7 +12,8 @@ import type { MatchStage } from './admin';
 // other public surface.
 
 export type MatchDetailPlayer = {
-  publicId: string;
+  /** null = guest line — played the game but has no site account. */
+  publicId: string | null;
   displayName: string;
   avatarUrl: string | null;
   goals: number;
@@ -99,10 +100,18 @@ export async function getMatchDetail(matchId: string): Promise<MatchDetail | nul
       eq(users.isBlacklisted, false),
     ));
 
+  // Guest lines: players in the game with no linked site account. Best-effort
+  // read — a missing table (migration 0018 not yet run) degrades to none.
+  const guestRows = await db
+    .select()
+    .from(matchGuestLines)
+    .where(eq(matchGuestLines.matchId, matchId))
+    .catch(() => []);
+
   const playersOf = (teamId: string): MatchDetailPlayer[] =>
     rows
       .filter((r): r is typeof r & { publicId: string } => r.teamId === teamId && r.publicId != null)
-      .map(r => ({
+      .map((r): MatchDetailPlayer => ({
         publicId: r.publicId,
         displayName: r.displayName,
         avatarUrl: r.avatarUrl,
@@ -118,6 +127,23 @@ export async function getMatchDetail(matchId: string): Promise<MatchDetail | nul
         position: normalizePosition(r.position),
         excluded: excluded.has(r.discordId),
       }))
+      .concat(guestRows
+        .filter(g => g.teamId === teamId)
+        .map((g): MatchDetailPlayer => ({
+          publicId: null,
+          displayName: g.eaName,
+          avatarUrl: null,
+          goals: g.goals,
+          assists: g.assists,
+          tackles: g.tackles,
+          cleanSheet: g.cleanSheet,
+          saves: g.saves,
+          redCards: g.redCards,
+          mom: g.mom,
+          rating: g.rating != null ? parseFloat(g.rating) : null,
+          position: normalizePosition(g.position),
+          excluded: false,
+        })))
       .sort((a, b) =>
         (BUCKET_ORDER[a.position ?? ''] ?? 9) - (BUCKET_ORDER[b.position ?? ''] ?? 9) ||
         (b.rating ?? -1) - (a.rating ?? -1) ||

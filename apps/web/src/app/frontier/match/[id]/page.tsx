@@ -25,19 +25,19 @@ function PlayerRow({ p }: { p: MatchDetailPlayer }) {
     p.redCards > 0 ? '🟥' : null,
   ].filter(Boolean);
 
-  return (
-    <Link
-      href={`/p/${p.publicId}`}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
-        borderRadius: 10, textDecoration: 'none',
-        background: p.mom ? rgba('#FFD24A', 0.08) : 'transparent',
-        border: p.mom ? `1px solid ${rgba('#FFD24A', 0.3)}` : '1px solid transparent',
-      }}
-    >
+  const guest = p.publicId == null; // played the game, no site account
+  const rowStyle: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+    borderRadius: 10, textDecoration: 'none',
+    background: p.mom ? rgba('#FFD24A', 0.08) : 'transparent',
+    border: p.mom ? `1px solid ${rgba('#FFD24A', 0.3)}` : '1px solid transparent',
+    ...(guest ? { opacity: 0.75 } : {}),
+  };
+  const body = (
+    <>
       <Avatar initials={p.displayName.slice(0, 2).toUpperCase()} src={p.avatarUrl} size={26} />
       <span style={{
-        flex: 1, fontFamily: FONT_B, fontSize: 13.5, color: T.text,
+        flex: 1, fontFamily: FONT_B, fontSize: 13.5, color: guest ? T.dim : T.text,
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
         {p.displayName}
@@ -60,8 +60,12 @@ function PlayerRow({ p }: { p: MatchDetailPlayer }) {
       }}>
         {p.rating != null ? p.rating.toFixed(1) : '—'}
       </span>
-    </Link>
+    </>
   );
+
+  return p.publicId != null
+    ? <Link href={`/p/${p.publicId}`} style={rowStyle}>{body}</Link>
+    : <div title="No site account yet — stats shown by EA name" style={rowStyle}>{body}</div>;
 }
 
 export default async function MatchCentrePage({ params }: Props) {
@@ -135,7 +139,7 @@ export default async function MatchCentrePage({ params }: Props) {
                     <div style={{ display: 'flex', justifyContent: 'flex-end', fontFamily: FONT_M, fontSize: 9, color: T.faint, padding: '0 10px 2px' }}>
                       RATING
                     </div>
-                    {side.players.map(p => <PlayerRow key={p.publicId} p={p} />)}
+                    {side.players.map(p => <PlayerRow key={p.publicId ?? p.displayName} p={p} />)}
                   </div>
                 </>
               )}
@@ -145,6 +149,7 @@ export default async function MatchCentrePage({ params }: Props) {
 
         <p style={{ fontFamily: FONT_M, fontSize: 11, color: T.faint, textAlign: 'center', marginTop: 16 }}>
           ⭐ Man of the Match · ratings and positions come from EA FC · tap a player for their full profile
+          · dimmed players haven&apos;t linked a site account yet
         </p>
       </div>
     </div>

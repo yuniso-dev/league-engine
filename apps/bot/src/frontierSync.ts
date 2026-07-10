@@ -223,7 +223,7 @@ export async function syncFrontierMatches(client: Client<true>): Promise<Frontie
               `[frontier] ✔ auto-recorded ${ourTeam.teamName} ${ourGoals}–${oppGoals} ${oppTeam.teamName}` +
               (dnf ? ' (DNF)' : '') +
               ` (${outcome.participants} player stat lines` +
-              (outcome.unmatched.length > 0 ? `; no site account for: ${outcome.unmatched.join(', ')}` : '') + ')',
+              (outcome.unmatched.length > 0 ? `; guests (no site account): ${outcome.unmatched.join(', ')}` : '') + ')',
             );
             if (dnf) {
               await alertAdminsDnf(client, m, clubId, oppId, ourTeam.teamName, oppTeam.teamName, ourGoals, oppGoals);

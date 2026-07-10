@@ -52,15 +52,15 @@ function Markings() {
 
 function PlayerChip({ p }: { p: MatchDetailPlayer }) {
   const rc = ratingColor(p.rating);
-  return (
-    <Link
-      href={`/p/${p.publicId}`}
-      title={`${p.displayName}${p.rating != null ? ` — rated ${p.rating.toFixed(1)}` : ''}${p.mom ? ' · Man of the Match' : ''}`}
-      style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-        width: 76, textDecoration: 'none',
-      }}
-    >
+  const guest = p.publicId == null; // played the game, no site account
+  const title = `${p.displayName}${p.rating != null ? ` — rated ${p.rating.toFixed(1)}` : ''}${p.mom ? ' · Man of the Match' : ''}${guest ? ' · no site account yet' : ''}`;
+  const style: React.CSSProperties = {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+    width: 76, textDecoration: 'none',
+    ...(guest ? { opacity: 0.75 } : {}),
+  };
+  const body = (
+    <>
       <span style={{
         position: 'relative', display: 'inline-flex', borderRadius: '50%',
         boxShadow: p.mom ? `0 0 0 2px ${MOTM_GOLD}, 0 0 16px ${rgba(MOTM_GOLD, 0.45)}` : 'none',
@@ -86,13 +86,17 @@ function PlayerChip({ p }: { p: MatchDetailPlayer }) {
         )}
       </span>
       <span style={{
-        fontFamily: FONT_B, fontSize: 11, color: T.text, maxWidth: 76, textAlign: 'center',
+        fontFamily: FONT_B, fontSize: 11, color: guest ? T.dim : T.text, maxWidth: 76, textAlign: 'center',
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
         {p.displayName}
       </span>
-    </Link>
+    </>
   );
+
+  return p.publicId != null
+    ? <Link href={`/p/${p.publicId}`} title={title} style={style}>{body}</Link>
+    : <span title={title} style={style}>{body}</span>;
 }
 
 export function PitchLineup({ players, accent }: { players: MatchDetailPlayer[]; accent: string }) {
@@ -121,7 +125,7 @@ export function PitchLineup({ players, accent }: { players: MatchDetailPlayer[];
                 display: 'flex', justifyContent: 'space-evenly', alignItems: 'center',
                 flexWrap: 'wrap', gap: 4, minHeight: 58,
               }}>
-                {linePlayers.map(p => <PlayerChip key={p.publicId} p={p} />)}
+                {linePlayers.map(p => <PlayerChip key={p.publicId ?? p.displayName} p={p} />)}
               </div>
             ))}
           </div>
@@ -136,7 +140,7 @@ export function PitchLineup({ players, accent }: { players: MatchDetailPlayer[];
             </div>
           )}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 14px' }}>
-            {bench.map(p => <PlayerChip key={p.publicId} p={p} />)}
+            {bench.map(p => <PlayerChip key={p.publicId ?? p.displayName} p={p} />)}
           </div>
         </div>
       )}
