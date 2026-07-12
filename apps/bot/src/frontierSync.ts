@@ -13,6 +13,7 @@ import {
 } from '@inazuma/db';
 import { eaNum, fetchClubMatches, type EaMatchType, type EaRawMatch } from './eaClient.js';
 import { sendDm } from './notifier.js';
+import { frontierResultEmbed, sendToChannel } from './channels.js';
 
 // Frontier automation, phase 1: while a tournament is LIVE and its teams have
 // EA clubs linked, poll the EA API and fill unscored fixtures automatically —
@@ -198,6 +199,11 @@ export async function syncFrontierMatches(client: Client<true>): Promise<Frontie
 
           const homeIsUs = fixture.homeTeamId === ourTeam.teamId;
 
+          const linePlayers = [
+            ...playersOf(clubId, ourTeam.teamId, oppGoals),
+            ...playersOf(oppId, oppTeam.teamId, ourGoals),
+          ];
+
           const outcome = await ingestFrontierResult({
             matchId: fixture.matchId,
             eaMatchId,
@@ -205,10 +211,7 @@ export async function syncFrontierMatches(client: Client<true>): Promise<Frontie
             homeScore: homeIsUs ? ourGoals : oppGoals,
             awayScore: homeIsUs ? oppGoals : ourGoals,
             dnf,
-            players: [
-              ...playersOf(clubId, ourTeam.teamId, oppGoals),
-              ...playersOf(oppId, oppTeam.teamId, ourGoals),
-            ],
+            players: linePlayers,
           });
 
           if (outcome.ok) {
@@ -227,6 +230,33 @@ export async function syncFrontierMatches(client: Client<true>): Promise<Frontie
             );
             if (dnf) {
               await alertAdminsDnf(client, m, clubId, oppId, ourTeam.teamName, oppTeam.teamName, ourGoals, oppGoals);
+            }
+
+            // Live results feed: post the game to #results-and-stats when set.
+            // A post failure never affects the recorded result (sendToChannel
+            // swallows its own errors).
+            if (cfg.resultsChannelId) {
+              await sendToChannel(client, cfg.resultsChannelId, {
+                embeds: [frontierResultEmbed({
+                  tournamentName: t.tournamentName,
+                  matchId: fixture.matchId,
+                  homeTeam: homeIsUs ? ourTeam.teamName : oppTeam.teamName,
+                  awayTeam: homeIsUs ? oppTeam.teamName : ourTeam.teamName,
+                  homeScore: homeIsUs ? ourGoals : oppGoals,
+                  awayScore: homeIsUs ? oppGoals : ourGoals,
+                  homeTeamId: homeIsUs ? ourTeam.teamId : oppTeam.teamId,
+                  awayTeamId: homeIsUs ? oppTeam.teamId : ourTeam.teamId,
+                  dnf,
+                  players: linePlayers.map(p => ({
+                    teamId: p.teamId,
+                    eaName: p.eaName,
+                    goals: p.goals,
+                    assists: p.assists,
+                    mom: p.mom,
+                    rating: p.rating,
+                  })),
+                })],
+              });
             }
           } else if (outcome.reason !== 'already-ingested') {
             console.warn(`[frontier] EA match ${eaMatchId} not ingested — ${outcome.reason}`);

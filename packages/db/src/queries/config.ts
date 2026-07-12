@@ -27,6 +27,7 @@ const DEFAULT_CONFIG: ConfigRow = {
   punishedRoleId: null,
   legacyRoleId: null,
   betaRoleId: null,
+  resultsChannelId: null,
   updatedAt: new Date(),
 };
 
@@ -53,6 +54,7 @@ export async function updateConfig(
     punishedRoleId?: string | null;
     legacyRoleId?: string | null;
     betaRoleId?: string | null;
+    resultsChannelId?: string | null;
   },
 ): Promise<void> {
   const now = new Date();
@@ -72,6 +74,7 @@ export async function updateConfig(
     ...(data.punishedRoleId !== undefined && { punishedRoleId: data.punishedRoleId }),
     ...(data.legacyRoleId !== undefined && { legacyRoleId: data.legacyRoleId }),
     ...(data.betaRoleId !== undefined && { betaRoleId: data.betaRoleId }),
+    ...(data.resultsChannelId !== undefined && { resultsChannelId: data.resultsChannelId }),
     updatedAt: now,
   };
 
