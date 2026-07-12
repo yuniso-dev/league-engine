@@ -11,6 +11,9 @@ const SITE = process.env.SITE_URL ?? 'https://inazuma-fc.vercel.app';
 // Brand palette (mirrors the site's announcement embeds).
 const BLUE = 0x3d8bff;
 const AMBER = 0xffb020; // DNF / forfeit-tinged results
+const GREEN = 0x3ddc97; // casual win
+const RED = 0xff5b5b;   // casual loss
+const SLATE = 0x8a94a6; // casual draw
 
 // Warn-once per channel so a persistent misconfig doesn't spam the logs.
 const warned = new Set<string>();
@@ -124,6 +127,75 @@ export function frontierResultEmbed(r: FrontierResultInput): EmbedBuilder {
   }
 
   embed.addFields({ name: '​', value: `[**Lineups & full stats →**](${SITE}/frontier/match/${r.matchId})`, inline: false });
+
+  return embed;
+}
+
+// ── Casual club result embed ──────────────────────────────────────────────────
+
+export type CasualResultInput = {
+  clubId: string;
+  clubName: string;
+  opponentName: string | null;
+  ourGoals: number;
+  oppGoals: number;
+  result: 'win' | 'loss' | 'draw';
+  matchType: string; // 'league' | 'playoff'
+  playedAt: Date;
+  players: {
+    eaName: string;
+    rating: number | null;
+    goals: number;
+    assists: number;
+    saves: number;
+    mom: boolean;
+  }[];
+};
+
+/** One compact squad line: name, rating, then only the stats that happened. */
+function squadLine(p: CasualResultInput['players'][number]): string {
+  return (
+    (p.mom ? '⭐ ' : '') +
+    `**${esc(p.eaName)}**` +
+    (p.rating != null ? `  ${p.rating.toFixed(1)}` : '') +
+    (p.goals > 0 ? `  ·  ⚽ ${p.goals}` : '') +
+    (p.assists > 0 ? `  ·  🅰️ ${p.assists}` : '') +
+    (p.saves > 0 ? `  ·  🧤 ${p.saves}` : '')
+  );
+}
+
+/** Build the casual-feed embed: colour-coded W/L/D scoreline linking to the
+ *  club page, plus a stat line for EVERY teammate who played (rating always;
+ *  goals/assists/saves when non-zero; ⭐ marks the player of the match). */
+export function casualResultEmbed(r: CasualResultInput): EmbedBuilder {
+  const verdict = r.result === 'win' ? 'WIN' : r.result === 'loss' ? 'LOSS' : 'DRAW';
+  const colour = r.result === 'win' ? GREEN : r.result === 'loss' ? RED : SLATE;
+
+  const embed = new EmbedBuilder()
+    .setAuthor({ name: `🎮 CASUAL · ${verdict}` })
+    .setTitle(`${esc(r.clubName)}  ${r.ourGoals}–${r.oppGoals}  ${esc(r.opponentName ?? 'Unknown opponent')}`)
+    .setURL(`${SITE}/casual/club/${r.clubId}`)
+    .setColor(colour)
+    .setFooter({ text: `INAZUMA FC · ${r.clubName} · ${r.matchType === 'playoff' ? 'Playoffs' : 'League'}` })
+    .setTimestamp(r.playedAt);
+
+  // Best performance first: rating desc, unrated last.
+  const squad = [...r.players].sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
+  if (squad.length > 0) {
+    // Discord caps a field value at 1024 chars — a full 11 fits comfortably,
+    // but clamp defensively so a weird EA payload can never break the post.
+    const lines: string[] = [];
+    let used = 0;
+    for (const p of squad) {
+      const line = squadLine(p);
+      if (used + line.length + 1 > 1000) { lines.push('…'); break; }
+      lines.push(line);
+      used += line.length + 1;
+    }
+    embed.addFields({ name: '👥 Squad', value: lines.join('\n'), inline: false });
+  }
+
+  embed.addFields({ name: '​', value: `[**Club page & leaderboard →**](${SITE}/casual/club/${r.clubId})`, inline: false });
 
   return embed;
 }

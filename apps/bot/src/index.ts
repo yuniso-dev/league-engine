@@ -48,7 +48,7 @@ const GUILD_OVERRIDE = process.env.BOT_GUILD_ID || null;
 const REVEAL_POLL_MS = 5 * 60_000;   // check for a committed reveal
 const MEMBER_SYNC_MS = 6 * 3_600_000; // periodic full member re-sync
 const GUILD_RETRY_MS = 60_000;        // re-check config.guildId when unset
-const CASUAL_POLL_MS = 10 * 60_000;   // EA Clubs API poll (unofficial API — be gentle)
+const CASUAL_POLL_MS = 5 * 60_000;    // EA Clubs API poll — 5 min keeps the results feed fresh while staying gentle (≤12 requests/pass at the 6-club cap)
 const FRONTIER_POLL_MS = 2 * 60_000;  // live-tournament result ingest (no-op unless a linked Frontier is live)
 const CLUB_TRACK_MS = 2 * 60_000;     // tracked-club snapshots, a few stalest clubs per pass
 
@@ -172,8 +172,8 @@ client.once(Events.ClientReady, async ready => {
   // CASUAL realm: poll the EA Clubs API for new club matches. No-op until
   // an EA Club ID is configured in Admin → Settings.
   if (!READ_ONLY) {
-    await syncCasualMatches().catch(e => console.error('[bot] casual sync failed —', e));
-    every(CASUAL_POLL_MS, 'casual sync', syncCasualMatches);
+    await syncCasualMatches(ready).catch(e => console.error('[bot] casual sync failed —', e));
+    every(CASUAL_POLL_MS, 'casual sync', () => syncCasualMatches(ready));
   }
 
   // Frontier automation: while a LIVE tournament has teams with EA clubs

@@ -131,11 +131,14 @@ export default function SettingsForm({ config }: Props) {
           CASUAL — EA FC CLUBS
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Field label="EA Club ID(s)" caption="The club the bot polls for casual matches (find it in your club's URL on EA's site). Comma-separate several. Blank = casual sync off.">
-            <input name="eaClubIds" defaultValue={config.eaClubIds ?? ''} autoComplete="off" placeholder="e.g. 123456" style={inputBase} />
+          <Field label="EA Club ID(s)" caption="The club(s) the bot polls for casual matches — up to 6, comma-separated (find each ID in the club's URL on EA's site). League + playoff games from ALL of them feed the casual leaderboard and player stats. Blank = casual sync off.">
+            <input name="eaClubIds" defaultValue={config.eaClubIds ?? ''} autoComplete="off" placeholder="e.g. 118660,172389" style={inputBase} />
           </Field>
           <Field label="EA platform" caption="Cross-play pool: common-gen5 (PS5/Xbox Series/PC) or common-gen4 (PS4/Xbox One).">
             <input name="eaPlatform" defaultValue={config.eaPlatform ?? 'common-gen5'} autoComplete="off" style={inputBase} />
+          </Field>
+          <Field label="Casual results channel ID" caption="Channel the bot posts every new club game into — scoreline plus each teammate's rating, goals, assists and saves. Right-click the channel → Copy Channel ID. The bot needs View + Send Messages + Embed Links there. Blank = off.">
+            <input name="casualResultsChannelId" defaultValue={config.casualResultsChannelId ?? ''} autoComplete="off" style={inputBase} />
           </Field>
         </div>
       </div>
