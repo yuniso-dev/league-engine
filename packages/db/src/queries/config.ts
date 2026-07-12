@@ -28,6 +28,7 @@ const DEFAULT_CONFIG: ConfigRow = {
   legacyRoleId: null,
   betaRoleId: null,
   resultsChannelId: null,
+  casualResultsChannelId: null,
   updatedAt: new Date(),
 };
 
@@ -55,6 +56,7 @@ export async function updateConfig(
     legacyRoleId?: string | null;
     betaRoleId?: string | null;
     resultsChannelId?: string | null;
+    casualResultsChannelId?: string | null;
   },
 ): Promise<void> {
   const now = new Date();
@@ -75,6 +77,7 @@ export async function updateConfig(
     ...(data.legacyRoleId !== undefined && { legacyRoleId: data.legacyRoleId }),
     ...(data.betaRoleId !== undefined && { betaRoleId: data.betaRoleId }),
     ...(data.resultsChannelId !== undefined && { resultsChannelId: data.resultsChannelId }),
+    ...(data.casualResultsChannelId !== undefined && { casualResultsChannelId: data.casualResultsChannelId }),
     updatedAt: now,
   };
 

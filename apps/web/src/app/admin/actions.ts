@@ -776,9 +776,13 @@ export async function updateConfigAction(
     if (eaClubIdsRaw && !/^\d+(\s*,\s*\d+)*$/.test(eaClubIdsRaw)) {
       return { error: 'EA Club IDs must be numbers, comma-separated.' };
     }
-    const eaClubIds = eaClubIdsRaw
-      ? eaClubIdsRaw.split(',').map(s => s.trim()).filter(Boolean).join(',')
-      : null;
+    const eaClubIdList = eaClubIdsRaw
+      ? eaClubIdsRaw.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+    if (eaClubIdList.length > 6) {
+      return { error: 'At most 6 EA clubs can feed the casual realm — remove some IDs.' };
+    }
+    const eaClubIds = eaClubIdList.length > 0 ? eaClubIdList.join(',') : null;
     const eaPlatform = str(formData, 'eaPlatform').toLowerCase() || 'common-gen5';
     if (!/^[a-z0-9-]{2,20}$/.test(eaPlatform)) {
       return { error: 'EA platform looks wrong — e.g. common-gen5.' };
@@ -798,16 +802,19 @@ export async function updateConfigAction(
       }
     }
 
-    // Discord channel the bot posts auto-recorded Frontier results into.
+    // Discord channels the bot posts result feeds into (Frontier / casual club games).
     const resultsChannelId = str(formData, 'resultsChannelId') || null;
-    if (resultsChannelId && !/^\d{5,25}$/.test(resultsChannelId)) {
-      return { error: 'Results feed channel ID must be a numeric Discord channel ID (right-click the channel → Copy Channel ID).' };
+    const casualResultsChannelId = str(formData, 'casualResultsChannelId') || null;
+    for (const [label, id] of [['Results feed', resultsChannelId], ['Casual results', casualResultsChannelId]] as const) {
+      if (id && !/^\d{5,25}$/.test(id)) {
+        return { error: `${label} channel ID must be a numeric Discord channel ID (right-click the channel → Copy Channel ID).` };
+      }
     }
 
     await updateConfig(admin.discordId, {
       currentSeason, eloBase, kPlacement, kEstablished, placementGames, movMultiplierCap,
       guildId, rankingsMessageId, eaClubIds, eaPlatform, frontierRules, signupRoleId, punishedRoleId,
-      legacyRoleId, betaRoleId, resultsChannelId,
+      legacyRoleId, betaRoleId, resultsChannelId, casualResultsChannelId,
     });
 
     revalidatePath('/admin/settings');

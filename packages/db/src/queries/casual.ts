@@ -37,11 +37,13 @@ export type CasualMatchInput = {
 };
 
 /** Merge freshly fetched matches. EA matchIds are globally unique, so re-polls
- *  are no-ops for matches we already hold. Returns how many were NEW. */
-export async function ingestCasualMatches(matches: CasualMatchInput[]): Promise<number> {
-  if (matches.length === 0) return 0;
+ *  are no-ops for matches we already hold. Returns the matchIds that were NEW —
+ *  the bot posts exactly these to the casual results feed, so a restart can
+ *  never re-announce a game the database already had. */
+export async function ingestCasualMatches(matches: CasualMatchInput[]): Promise<string[]> {
+  if (matches.length === 0) return [];
   const db = getDb();
-  let added = 0;
+  const added: string[] = [];
 
   for (const m of matches) {
     const inserted = await db
@@ -60,7 +62,7 @@ export async function ingestCasualMatches(matches: CasualMatchInput[]): Promise<
       .returning({ matchId: casualMatches.matchId });
 
     if (inserted.length === 0) continue; // already ingested
-    added += 1;
+    added.push(m.matchId);
 
     if (m.players.length > 0) {
       await db

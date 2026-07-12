@@ -221,6 +221,7 @@ export const config = pgTable('config', {
   legacyRoleId:       text('legacy_role_id'),   // Discord role for everyone in the pre-website archive
   betaRoleId:         text('beta_role_id'),      // Discord role for everyone who played the Season 0 test
   resultsChannelId:   text('results_channel_id'), // Channel the bot posts each auto-recorded Frontier result into
+  casualResultsChannelId: text('casual_results_channel_id'), // Channel the bot posts each newly ingested casual club game into
   updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
