@@ -798,10 +798,16 @@ export async function updateConfigAction(
       }
     }
 
+    // Discord channel the bot posts auto-recorded Frontier results into.
+    const resultsChannelId = str(formData, 'resultsChannelId') || null;
+    if (resultsChannelId && !/^\d{5,25}$/.test(resultsChannelId)) {
+      return { error: 'Results feed channel ID must be a numeric Discord channel ID (right-click the channel → Copy Channel ID).' };
+    }
+
     await updateConfig(admin.discordId, {
       currentSeason, eloBase, kPlacement, kEstablished, placementGames, movMultiplierCap,
       guildId, rankingsMessageId, eaClubIds, eaPlatform, frontierRules, signupRoleId, punishedRoleId,
-      legacyRoleId, betaRoleId,
+      legacyRoleId, betaRoleId, resultsChannelId,
     });
 
     revalidatePath('/admin/settings');

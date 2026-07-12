@@ -239,6 +239,7 @@ create table config (
     punished_role_id    text,
     legacy_role_id      text,
     beta_role_id        text,
+    results_channel_id  text,
     updated_at          timestamptz not null default now(),
     check (id = 1)
 );

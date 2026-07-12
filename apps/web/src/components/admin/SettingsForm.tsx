@@ -108,6 +108,9 @@ export default function SettingsForm({ config }: Props) {
           <Field label="Rankings message ID" caption="ID of the Discord message the bot will edit to keep rankings up to date. Leave blank until the bot is set up.">
             <input name="rankingsMessageId" defaultValue={config.rankingsMessageId ?? ''} autoComplete="off" style={inputBase} />
           </Field>
+          <Field label="Results feed channel ID" caption="Channel the bot posts every auto-recorded Frontier game into — scoreline, scorers and player of the match, with a link to the full stats. Right-click the channel → Copy Channel ID. The bot needs View + Send Messages + Embed Links there. Blank = off.">
+            <input name="resultsChannelId" defaultValue={config.resultsChannelId ?? ''} autoComplete="off" style={inputBase} />
+          </Field>
           <Field label="Signed-up role ID" caption="Role the bot gives everyone signed up for the open Frontier — added on signup, removed on withdrawal, cleared when it completes. Right-click the role → Copy Role ID (the bot's role must sit above it). Blank = off.">
             <input name="signupRoleId" defaultValue={config.signupRoleId ?? ''} autoComplete="off" style={inputBase} />
           </Field>
