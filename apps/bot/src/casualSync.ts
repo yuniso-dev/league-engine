@@ -1,6 +1,6 @@
 import type { Client } from 'discord.js';
 import { normalizePosition } from '@inazuma/core';
-import { getConfig, ingestCasualMatches, type CasualMatchInput } from '@inazuma/db';
+import { ensureCasualSince, getConfig, ingestCasualMatches, type CasualMatchInput } from '@inazuma/db';
 import { fetchClubMatches, type EaMatchType, type EaRawMatch } from './eaClient.js';
 import { casualResultEmbed, sendToChannel } from './channels.js';
 
@@ -78,13 +78,22 @@ export async function syncCasualMatches(client: Client<true>): Promise<void> {
 
   const platform = cfg.eaPlatform || 'common-gen5';
 
+  // Era watermarks: a club's games only count from the moment it was added to
+  // the config — EA serves each club's last ~10 games, and without this the
+  // first poll would backfill that history into the stats and the feed.
+  const { since, seeded } = await ensureCasualSince(clubIds);
+  for (const clubId of seeded) {
+    console.log(`[casual] club ${clubId} is now tracked — games played before this moment are ignored`);
+  }
+
   for (const clubId of clubIds) {
+    const start = since.get(clubId);
     for (const matchType of ['leagueMatch', 'playoffMatch'] as const) {
       try {
         const raw = await fetchClubMatches(clubId, platform, matchType);
         const parsed = raw
           .map(m => parseEaMatch(m, clubId, matchType))
-          .filter((m): m is CasualMatchInput => m !== null);
+          .filter((m): m is CasualMatchInput => m !== null && (!start || m.playedAt >= start));
         const added = await ingestCasualMatches(parsed);
         if (added.length > 0) {
           console.log(`[casual] club ${clubId}: +${added.length} new ${matchType === 'playoffMatch' ? 'playoff' : 'league'} match${added.length === 1 ? '' : 'es'}`);

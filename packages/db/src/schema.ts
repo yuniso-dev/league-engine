@@ -337,6 +337,14 @@ export const draftPool = pgTable('draft_pool', {
 // persona name and joined to users at query time via lower(ea_name), so a
 // player who links their EA ID later still claims their earlier matches.
 
+// A club's casual games only count from the moment it was added to
+// config.ea_club_ids — this table records that moment per club, so EA's
+// ~10-game history never backfills the leaderboard or the results feed.
+export const casualClubSince = pgTable('casual_club_since', {
+  clubId: text('club_id').primaryKey(),
+  since:  timestamp('since', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const casualMatches = pgTable('casual_matches', {
   matchId:      text('match_id').primaryKey(),  // EA's matchId — globally unique
   clubId:       text('club_id').notNull(),

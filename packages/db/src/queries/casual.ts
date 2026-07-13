@@ -1,6 +1,6 @@
-import { sql } from 'drizzle-orm';
+import { notInArray, sql } from 'drizzle-orm';
 import { getDb } from '../client';
-import { casualMatches, casualMatchPlayers } from '../schema';
+import { casualClubSince, casualMatches, casualMatchPlayers } from '../schema';
 
 // CASUAL realm: FC Clubs matches ingested from the EA Clubs API.
 // The bot writes (ingestCasualMatches); the website reads everything else.
@@ -35,6 +35,31 @@ export type CasualMatchInput = {
   result: 'win' | 'loss' | 'draw';
   players: CasualPlayerLine[];
 };
+
+/** Per-club "tracking since" watermarks. Seeds now() for clubs seen for the
+ *  first time, forgets clubs no longer configured (so re-adding one later
+ *  starts a fresh era), and returns every configured club's watermark. The
+ *  sync drops any EA game played before its club's watermark — adding a club
+ *  must never backfill its history into the leaderboard or the results feed. */
+export async function ensureCasualSince(
+  clubIds: string[],
+): Promise<{ since: Map<string, Date>; seeded: string[] }> {
+  const db = getDb();
+  if (clubIds.length === 0) return { since: new Map(), seeded: [] };
+
+  await db.delete(casualClubSince).where(notInArray(casualClubSince.clubId, clubIds));
+  const inserted = await db
+    .insert(casualClubSince)
+    .values(clubIds.map(clubId => ({ clubId })))
+    .onConflictDoNothing()
+    .returning({ clubId: casualClubSince.clubId });
+
+  const rows = await db.select().from(casualClubSince);
+  return {
+    since: new Map(rows.map(r => [r.clubId, r.since])),
+    seeded: inserted.map(r => r.clubId),
+  };
+}
 
 /** Merge freshly fetched matches. EA matchIds are globally unique, so re-polls
  *  are no-ops for matches we already hold. Returns the matchIds that were NEW —
