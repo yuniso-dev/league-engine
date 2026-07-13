@@ -467,3 +467,10 @@ create table if not exists match_guest_lines (
 );
 
 create index if not exists match_guest_lines_match_idx on match_guest_lines (match_id);
+
+-- Casual era watermarks: a club's games only count from the moment it was
+-- added to config.ea_club_ids — EA's ~10-game history never backfills.
+create table if not exists casual_club_since (
+    club_id text primary key,
+    since   timestamptz not null default now()
+);

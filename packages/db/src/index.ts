@@ -56,6 +56,7 @@ export {
 } from './queries/draftPool';
 export type { DraftPoolEntry } from './queries/draftPool';
 export {
+  ensureCasualSince,
   ingestCasualMatches,
   getCasualLeaderboard,
   getCasualHistory,

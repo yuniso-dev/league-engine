@@ -131,7 +131,8 @@ export default function SettingsForm({ config }: Props) {
           CASUAL — EA FC CLUBS
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Field label="EA Club ID(s)" caption="The club(s) the bot polls for casual matches — up to 6, comma-separated (find each ID in the club's URL on EA's site). League + playoff games from ALL of them feed the casual leaderboard and player stats. Blank = casual sync off.">
+          <Field label="EA Club ID(s)" caption="The club(s) the bot polls for casual matches — up to 6, comma-separated (find each ID in the club's URL on EA's site). League + playoff games from ALL of them feed the casual leaderboard and player stats. Games only count from the moment a club is added — its earlier EA history is never pulled in. Blank = casual sync off.">
+
             <input name="eaClubIds" defaultValue={config.eaClubIds ?? ''} autoComplete="off" placeholder="e.g. 118660,172389" style={inputBase} />
           </Field>
           <Field label="EA platform" caption="Cross-play pool: common-gen5 (PS5/Xbox Series/PC) or common-gen4 (PS4/Xbox One).">
