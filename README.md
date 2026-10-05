@@ -1,130 +1,61 @@
-# Inazuma FC
+# League Platform
 
-The web platform for **Inazuma FC**, a Discord-based EA FC Pro Clubs ranked league. It covers player profiles, ratings and rankings, tournaments, and a Discord bot, all backed by one shared database.
+A full-stack web platform and Discord bot for a competitive online football league. It handles player accounts, an Elo-based ranking system, tournaments, and automated community tooling, all on a shared database.
 
-> Live site: `https://<your-app>.vercel.app`
+## What it does
 
-## Features
-
-- **Discord sign-in**: players log in with their Discord account
-- **Player profiles and stats**: match history, ratings and rank
-- **Ranked league**: Elo-based ratings with tiered ranks
-- **Tournaments**: group and round-robin formats, scheduling and results
-- **Discord bot**: stats lookups, leaderboards, role and nickname sync, event signups
-- **Admin tools**: league management and an initialise flow for new seasons
+- **Discord sign-in:** players authenticate with their Discord account
+- **Player profiles:** stats, match history, rating and rank
+- **Ranking system:** a custom Elo model that weighs match result, match rating, expected result, opponent strength and goal difference, with tiered ranks
+- **Tournaments:** group and partial round-robin formats with scheduling and results
+- **Discord bot:** stats lookups, leaderboards, event signups, and automatic role and nickname sync
+- **Admin tooling:** season management and league setup
 
 ## Tech stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js (App Router), TypeScript |
-| Auth | Auth.js v5 (Discord provider) |
-| Database | PostgreSQL (Supabase) |
-| ORM / migrations | Drizzle ORM + drizzle-kit |
-| Hosting | Vercel |
-| Bot hosting | bot-hosting.net |
-| Package manager | pnpm (monorepo) |
+- Next.js (App Router) and TypeScript
+- Auth.js v5 with the Discord provider
+- PostgreSQL (Supabase) with Drizzle ORM
+- Vercel for the web app, a separate host for the bot
+- pnpm monorepo shared between the site and the bot
 
-## Project structure
+## Architecture
 
 ```
-.
-├── apps/
-│   ├── web/          # Next.js site
-│   └── bot/          # Discord bot
-├── packages/
-│   └── db/           # Drizzle schema, migrations, shared DB client
-├── pnpm-workspace.yaml
-└── README.md
+┌────────────┐     ┌──────────────┐
+│  Web app   │     │ Discord bot  │
+│ (Next.js)  │     │              │
+└─────┬──────┘     └──────┬───────┘
+      │                   │
+      └────────┬──────────┘
+               ▼
+        ┌─────────────┐
+        │  Postgres   │
+        │ (via Drizzle)│
+        └─────────────┘
 ```
 
-> Adjust the folder names to match your repo.
+The site and the bot share one schema package, so there is a single source of truth for the data model.
 
-## Getting started
+## Interesting problems
 
-### Prerequisites
+**Serverless database connections.** Serverless functions open a new connection per invocation, which exhausted the database under load. The fix was routing runtime traffic through a transaction pooler and keeping migrations on a direct connection, because migrations need session-level features the pooler doesn't support.
 
-- Node.js 20+
-- pnpm
-- A Supabase project (Postgres)
-- A Discord application (OAuth2 + bot token)
+**Ranking design.** The Elo variant combines several weighted components rather than win/loss alone. A lot of the work was reasoning about where the formula could be gamed or produce unfair swings, and how tiers should feel to players.
 
-### Install
+**Tournament formats.** A two-groups-of-three layout left a team idle for a whole round on a single pitch. A partial round-robin for six teams removed the idle time while keeping the competition fair.
 
-```bash
-git clone <repo-url>
-cd <repo>
-pnpm install
-```
+**Auth edge cases.** Silent sign-in failures turned out to be a missing session context and were fixed by moving to server actions. I also fixed a bug where the session token stored an internal ID instead of the Discord user ID.
 
-### Environment variables
+**Schema tooling.** A mismatch between the schema path used by the ORM tooling and the app caused silent breakage and a redirect loop, so Drizzle is now the single schema authority.
 
-Create `.env.local` in the web app:
+## What I learned
 
-```env
-# Database
-DATABASE_URL=postgresql://...:6543/postgres   # transaction pooler (runtime)
-DIRECT_URL=postgresql://...:5432/postgres     # direct connection (migrations only)
-
-# Auth.js
-AUTH_SECRET=
-AUTH_DISCORD_ID=
-AUTH_DISCORD_SECRET=
-AUTH_URL=http://localhost:3000
-
-# Discord bot
-DISCORD_BOT_TOKEN=
-DISCORD_GUILD_ID=
-```
-
-**Important:**
-- Vercel (serverless) must use the **transaction pooler on port 6543**. Direct connections on port 5432 exhaust connections at scale.
-- Run migrations against `DIRECT_URL`, not the pooler.
-
-### Database
-
-```bash
-pnpm drizzle-kit generate   # generate a migration from schema changes
-pnpm drizzle-kit migrate    # apply migrations (uses DIRECT_URL)
-```
-
-Drizzle is the schema authority. If you run `drizzle-kit pull`, check the output path matches the schema path the app imports, otherwise the ORM breaks silently.
-
-### Run locally
-
-```bash
-pnpm dev                    # web app on http://localhost:3000
-pnpm --filter bot dev       # Discord bot
-```
-
-## Deployment
-
-**Web (Vercel)**
-1. Import the repo into Vercel.
-2. Set the environment variables above, with `DATABASE_URL` pointing at the pooler (port 6543).
-3. Deploy.
-
-**Bot (bot-hosting.net)**
-1. Upload or connect the bot package.
-2. Set the bot environment variables.
-3. Make sure the bot's role sits **above** the roles it manages in Discord's role hierarchy, otherwise it cannot set nicknames.
-
-## Troubleshooting
-
-| Problem | Likely cause |
-|---|---|
-| Connection exhaustion in production | App is using port 5432 instead of the pooler on 6543 |
-| `signIn()` fails silently | Missing `SessionProvider` context. Use server actions for sign-in |
-| 404 or redirect loop on initialise | Drizzle schema path mismatch |
-| Bot can't change nicknames | Bot role is below the target role in the hierarchy |
-| Buttons not clickable in drag UI | `setPointerCapture` called on `onDown`. Defer it to `onMove` past a movement threshold |
-
-## Contributing
-
-1. Create a branch from `main`.
-2. Make your change and run `pnpm lint` and `pnpm build`.
-3. Open a pull request describing what changed and why.
+- Where serverless and traditional database assumptions clash
+- Designing a rating system from a fairness and player-experience angle
+- Building a web app and a bot around one shared data model
+- Explaining technical changes in plain language for non-technical users
 
 ## License
 
-Add a license here (e.g. MIT), or mark as private/all rights reserved.
+All rights reserved. Source is provided for viewing only.
